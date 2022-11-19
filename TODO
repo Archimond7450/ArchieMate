@@ -1,0 +1,16 @@
+# This week: Twitch Authentication
+
+https://www.nuget.org/packages/AspNet.Security.OAuth.Twitch/
+Twitch redirect_uri for production: https://archiemate.com/oauth/redirect/twitch
+Twitch redirect_uri for development: http://localhost/oauth/redirect/twitch
+
+# Soon
+
+Extend commands to use a property specifying badge requirement.
+BONUS: ... and properties specifying command and user cooldown.
+
+# Later
+
+Let commands have the ability to play a sound in addition to text response or have the possibility to not respond with text at all.
+Extend IdentityUser with user's Twitch ID, access token, refresh token and scopes, maybe boolean indicating if chatbot should join the user's channel
+New DB table Commands with columns twitch room id, regex, response

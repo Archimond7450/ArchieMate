@@ -1,0 +1,12 @@
+FROM nginx:alpine
+
+COPY ./nginx/default.conf /etc/nginx/conf.d
+COPY ./nginx/gzip.conf ./nginx/hsts.conf /etc/nginx/includes/
+COPY ./nginx/site.conf.debug.tpl /customization/
+COPY ./nginx/nginx.debug.sh /customization
+
+RUN chmod +x /customization/nginx.debug.sh
+
+EXPOSE 80
+
+CMD ["/customization/nginx.debug.sh"]

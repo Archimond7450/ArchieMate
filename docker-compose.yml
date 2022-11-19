@@ -1,0 +1,97 @@
+# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP .NET Core service.
+
+version: "3.4"
+
+services:
+  nginx:
+    image: archiemate/nginx
+    container_name: nginx
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+    env_file: .env
+    volumes:
+      - nginx_conf:/etc/nginx/sites
+      - letsencrypt_certs:/etc/letsencrypt
+      - certbot_acme_challenge:/var/www/certbot
+      - ./vhosts:/etc/nginx/vhosts
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    depends_on:
+      archiemate_frontend:
+        condition: service_healthy
+      archiemate_backend:
+        condition: service_healthy
+
+  certbot:
+    image: archiemate/certbot
+    container_name: certbot
+    build: ./certbot
+    env_file: .env
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - certbot_acme_challenge:/var/www/certbot
+    depends_on:
+      - nginx
+
+  archiemate_frontend:
+    image: archiemate/frontend
+    container_name: archiemate_frontend
+    build:
+      context: .
+      dockerfile: ./ArchieMate.Frontend/Dockerfile
+    expose:
+      - 3000
+    volumes:
+      - /app/node_modules
+      - /app/.next
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://archiemate_frontend:3000 || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  archiemate_backend:
+    image: archiemate/backend
+    container_name: archiemate_backend
+    build:
+      context: .
+      dockerfile: ./ArchieMate.Backend/Dockerfile
+    expose:
+      - 8080
+    volumes:
+      - ./logs:/logs:rw
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://archiemate_backend:8080/health/live || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  db:
+    image: postgres:14
+    container_name: db
+    shm_size: 256MB
+    expose:
+      - 5432
+    volumes:
+      - ./db/data:/var/lib/postgresql/data:rw
+    env_file: .env
+    healthcheck:
+      test: pg_isready -U archiemate -d archiemate_db
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  nginx_conf:
+  letsencrypt_certs:
+  certbot_acme_challenge:
