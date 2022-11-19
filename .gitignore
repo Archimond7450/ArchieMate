@@ -457,4 +457,7 @@ $RECYCLE.BIN/
 .env
 
 # PostgreSQL data from Docker
-pgdata/
+db/data/
+
+# Log files
+log*.txt
