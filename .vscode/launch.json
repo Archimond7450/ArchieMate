@@ -24,16 +24,7 @@
       "type": "coreclr",
       "request": "launch",
       "program": "${workspaceFolder}/ArchieMate.Backend/bin/Debug/net6.0/ArchieMate.Backend.dll",
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://+:8080",
-        "POSTGRES_DB": "archiemate_db",
-        "POSTGRES_USER": "archiemate",
-        "POSTGRES_PASSWORD": "Losyxt6hn8wg4eHau1UX",
-        "POSTGRES_HOST": "127.0.0.1",
-        "AuthOptions__Username": "archiemate",
-        "AuthOptions__Token": "gimz2kskbtf9cbi7i3jl8kjmp2ehhb"
-      },
+      "envFile": "${workspaceFolder}/.env",
       "justMyCode": false,
       "suppressJITOptimizations": true,
       "symbolOptions": {
