@@ -14,10 +14,11 @@ COPY ArchieMate.EventSub ./ArchieMate.EventSub
 COPY ArchieMate.Frontend ./ArchieMate.Frontend
 COPY ArchieMate.Helpers ./ArchieMate.Helpers
 COPY ArchieMate.TwitchIRC ./ArchieMate.TwitchIRC
+COPY Directory.Packages.props .
 WORKDIR /src
 
 FROM staging AS publish
-RUN dotnet publish "ArchieMate.Backend/ArchieMate.Backend.csproj" -c Release -o /app/publish /p:UseAppHost=false --nologo
+RUN dotnet publish "ArchieMate.Backend" -c Release -o /app/publish /p:UseAppHost=false --nologo
 
 FROM base AS final
 WORKDIR /app
