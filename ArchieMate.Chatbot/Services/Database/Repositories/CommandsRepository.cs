@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ArchieMate.Chatbot.Services.Database.Repositories;
 
-class CommandsRepository : ICommandsRepository
+public class CommandsRepository : ICommandsRepository
 {
     private readonly IDataContext context;
     private readonly ILogger<CommandsRepository> logger;
