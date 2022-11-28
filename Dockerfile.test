@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/dotnet/sdk:7.0-alpine
+RUN mkdir -p /src
+WORKDIR /src
+RUN apk update && apk add tzdata
+RUN apk add --update npm
+COPY ArchieMate.sln .
+COPY ArchieMate.Backend ./ArchieMate.Backend
+COPY ArchieMate.Chatbot ./ArchieMate.Chatbot
+COPY ArchieMate.Chatbot.UnitTests ./ArchieMate.Chatbot.UnitTests
+COPY ArchieMate.EventSub ./ArchieMate.EventSub
+COPY ArchieMate.EventSub.UnitTests ./ArchieMate.EventSub.UnitTests
+COPY ArchieMate.Frontend ./ArchieMate.Frontend
+COPY ArchieMate.Helpers ./ArchieMate.Helpers
+COPY ArchieMate.TwitchIRC ./ArchieMate.TwitchIRC
+COPY ArchieMate.TwitchIRC.UnitTests ./ArchieMate.TwitchIRC.UnitTests
+COPY Directory.Packages.props .
+RUN dotnet restore
+WORKDIR /src/ArchieMate.Frontend
+RUN npm install --include=dev
+WORKDIR /src
+RUN dotnet build
+ENTRYPOINT ["dotnet", "test"]
