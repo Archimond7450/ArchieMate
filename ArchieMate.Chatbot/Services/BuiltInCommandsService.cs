@@ -57,13 +57,11 @@ public class BuiltInCommandsService : IBuiltInCommandsService
     }
 
     private readonly ILogger<BuiltInCommandsService> logger;
-    private readonly IServiceProvider serviceProvider;
     private readonly IChannelsRepository channelsRepository;
     private readonly ICommandsRepository commandsRepository;
-    public BuiltInCommandsService(ILogger<BuiltInCommandsService> logger, IServiceProvider serviceProvider, IChannelsRepository channelsRepository, ICommandsRepository commandsRepository)
+    public BuiltInCommandsService(ILogger<BuiltInCommandsService> logger, IChannelsRepository channelsRepository, ICommandsRepository commandsRepository)
     {
         this.logger = logger;
-        this.serviceProvider = serviceProvider;
         this.channelsRepository = channelsRepository;
         this.commandsRepository = commandsRepository;
     }
