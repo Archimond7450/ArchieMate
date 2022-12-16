@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using System.Text.Json;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Builder;
+using ArchieMate.Chatbot.Services.Cache;
 
 namespace ArchieMate.Chatbot;
 
@@ -41,6 +42,8 @@ public static class ExtensionMethods
 
         services.AddScoped<IBuiltInCommandsService, BuiltInCommandsService>();
         services.AddScoped<ICommandsService, CommandsService>();
+
+        services.AddSingleton<IChannelMessageCacheService, ChannelMessageCacheService>();
 
         services.AddHealthChecks()
         .AddNpgSql(connectionString, name: "PostgreSQL DB", timeout: TimeSpan.FromSeconds(30), tags: new[] { DB_READY });

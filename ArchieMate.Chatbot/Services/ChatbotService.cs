@@ -1,12 +1,8 @@
-using System;
-using System.Globalization;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using System.Security.Cryptography;
 using System.Diagnostics;
 using ArchieMate.Chatbot.Models;
 using ArchieMate.Chatbot.Models.DTOs.Incoming;
 using ArchieMate.Chatbot.Options;
+using ArchieMate.Chatbot.Services.Cache;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.TwitchIRC;
 using ArchieMate.TwitchIRC.Messages.Incoming;
@@ -23,8 +19,9 @@ public class ChatbotService : BackgroundService
     private readonly ILogger<ChatbotService> logger;
     private readonly IServiceProvider serviceProvider;
     private readonly AuthOptions authOptions;
+    private readonly IChannelMessageCacheService channelMessageCacheService;
 
-    public ChatbotService(ILogger<ChatbotService> logger, IServiceProvider serviceProvider, IOptions<AuthOptions> authOptions)
+    public ChatbotService(ILogger<ChatbotService> logger, IServiceProvider serviceProvider, IOptions<AuthOptions> authOptions, IChannelMessageCacheService channelMessageCacheService)
     {
         this.logger = logger;
 
@@ -32,6 +29,9 @@ public class ChatbotService : BackgroundService
 
         this.serviceProvider = serviceProvider;
         this.authOptions = authOptions.Value;
+
+        this.channelMessageCacheService = channelMessageCacheService;
+
         this.irc = new IRC(this.logger, this.authOptions.Username, this.authOptions.Token);
     }
 
@@ -74,6 +74,11 @@ public class ChatbotService : BackgroundService
                     var message = await this.irc.ReceiveAsync();
                     if (message is PrivMsg privMsg)
                     {
+                        /*if (privMsg.Message.Contains('ᝬ'))
+                        {
+                            // delete message
+                        }*/
+
                         using (var scope = this.serviceProvider.CreateScope())
                         {
                             var commandsService = scope.ServiceProvider.GetRequiredService<ICommandsService>();
@@ -98,13 +103,20 @@ public class ChatbotService : BackgroundService
                                 if (response is string r && r.Length > 0)
                                 {
                                     await this.irc.SendMessageAsync(privMsg.Channel, await commandsService.ExpandVariablesAsync(r, privMsg, commandDetail));
+                                    continue; // Do not send commands invocations to tts
                                 }
+                            }
+
+                            if (privMsg.Username != privMsg.Channel /*&& privMsg.Username != this.authOptions.Username*/ && await channelsRepository.GetByNameAsync(privMsg.Channel) is Channel channel)
+                            {
+                                this.channelMessageCacheService.AddChannelMessage(channel.Id, privMsg);
                             }
                         }
                     }
                     else if (message is Ping pingMsg)
                     {
                         await this.irc.SendPongAsync();
+                        this.channelMessageCacheService.CleanCache();
                     }
                     else if (message is RoomState roomStateMsg)
                     {

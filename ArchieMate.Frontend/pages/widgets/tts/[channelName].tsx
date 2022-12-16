@@ -1,0 +1,367 @@
+import React from "react";
+import { useRouter } from "next/router";
+import channelMessageRepository, {
+  ChannelMessage,
+} from "../../../repositories/ChannelMessageRepository";
+import channelRepository from "../../../repositories/ChannelRepository";
+
+enum TextToSpeechWidgetStatus {
+  Initial,
+  GettingChannelId,
+  GettingLastMessage,
+  GettingNewestMessages,
+}
+
+const brianBaseURI =
+  "https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=";
+
+const makeBrianURI = (channelMessage: ChannelMessage): string => {
+  return `${brianBaseURI}${encodeURIComponent(
+    `${channelMessage.displayName} said: ${channelMessage.message}`
+  )}`;
+};
+
+interface TextToSpeechWidgetState {
+  status: TextToSpeechWidgetStatus;
+  channelId: string | null;
+  errorMessage: string;
+  lastRetrievedMessage: ChannelMessage | null;
+  queue: Array<ChannelMessage>;
+  currentURI: string;
+  cooldownSeconds: number;
+}
+
+const initialState: TextToSpeechWidgetState = {
+  status: TextToSpeechWidgetStatus.Initial,
+  channelId: null,
+  errorMessage: "",
+  lastRetrievedMessage: null,
+  queue: [],
+  currentURI: "",
+  cooldownSeconds: 10,
+};
+
+const TextToSpeechWidget = () => {
+  const router = useRouter();
+  const { channelName } = router.query;
+
+  const [state, setState] =
+    React.useState<TextToSpeechWidgetState>(initialState);
+
+  const createUpdatedState = React.useCallback(
+    (newState: Partial<TextToSpeechWidgetState>): TextToSpeechWidgetState => {
+      return { ...state, ...newState };
+    },
+    [state]
+  );
+
+  const {
+    status,
+    channelId,
+    errorMessage,
+    lastRetrievedMessage,
+    queue,
+    currentURI,
+    cooldownSeconds,
+  } = state;
+
+  const removeOneFromQueue = React.useCallback(() => {
+    let newQueue = [...queue];
+    newQueue.splice(0, 1);
+    return newQueue;
+  }, [queue]);
+
+  const afterPlayCooldown = () => {
+    console.log("Clearing current audio source");
+    setState(createUpdatedState({ currentURI: "" }));
+  };
+
+  const onPlayEnded = () => {
+    console.log("onPlayEnded");
+    if (cooldownSeconds > 0) {
+      setTimeout(() => {
+        afterPlayCooldown();
+      }, cooldownSeconds * 1000);
+    } else {
+      afterPlayCooldown();
+    }
+  };
+
+  React.useEffect(() => {
+    if (status === TextToSpeechWidgetStatus.Initial) {
+      const interval = setInterval(() => {
+        if (typeof channelName === "string" && channelName.length > 0) {
+          console.log("Channel name retrieved, changing status");
+          setState(
+            createUpdatedState({
+              status: TextToSpeechWidgetStatus.GettingChannelId,
+              errorMessage: "",
+            })
+          );
+        }
+      }, 100);
+
+      const timeout = setTimeout(() => {
+        console.log("Invalid channelName in address bar");
+        setState(
+          createUpdatedState({
+            errorMessage: "Invalid channelName",
+          })
+        );
+      }, 2500);
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [channelName, createUpdatedState, status]);
+
+  React.useEffect(() => {
+    if (status === TextToSpeechWidgetStatus.GettingChannelId) {
+      channelRepository
+        .getByNameAsync(channelName as string, (error) => {
+          console.log("Error when getting channel info");
+          setState(
+            createUpdatedState({
+              errorMessage: `Error when getting channel info: ${error}`,
+            })
+          );
+        })
+        .then((channel) => {
+          if (channel !== null) {
+            setState(
+              createUpdatedState({
+                status: TextToSpeechWidgetStatus.GettingLastMessage,
+                channelId: channel.id,
+                errorMessage: "",
+              })
+            );
+            console.log(channel);
+            console.log("Channel info retrieved, changing status again");
+          }
+        });
+    }
+  }, [channelName, createUpdatedState, status]);
+
+  React.useEffect(() => {
+    if (status === TextToSpeechWidgetStatus.GettingLastMessage) {
+      const interval = setInterval(() => {
+        channelMessageRepository
+          .getLastChannelMessage(channelId as string, (error) => {
+            clearInterval(interval);
+            console.log("Error while getting last message");
+            setState(
+              createUpdatedState({
+                errorMessage: `Error while getting last message: ${error}`,
+              })
+            );
+          })
+          .then((channelMessage) => {
+            if (channelMessage !== null) {
+              clearInterval(interval);
+              console.log(channelMessage);
+              console.log(
+                "Last message retrieved, changing status one last time"
+              );
+              setState(
+                createUpdatedState({
+                  status: TextToSpeechWidgetStatus.GettingNewestMessages,
+                  lastRetrievedMessage: channelMessage!,
+                  queue: [channelMessage!],
+                  errorMessage: "",
+                })
+              );
+            } else {
+              console.log("No message yet");
+            }
+          });
+      }, 1000);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [
+    channelName,
+    channelId,
+    createUpdatedState,
+    status,
+    lastRetrievedMessage,
+  ]);
+
+  React.useEffect(() => {
+    if (status === TextToSpeechWidgetStatus.GettingNewestMessages) {
+      const interval = setInterval(() => {
+        channelMessageRepository
+          .GetAllChannelMessagesFromCertainMessage(
+            channelId as string,
+            (lastRetrievedMessage as ChannelMessage).messageId,
+            (error) => {
+              clearInterval(interval);
+              console.log("Error while getting newest messages");
+              setState(
+                createUpdatedState({
+                  errorMessage: `Error while getting newest messages: ${error}`,
+                })
+              );
+            }
+          )
+          .then((channelMessages) => {
+            if (channelMessages !== null) {
+              console.log(channelMessages);
+              console.log("Newest messages retrieved");
+              setState(
+                createUpdatedState({
+                  queue: [
+                    ...queue,
+                    ...(channelMessages as Array<ChannelMessage>),
+                  ],
+                  lastRetrievedMessage: channelMessages[
+                    channelMessages.length - 1
+                  ] as ChannelMessage,
+                  errorMessage: "",
+                })
+              );
+            } else {
+              console.log("No newer messages");
+            }
+          });
+      }, 1000);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [
+    channelName,
+    channelId,
+    createUpdatedState,
+    lastRetrievedMessage,
+    queue,
+    status,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      status === TextToSpeechWidgetStatus.GettingNewestMessages &&
+      currentURI === ""
+    ) {
+      if (queue.length === 0) {
+        console.log("Queue is empty");
+      } else if (queue.length > 0) {
+        console.log("Queue is not empty, changing audio source");
+        setState(
+          createUpdatedState({
+            currentURI: makeBrianURI(queue[0]),
+            queue: removeOneFromQueue(),
+          })
+        );
+      }
+    }
+  }, [
+    currentURI,
+    createUpdatedState,
+    queue,
+    queue.length,
+    status,
+    removeOneFromQueue,
+  ]);
+
+  return (
+    <React.Fragment>
+      <audio
+        //ref={audioRef}
+        src={currentURI}
+        //controls
+        autoPlay
+        //controls
+        preload="auto"
+        /*onCanPlay={() => {
+          console.log("onCanPlay");
+        }}
+        onCanPlayThrough={() => {
+          onCanPlayThrough();
+        }}
+        onDurationChange={() => {
+          console.log("onDurationChange");
+        }}
+        onEmptied={() => {
+          console.log("onEmptied");
+        }}*/
+        onEnded={() => {
+          onPlayEnded();
+        }} /*
+        onLoadedData={() => {
+          console.log("onLoadedData");
+        }}
+        onLoadedMetadata={() => {
+          console.log("onLoadedMetadata");
+        }}
+        onPause={() => {
+          console.log("onPause");
+        }}
+        onPlay={() => {
+          console.log("onPlay");
+        }}
+        onPlaying={() => {
+          console.log("onPlaying");
+        }}
+        onRateChange={() => {
+          console.log("onRateChange");
+        }}
+        onSeeked={() => {
+          console.log("onSeeked");
+        }}
+        onSeeking={() => {
+          console.log("onSeeking");
+        }}
+        onStalled={() => {
+          console.log("onStalled");
+        }}
+        onSuspend={() => {
+          console.log("onSuspend");
+        }}
+        onTimeUpdate={() => {
+          console.log("onTimeUpdate");
+        }}
+        onVolumeChange={() => {
+          console.log("onVolumeChange");
+        }}
+        onWaiting={() => {
+          console.log("onWaiting");
+        }}*/
+      />
+      {status === TextToSpeechWidgetStatus.Initial && <p>Loading (0/3)</p>}
+      {status === TextToSpeechWidgetStatus.GettingChannelId && (
+        <p>Loading (1/3)</p>
+      )}
+      {status === TextToSpeechWidgetStatus.GettingLastMessage && (
+        <p>Loading (2/3)</p>
+      )}
+      {errorMessage !== "" && (
+        <React.Fragment>
+          <h1>Error</h1>
+          <p>{errorMessage}</p>
+        </React.Fragment>
+      )}
+      {currentURI !== "" && (
+        <React.Fragment>
+          <p>
+            <b>
+              {queue.length > 0
+                ? queue[0].displayName
+                : lastRetrievedMessage?.displayName}
+            </b>
+            &nbsp;said:
+          </p>
+          <p>
+            {queue.length > 0
+              ? queue[0].message
+              : lastRetrievedMessage?.message}
+          </p>
+        </React.Fragment>
+      )}
+    </React.Fragment>
+  );
+};
+
+export default TextToSpeechWidget;
