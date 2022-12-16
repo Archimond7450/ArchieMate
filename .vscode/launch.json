@@ -40,7 +40,7 @@
       "url": "http://localhost:8080",
       "webRoot": "${workspaceFolder}/ArchieMate.Frontend/",
       "runtimeArgs": [
-        "--load-extension=${env:userprofile}/AppData/Local/Google/Chrome/User Data/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.25.0_0"
+        "--load-extension=${env:userprofile}/AppData/Local/Google/Chrome/User Data/Default/Extensions/fmkadmapgofadopljbjfkapdkoienihi/4.27.1_0"
       ]
     }
   ]
