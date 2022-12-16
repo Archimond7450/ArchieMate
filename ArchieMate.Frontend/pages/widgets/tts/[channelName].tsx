@@ -29,6 +29,7 @@ interface TextToSpeechWidgetState {
   queue: Array<ChannelMessage>;
   currentURI: string;
   cooldownSeconds: number;
+  currentMessageData: ChannelMessage | null;
 }
 
 const initialState: TextToSpeechWidgetState = {
@@ -39,6 +40,7 @@ const initialState: TextToSpeechWidgetState = {
   queue: [],
   currentURI: "",
   cooldownSeconds: 10,
+  currentMessageData: null,
 };
 
 const TextToSpeechWidget = () => {
@@ -63,6 +65,7 @@ const TextToSpeechWidget = () => {
     queue,
     currentURI,
     cooldownSeconds,
+    currentMessageData,
   } = state;
 
   const removeOneFromQueue = React.useCallback(() => {
@@ -73,7 +76,7 @@ const TextToSpeechWidget = () => {
 
   const afterPlayCooldown = () => {
     console.log("Clearing current audio source");
-    setState(createUpdatedState({ currentURI: "" }));
+    setState(createUpdatedState({ currentURI: "", currentMessageData: null }));
   };
 
   const onPlayEnded = () => {
@@ -120,7 +123,7 @@ const TextToSpeechWidget = () => {
   React.useEffect(() => {
     if (status === TextToSpeechWidgetStatus.GettingChannelId) {
       channelRepository
-        .getByNameAsync(channelName as string, (error) => {
+        .getByNameAsync((channelName as string).toLowerCase(), (error) => {
           console.log("Error when getting channel info");
           setState(
             createUpdatedState({
@@ -168,7 +171,7 @@ const TextToSpeechWidget = () => {
                 createUpdatedState({
                   status: TextToSpeechWidgetStatus.GettingNewestMessages,
                   lastRetrievedMessage: channelMessage!,
-                  queue: [channelMessage!],
+                  queue: [],
                   errorMessage: "",
                 })
               );
@@ -210,15 +213,23 @@ const TextToSpeechWidget = () => {
             if (channelMessages !== null) {
               console.log(channelMessages);
               console.log("Newest messages retrieved");
+              const prefix = `@${(channelName as string).toLowerCase()}`;
+              const filteredMessages = channelMessages!
+                .filter((messageData) => {
+                  return messageData.message.toLowerCase().startsWith(prefix);
+                })
+                .map((messageData) => {
+                  const newMessageData = {
+                    ...messageData,
+                    message: messageData.message.substring(prefix.length),
+                  };
+                  return newMessageData;
+                });
               setState(
                 createUpdatedState({
-                  queue: [
-                    ...queue,
-                    ...(channelMessages as Array<ChannelMessage>),
-                  ],
-                  lastRetrievedMessage: channelMessages[
-                    channelMessages.length - 1
-                  ] as ChannelMessage,
+                  queue: [...queue, ...filteredMessages],
+                  lastRetrievedMessage:
+                    channelMessages![channelMessages.length - 1],
                   errorMessage: "",
                 })
               );
@@ -243,7 +254,8 @@ const TextToSpeechWidget = () => {
   React.useEffect(() => {
     if (
       status === TextToSpeechWidgetStatus.GettingNewestMessages &&
-      currentURI === ""
+      currentURI === "" &&
+      currentMessageData === null
     ) {
       if (queue.length === 0) {
         console.log("Queue is empty");
@@ -252,6 +264,7 @@ const TextToSpeechWidget = () => {
         setState(
           createUpdatedState({
             currentURI: makeBrianURI(queue[0]),
+            currentMessageData: queue[0],
             queue: removeOneFromQueue(),
           })
         );
@@ -264,6 +277,7 @@ const TextToSpeechWidget = () => {
     queue.length,
     status,
     removeOneFromQueue,
+    currentMessageData,
   ]);
 
   return (
@@ -343,21 +357,13 @@ const TextToSpeechWidget = () => {
           <p>{errorMessage}</p>
         </React.Fragment>
       )}
-      {currentURI !== "" && (
+      {currentMessageData !== null && (
         <React.Fragment>
           <p>
-            <b>
-              {queue.length > 0
-                ? queue[0].displayName
-                : lastRetrievedMessage?.displayName}
-            </b>
+            <b>{currentMessageData.displayName}</b>
             &nbsp;said:
           </p>
-          <p>
-            {queue.length > 0
-              ? queue[0].message
-              : lastRetrievedMessage?.message}
-          </p>
+          <p>{currentMessageData.message}</p>
         </React.Fragment>
       )}
     </React.Fragment>
