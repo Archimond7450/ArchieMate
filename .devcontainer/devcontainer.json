@@ -1,0 +1,39 @@
+{
+  "name": "Dev Container for ArchieMate",
+  "build": {
+    "dockerfile": "./Dockerfile",
+    "context": "."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "kreativ-software.csharpextensions",
+        "Fudge.auto-using",
+        "formulahendry.dotnet-test-explorer",
+        "dsznajder.es7-react-js-snippets",
+        "planbcoding.vscode-react-refactor",
+        "Orta.vscode-jest",
+        "christian-kohler.npm-intellisense",
+        "eamodio.gitlens",
+        "aaron-bond.better-comments",
+        "formulahendry.auto-rename-tag",
+        "mikestead.dotenv",
+        "andys8.jest-snippets",
+        "xabikos.JavaScriptSnippets",
+        "wayou.vscode-todo-highlight",
+        "vscode-icons-team.vscode-icons",
+        "dbaeumer.vscode-eslint",
+        "mhutchie.git-graph",
+        "cschleiden.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "oderwat.indent-rainbow",
+        "patcx.vscode-nuget-gallery",
+        "ckolkman.vscode-postgres",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "remoteUser": "root",
+  "runArgs": ["--env-file", ".devcontainer/devcontainer.env"]
+}
