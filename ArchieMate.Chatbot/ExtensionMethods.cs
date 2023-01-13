@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Builder;
 using ArchieMate.Chatbot.Services.Cache;
+using ArchieMate.Chatbot.Models;
 
 namespace ArchieMate.Chatbot;
 
@@ -39,6 +40,7 @@ public static class ExtensionMethods
         services.AddScoped<IChannelsRepository, ChannelsRepository>();
         services.AddScoped<ICommandsRepository, CommandsRepository>();
         services.AddScoped<IChannelVariablesRepository, ChannelVariablesRepository>();
+        services.AddScoped<IWidgetConfigurationsRepository<TTSWidgetConfiguration>, TTSWidgetConfigurationsRepository>();
 
         services.AddScoped<IBuiltInCommandsService, BuiltInCommandsService>();
         services.AddScoped<ICommandsService, CommandsService>();
@@ -93,10 +95,22 @@ public static class ExtensionMethods
     /// Checks and performs any unapplied database migrations
     /// </summary>
     /// <param name="scope">The temporary Service Scope on application startup</param>
-    public static void PerformDatabaseMigrations(this IServiceScope scope)
+    public static async Task PerformDatabaseMigrations(this IServiceScope scope)
     {
         var context = scope.ServiceProvider.GetRequiredService<PostgreSqlContext>();
+        var channelsRepository = scope.ServiceProvider.GetRequiredService<IChannelsRepository>();
+        var ttsWidgetConfigurationsRepository = scope.ServiceProvider.GetRequiredService<IWidgetConfigurationsRepository<TTSWidgetConfiguration>>();
 
         context.Database.Migrate();
+
+        var channels = await channelsRepository.GetAllAsync();
+        foreach (var channel in channels)
+        {
+            var ttsWidgetConfiguration = await ttsWidgetConfigurationsRepository.GetByChannelIdAsync(channel.Id);
+            if (ttsWidgetConfiguration is null)
+            {
+                await ttsWidgetConfigurationsRepository.AddAsync(channel.Id);
+            }
+        }
     }
 }

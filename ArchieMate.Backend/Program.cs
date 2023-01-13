@@ -39,7 +39,7 @@ try
     {
         // Force DB migrations before staring app
         app.Logger.LogInformation("Performing database migrations...");
-        scope.PerformDatabaseMigrations();
+        await scope.PerformDatabaseMigrations();
     }
 
     app.Logger.LogInformation("Starting");

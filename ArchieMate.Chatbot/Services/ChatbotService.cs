@@ -44,13 +44,14 @@ public class ChatbotService : BackgroundService
             using (var scope = this.serviceProvider.CreateScope())
             {
                 var channelsRepository = scope.ServiceProvider.GetRequiredService<IChannelsRepository>();
-                if (channelsRepository.GetByNameAsync(this.authOptions.Username).Result is null)
+                if (await channelsRepository.GetByNameAsync(this.authOptions.Username) is null)
                 {
-                    await channelsRepository.AddAsync(new Channel
+                    var newChannel = new Channel
                     {
                         Name = this.authOptions.Username,
                         Join = true
-                    });
+                    };
+                    await channelsRepository.AddAsync(newChannel);
                 }
             }
 

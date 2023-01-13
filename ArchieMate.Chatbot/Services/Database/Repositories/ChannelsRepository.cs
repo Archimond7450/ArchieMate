@@ -8,9 +8,11 @@ public class ChannelsRepository : IChannelsRepository
 {
     private readonly IDataContext context;
     private readonly ILogger<ChannelsRepository> logger;
+    private readonly IWidgetConfigurationsRepository<TTSWidgetConfiguration> ttsWidgetConfigurationsRepository;
 
-    public ChannelsRepository(IDataContext context, ILogger<ChannelsRepository> logger)
+    public ChannelsRepository(IDataContext context, IWidgetConfigurationsRepository<TTSWidgetConfiguration> ttsWidgetConfigurationsRepository, ILogger<ChannelsRepository> logger)
     {
+        this.ttsWidgetConfigurationsRepository = ttsWidgetConfigurationsRepository;
         this.context = context;
         this.logger = logger;
     }
@@ -18,6 +20,7 @@ public class ChannelsRepository : IChannelsRepository
     public async Task AddAsync(Channel channel)
     {
         await this.context.Channels.AddAsync(channel);
+        await this.ttsWidgetConfigurationsRepository.AddAsync(channel.Id);
         await this.context.SaveChangesAsync();
     }
 
