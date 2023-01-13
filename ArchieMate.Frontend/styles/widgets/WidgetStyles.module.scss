@@ -1,0 +1,29 @@
+#alertText {
+  padding: 24px;
+  text-shadow: 0px 0px 1px #000, 0px 0px 2px #000, 0px 0px 3px #000,
+    0px 0px 4px #000, 0px 0px 5px #000;
+}
+
+#alertHeader {
+  font-size: 32px;
+  color: rgb(255, 255, 255);
+  font-family: "Open Sans";
+  font-weight: 600;
+}
+
+#alertMessage {
+  font-size: 24px;
+  color: rgb(255, 255, 255);
+  font-family: "Open Sans";
+  font-weight: 600;
+}
+
+.highlightWrapper {
+  color: rgb(50, 195, 166);
+  position: relative;
+  text-align: center;
+}
+
+.highlight {
+  letter-spacing: -1px;
+}
