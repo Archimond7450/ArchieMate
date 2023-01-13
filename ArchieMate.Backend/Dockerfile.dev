@@ -1,0 +1,10 @@
+FROM mcr.microsoft.com/dotnet/sdk:7.0-alpine AS base
+WORKDIR /src
+EXPOSE 8080
+RUN apk update && apk add tzdata
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+ENV DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
+
+ENTRYPOINT ["dotnet", "watch", "--non-interactive", "--project", "ArchieMate.Backend"]
