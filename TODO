@@ -1,16 +1,42 @@
-# This week: Twitch Authentication
+# Rename ChatbotService to TwitchIRCService
+
+- That should be more proper name for the service as there will be probably more services like this for e.g. Discord or YouTube
+
+# Backend: Make TTS Widget remember the last message on received PING from Twitch IRC
+
+- Probably make a new entity in DB for that or change the implementation to redis (with possible backup file memory if Redis doesn't remember after restart)
+- Will fix the problem with infinite (until first message) loading after chatbot restarts
+
+# Backend: Filter out known chatbots messages from further processing
+
+- Maybe make two separate DB entities for this - one for global known chatbots and one for chatbots known in a channel
+
+# Frontend: Refactor TTS Widget
+
+- Use React Query
+- Use zod validation library
+
+# Frontend: Add configuration checking for TTS Widget
+
+# Add automated CI/CD pipeline
+
+# Change the backend developer image so that it uses dotnet watch command to keep rebuilding when a change occurs
+
+# Twitch Authentication
 
 https://www.nuget.org/packages/AspNet.Security.OAuth.Twitch/
 Twitch redirect_uri for production: https://archiemate.com/oauth/redirect/twitch
 Twitch redirect_uri for development: http://localhost/oauth/redirect/twitch
 
-# Soon
+# Extend commands to use a property specifying badge requirement.
 
-Extend commands to use a property specifying badge requirement.
 BONUS: ... and properties specifying command and user cooldown.
 
-# Later
+- Let commands have the ability to play a sound in addition to text response or have the possibility to not respond with text at all.
+- Extend IdentityUser with user's Twitch ID, access token, refresh token and scopes, maybe boolean indicating if chatbot should join the user's channel
+- New DB table Commands with columns twitch room id, regex, response
 
-Let commands have the ability to play a sound in addition to text response or have the possibility to not respond with text at all.
-Extend IdentityUser with user's Twitch ID, access token, refresh token and scopes, maybe boolean indicating if chatbot should join the user's channel
-New DB table Commands with columns twitch room id, regex, response
+# Documentation
+
+- Make comments in the code, use xml documentation
+- Set up swagger to display the documentation
