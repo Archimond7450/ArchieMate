@@ -36,26 +36,6 @@
         "${workspaceFolder}/ArchieMate.Backend/ArchieMate.Backend.csproj"
       ],
       "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "down",
-      "command": "docker-compose",
-      "type": "shell",
-      "args": ["-f", "${workspaceFolder}/docker-compose.debug.yml", "down"]
-    },
-    {
-      "label": "compose-debug",
-      "type": "docker-compose",
-      "dockerCompose": {
-        "up": {
-          "detached": true,
-          "build": true
-        },
-        "files": ["${workspaceFolder}/docker-compose.debug.yml"]
-      },
-      "problemMatcher": [],
-      "dependsOrder": "sequence",
-      "dependsOn": ["down"]
     }
   ]
 }
