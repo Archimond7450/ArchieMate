@@ -7,3 +7,7 @@ RUN apk update && apk add tzdata npm git openssh
 RUN dotnet tool install --global dotnet-ef
 
 RUN echo 'export PATH=$PATH:/root/.dotnet/tools/' >/root/.profile
+
+RUN mkdir -p /root/.ssh
+COPY .ssh /root/.ssh
+RUN chmod -R 600 /root/.ssh

@@ -461,3 +461,6 @@ db/data/
 
 # Log files
 log*.txt
+
+# SSH identity file for dev container's git
+.devcontainer/.ssh/github
