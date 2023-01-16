@@ -54,3 +54,7 @@ BONUS: ... and properties specifying command and user cooldown.
 ## Clips command
 
 - Simple usage - no arguments. Produces a table with favourite clips (similar to !commands)
+
+# Change the only Command endpoint to not use /channel
+
+- Should look like this: /api/commands/{channelName}
