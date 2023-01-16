@@ -1,3 +1,5 @@
+import { callErrorCallbackOnErrorAsync } from "./common";
+
 const rootEndpoint = "/api/channelmessage";
 
 export interface ChannelMessage {
@@ -20,13 +22,9 @@ class ChannelMessageRepository {
         return null;
       }
     }
-    if (onErrorCallback !== undefined) {
-      onErrorCallback(
-        `${response.status} - ${
-          response.statusText
-        } => ${await response.text()}`
-      );
-    }
+
+    callErrorCallbackOnErrorAsync(response, onErrorCallback);
+
     return null;
   }
 
@@ -46,13 +44,9 @@ class ChannelMessageRepository {
         return null;
       }
     }
-    if (onErrorCallback !== undefined) {
-      onErrorCallback(
-        `${response.status} - ${
-          response.statusText
-        } => ${await response.text()}`
-      );
-    }
+
+    callErrorCallbackOnErrorAsync(response, onErrorCallback);
+
     return null;
   }
 }
