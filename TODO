@@ -40,3 +40,17 @@ BONUS: ... and properties specifying command and user cooldown.
 
 - Make comments in the code, use xml documentation
 - Set up swagger to display the documentation
+
+# New built-in command to store favourite clips + another to list favourite clips?
+
+## Clip command
+
+- Docs: !clip (add|remove)? [name] [clip_url]
+- Adding: !clip add shivs https://clips.twitch.tv/PlayfulPiercingMagePogChamp-Xa3EBFn_Ih3VJvNj
+- Removal: !clip remove shivs
+- Usage like: !clip shivs
+- Limitation to not use add or remove as a name
+
+## Clips command
+
+- Simple usage - no arguments. Produces a table with favourite clips (similar to !commands)
