@@ -58,3 +58,9 @@ BONUS: ... and properties specifying command and user cooldown.
 # Change the only Command endpoint to not use /channel
 
 - Should look like this: /api/commands/{channelName}
+
+# Alias command
+
+- Usage: !alias !luck !clip luck
+
+# Make commands available even without exclamation marks
