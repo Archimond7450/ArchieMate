@@ -59,7 +59,7 @@ public class ChannelController : ControllerBase
 
         await this.channelsRepository.AddAsync(channelModel);
 
-        return CreatedAtAction(nameof(GetAsync), new { id = channelModel.Id }, channelModel.ToDTO());
+        return CreatedAtAction(nameof(GetAsync), new { Id = channelModel.Id }, channelModel.ToDTO());
     }
 
     [HttpPut("{id}")]
