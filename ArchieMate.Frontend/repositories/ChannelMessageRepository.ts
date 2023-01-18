@@ -1,4 +1,4 @@
-import { callErrorCallbackOnErrorAsync } from "./common";
+import { ErrorCallback, callErrorCallbackOnErrorAsync } from "./common";
 
 const rootEndpoint = "/api/channelmessage";
 
@@ -8,12 +8,16 @@ export interface ChannelMessage {
   message: string;
 }
 
+function constructEndpoint(endpoint: string = "") {
+  return endpoint.length > 0 ? `${rootEndpoint}/${endpoint}` : rootEndpoint;
+}
+
 class ChannelMessageRepository {
   async getLastChannelMessage(
     channelId: string,
-    onErrorCallback?: (error: string) => void
-  ): Promise<ChannelMessage | null> {
-    const response = await fetch(`${rootEndpoint}/${channelId}/last`);
+    onErrorCallback?: ErrorCallback
+  ) {
+    const response = await fetch(constructEndpoint(`${channelId}/last`));
     if (response.ok) {
       if (response.status === 200) {
         return (await response.json()) as ChannelMessage;
@@ -31,10 +35,10 @@ class ChannelMessageRepository {
   async GetAllChannelMessagesFromCertainMessage(
     channelId: string,
     messageFromId: string,
-    onErrorCallback?: (error: string) => void
-  ): Promise<Array<ChannelMessage> | null> {
+    onErrorCallback?: ErrorCallback
+  ) {
     const response = await fetch(
-      `${rootEndpoint}/${channelId}/from/${messageFromId}`
+      constructEndpoint(`${channelId}/from/${messageFromId}`)
     );
     if (response.ok) {
       if (response.status === 200) {
@@ -49,8 +53,18 @@ class ChannelMessageRepository {
 
     return null;
   }
+
+  async GetAll(onErrorCallback?: ErrorCallback) {
+    const response = await fetch(constructEndpoint());
+    if (response.ok) {
+      return (await response.json()) as Array<ChannelMessage>;
+    }
+
+    callErrorCallbackOnErrorAsync(response, onErrorCallback);
+
+    return null;
+  }
 }
 
-var channelMessageRepository: ChannelMessageRepository =
-  new ChannelMessageRepository();
+var channelMessageRepository = new ChannelMessageRepository();
 export default channelMessageRepository;

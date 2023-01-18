@@ -1,4 +1,4 @@
-import { callErrorCallbackOnErrorAsync } from "./common";
+import { ErrorCallback, callErrorCallbackOnErrorAsync } from "./common";
 
 const rootEndpoint = "/api/commands";
 
@@ -11,7 +11,7 @@ export interface Command {
 class CommandRepository {
   async getCommandsByChannelNameAsync(
     channelName: string,
-    onErrorCallback?: (error: string) => void
+    onErrorCallback?: ErrorCallback
   ) {
     const response = await fetch(`${rootEndpoint}/channel/${channelName}`);
     if (response.ok) {

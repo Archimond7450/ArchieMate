@@ -111,5 +111,5 @@ class ChannelRepository {
   }
 }
 
-var channelRepository: ChannelRepository = new ChannelRepository();
+var channelRepository = new ChannelRepository();
 export default channelRepository;
