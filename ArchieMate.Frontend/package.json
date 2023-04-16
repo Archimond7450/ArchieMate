@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "testWithCoverage": "jest --coverage"
   },
   "dependencies": {
     "@emotion/react": "^11.10.4",
@@ -16,39 +17,27 @@
     "@mui/material": "^5.10.6",
     "next": "12.3.1",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "ts-node": "^10.9.1"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^13.3.0",
     "@testing-library/dom": "^8.18.1",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@types/node": "18.7.20",
     "@types/react": "18.0.21",
     "@types/react-dom": "18.0.6",
+    "@typescript-eslint/eslint-plugin": "^5.58.0",
+    "@typescript-eslint/parser": "^5.58.0",
     "babel-jest": "^29.0.3",
     "cross-env": "^7.0.3",
     "eslint": "8.24.0",
     "eslint-config-next": "12.3.1",
-    "jest": "^29.0.3",
+    "eslint-config-prettier": "^8.6.0",
+    "jest": "^29.5.0",
     "jest-environment-jsdom": "^29.0.3",
     "sass": "^1.57.1",
     "typescript": "4.8.3"
-  },
-  "jest": {
-    "testPathIgnorePatterns": [
-      "<rootDir>/.next/",
-      "<rootDir>/node_modules/"
-    ],
-    "transform": {
-      "^.+\\.(js|jsx|ts|tsx)$": "<rootDir>/node_modules/babel-jest"
-    },
-    "moduleNameMapper": {
-      "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.ts",
-      "\\.(css|less)$": "<rootDir>/__mocks__/styleMock.ts"
-    },
-    "setupFilesAfterEnv": [
-      "./setupTests.ts"
-    ],
-    "testEnvironment": "jsdom"
   }
 }
