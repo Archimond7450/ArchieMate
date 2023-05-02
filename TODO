@@ -20,8 +20,6 @@
 
 # Add automated CI/CD pipeline
 
-# Change the backend developer image so that it uses dotnet watch command to keep rebuilding when a change occurs
-
 # Twitch Authentication
 
 https://www.nuget.org/packages/AspNet.Security.OAuth.Twitch/
@@ -64,3 +62,8 @@ BONUS: ... and properties specifying command and user cooldown.
 - Usage: !alias !luck !clip luck
 
 # Make commands available even without exclamation marks
+
+# Emotes
+
+- Backend needs to detect all emotes (not just Twitch, but BTTV, FrankerFaceZ and 7TV as well)
+- Frontend needs to use detected info about emotes to display them
