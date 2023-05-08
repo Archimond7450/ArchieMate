@@ -3,6 +3,7 @@ using ArchieMate.Chatbot.Services.Cache;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using ChatMessage = ArchieMate.Chatbot.Models.Message;
 
 namespace ArchieMate.Chatbot.Controllers
 {
@@ -21,9 +22,9 @@ namespace ArchieMate.Chatbot.Controllers
         [HttpGet("{channelId}/last")]
         public ActionResult<ChannelMessageDTO> GetLastChannelMessage(Guid channelId)
         {
-            if (this.channelMessageCacheService.GetLatestChannelMessage(channelId) is PrivMsg msg)
+            if (this.channelMessageCacheService.GetLatestChannelMessage(channelId) is ChatMessage msg)
             {
-                return Ok(new ChannelMessageDTO { MessageId = msg.MessageId, DisplayName = msg.DisplayName, Message = msg.Message });
+                return Ok(new ChannelMessageDTO { MessageId = msg.Id, DisplayName = msg.DisplayName, Message = msg.Text });
             }
 
             return NoContent();

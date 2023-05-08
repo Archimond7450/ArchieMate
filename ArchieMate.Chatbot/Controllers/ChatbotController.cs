@@ -9,18 +9,18 @@ namespace ArchieMate.Backend.Controllers;
 public class ChatbotController : ControllerBase
 {
     private readonly ILogger<ChatbotController> logger;
-    private readonly TwitchIRCService chatbotService;
+    private readonly TwitchIRCService twitchIRCService;
 
-    public ChatbotController(ILogger<ChatbotController> logger, TwitchIRCService chatbotService)
+    public ChatbotController(ILogger<ChatbotController> logger, TwitchIRCService twitchIRCService)
     {
         this.logger = logger;
-        this.chatbotService = chatbotService;
+        this.twitchIRCService = twitchIRCService;
     }
 
     [HttpGet("join")]
     public async Task<IActionResult> Join([FromQuery] string channelName)
     {
-        await this.chatbotService.JoinChannelAsync(channelName);
+        await this.twitchIRCService.JoinChannelAsync(channelName);
 
         return await Task.FromResult(NoContent());
     }
@@ -28,7 +28,7 @@ public class ChatbotController : ControllerBase
     [HttpGet("part")]
     public async Task<IActionResult> Part([FromQuery] string channelName)
     {
-        await this.chatbotService.LeaveChannelAsync(channelName);
+        await this.twitchIRCService.LeaveChannelAsync(channelName);
 
         return await Task.FromResult(NoContent());
     }
@@ -36,6 +36,6 @@ public class ChatbotController : ControllerBase
     [HttpGet("status")]
     public IActionResult Status()
     {
-        return Ok(this.chatbotService.GetActiveChannels());
+        return Ok(this.twitchIRCService.GetActiveChannels());
     }
 }

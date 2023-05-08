@@ -110,14 +110,14 @@ public class TwitchIRCService : BackgroundService
 
                             if (privMsg.Username != privMsg.Channel /*&& privMsg.Username != this.authOptions.Username*/ && await channelsRepository.GetByNameAsync(privMsg.Channel) is Channel channel)
                             {
-                                this.channelMessageCacheService.AddChannelMessage(channel.Id, privMsg);
+                                await this.channelMessageCacheService.AddChannelMessage(channel.Id, privMsg);
                             }
                         }
                     }
                     else if (message is Ping pingMsg)
                     {
                         await this.irc.SendPongAsync();
-                        this.channelMessageCacheService.CleanCache();
+                        await this.channelMessageCacheService.CleanCacheAndBackup();
                     }
                     else if (message is RoomState roomStateMsg)
                     {

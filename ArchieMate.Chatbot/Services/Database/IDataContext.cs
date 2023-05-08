@@ -9,6 +9,7 @@ public interface IDataContext
     DbSet<Command> Commands { get; set; }
     DbSet<ChannelVariable> ChannelVariables { get; set; }
     DbSet<TTSWidgetConfiguration> TTSWidgetConfigurations { get; set; }
+    DbSet<Message> Messages { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

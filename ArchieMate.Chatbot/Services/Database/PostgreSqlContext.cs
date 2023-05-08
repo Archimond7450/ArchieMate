@@ -5,10 +5,11 @@ namespace ArchieMate.Chatbot.Services.Database;
 
 public class PostgreSqlContext : DbContext, IDataContext
 {
-    public DbSet<Channel> Channels { get; set; } = default!;
-    public DbSet<Command> Commands { get; set; } = default!;
-    public DbSet<ChannelVariable> ChannelVariables { get; set; } = default!;
-    public DbSet<TTSWidgetConfiguration> TTSWidgetConfigurations { get; set; } = default!;
+    public required DbSet<Channel> Channels { get; set; }
+    public required DbSet<Command> Commands { get; set; }
+    public required DbSet<ChannelVariable> ChannelVariables { get; set; }
+    public required DbSet<TTSWidgetConfiguration> TTSWidgetConfigurations { get; set; }
+    public required DbSet<Message> Messages { get; set; }
 
     public PostgreSqlContext(DbContextOptions<PostgreSqlContext> options) : base(options)
     {

@@ -41,6 +41,7 @@ public static class ExtensionMethods
         services.AddScoped<ICommandsRepository, CommandsRepository>();
         services.AddScoped<IChannelVariablesRepository, ChannelVariablesRepository>();
         services.AddScoped<IWidgetConfigurationsRepository<TTSWidgetConfiguration>, TTSWidgetConfigurationsRepository>();
+        services.AddScoped<IMessagesRepository, MessagesRepository>();
 
         services.AddScoped<IBuiltInCommandsService, BuiltInCommandsService>();
         services.AddScoped<ICommandsService, CommandsService>();
