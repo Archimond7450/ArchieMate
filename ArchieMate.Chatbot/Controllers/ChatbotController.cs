@@ -9,9 +9,9 @@ namespace ArchieMate.Backend.Controllers;
 public class ChatbotController : ControllerBase
 {
     private readonly ILogger<ChatbotController> logger;
-    private readonly ChatbotService chatbotService;
+    private readonly TwitchIRCService chatbotService;
 
-    public ChatbotController(ILogger<ChatbotController> logger, ChatbotService chatbotService)
+    public ChatbotController(ILogger<ChatbotController> logger, TwitchIRCService chatbotService)
     {
         this.logger = logger;
         this.chatbotService = chatbotService;

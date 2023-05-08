@@ -13,15 +13,15 @@ using Microsoft.Extensions.Options;
 
 namespace ArchieMate.Chatbot.Services;
 
-public class ChatbotService : BackgroundService
+public class TwitchIRCService : BackgroundService
 {
     private IRC irc;
-    private readonly ILogger<ChatbotService> logger;
+    private readonly ILogger<TwitchIRCService> logger;
     private readonly IServiceProvider serviceProvider;
     private readonly AuthOptions authOptions;
     private readonly IChannelMessageCacheService channelMessageCacheService;
 
-    public ChatbotService(ILogger<ChatbotService> logger, IServiceProvider serviceProvider, IOptions<AuthOptions> authOptions, IChannelMessageCacheService channelMessageCacheService)
+    public TwitchIRCService(ILogger<TwitchIRCService> logger, IServiceProvider serviceProvider, IOptions<AuthOptions> authOptions, IChannelMessageCacheService channelMessageCacheService)
     {
         this.logger = logger;
 

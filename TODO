@@ -1,7 +1,3 @@
-# Rename ChatbotService to TwitchIRCService
-
-- That should be more proper name for the service as there will be probably more services like this for e.g. Discord or YouTube
-
 # Backend: Make TTS Widget remember the last message on received PING from Twitch IRC
 
 - Probably make a new entity in DB for that or change the implementation to redis (with possible backup file memory if Redis doesn't remember after restart)

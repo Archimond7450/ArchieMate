@@ -23,8 +23,8 @@ public static class ExtensionMethods
     {
         services.Configure<AuthOptions>(configuration.GetSection(nameof(AuthOptions)));
 
-        services.AddSingleton<ChatbotService>();
-        services.AddHostedService<ChatbotService>(provider => provider.GetRequiredService<ChatbotService>());
+        services.AddSingleton<TwitchIRCService>();
+        services.AddHostedService<TwitchIRCService>(provider => provider.GetRequiredService<TwitchIRCService>());
 
         // Construct the connection string to the DB
         var postgresDb = Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.POSTGRES_DB);
