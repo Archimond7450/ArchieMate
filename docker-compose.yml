@@ -24,6 +24,10 @@ services:
         condition: service_healthy
       archiemate_backend:
         condition: service_healthy
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "10"
 
   certbot:
     image: archiemate/certbot
@@ -35,6 +39,10 @@ services:
       - certbot_acme_challenge:/var/www/certbot
     depends_on:
       - nginx
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "10"
 
   archiemate_frontend:
     image: archiemate/frontend
@@ -53,6 +61,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "10"
 
   archiemate_backend:
     image: archiemate/backend
@@ -76,6 +88,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "10"
 
   archiemate_db:
     image: archiemate/db
@@ -95,6 +111,10 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "10"
 
 volumes:
   nginx_conf:
