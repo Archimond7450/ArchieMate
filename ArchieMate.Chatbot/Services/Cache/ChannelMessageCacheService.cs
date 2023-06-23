@@ -25,22 +25,26 @@ namespace ArchieMate.Chatbot.Services.Cache
 
         public async Task AddChannelMessage(Guid channelId, PrivMsg msg)
         {
-            this.logger.LogDebug($"ChannelMessageCacheService.AddChannelMessage(${channelId}, ${msg.Message}");
+            this.logger.LogDebug($"ChannelMessageCacheService.AddChannelMessage({channelId}, {msg.Message}");
 
             using (var scope = this.serviceProvider.CreateScope())
             {
                 var channelsRepository = scope.ServiceProvider.GetRequiredService<IChannelsRepository>();
                 var message = await ChatMessage.FromTwitchPrivMsg(msg, channelsRepository);
+
                 if (message is null)
                 {
+                    this.logger.LogError("Converted message ready to be cached is null!");
                     return;
                 }
+                this.logger.LogDebug($"Message ready to be cached: {message}");
                 EnsureOneCacheIsCreated(channelId).Add(message);
             }
         }
 
         public ChatMessage GetLatestChannelMessage(Guid channelId)
         {
+            this.logger.LogDebug($"ChannelMessageCacheService.GetLatestChannelMessage({channelId})");
             return EnsureOneCacheIsCreated(channelId).Last();
         }
 
