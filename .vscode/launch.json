@@ -5,18 +5,14 @@
   },
   "configurations": [
     {
-      "name": "Backend",
-      "type": "coreclr",
-      "request": "launch",
-      "program": "${workspaceFolder}/ArchieMate.Backend/bin/Debug/net6.0/ArchieMate.Backend.dll",
-      "envFile": "${workspaceFolder}/.env",
-      "justMyCode": false,
-      "suppressJITOptimizations": true,
-      "symbolOptions": {
-        "searchPaths": [],
-        "searchMicrosoftSymbolServer": false,
-        "searchNuGetOrgSymbolServer": false
-      }
+      "name": "Attach to backend in Docker",
+      "type": "docker",
+      "request": "attach",
+      "platform": "netCore",
+      "sourceFileMap": {
+        "/src": "${workspaceFolder}"
+      },
+      "containerName": "archiemate_backend"
     },
     {
       "name": "Frontend only on Chrome",
