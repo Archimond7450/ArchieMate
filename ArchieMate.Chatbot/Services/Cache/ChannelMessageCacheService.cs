@@ -51,7 +51,11 @@ namespace ArchieMate.Chatbot.Services.Cache
             {
                 return EnsureOneCacheIsCreated(channelId).Last();
             }
-            this.logger.LogDebug($"No messages yet for channelId: {channelId");
+            catch (InvalidOperationException)
+            {
+
+            }
+            this.logger.LogDebug($"No messages yet for channelId: {channelId}");
             return null;
         }
 
