@@ -7,9 +7,12 @@ interface HighlightWrapperProps {
 }
 
 const HighlightWrapper = (props: HighlightWrapperProps) => {
-  const highlightLetters = (letter: string) => {
+  const highlightLetters = (letter: string, index: number) => {
     return (
-      <span className={`${Animations.animatedLetter} ${Animations.wiggle}`}>
+      <span
+        key={`highlight-letter-${index}`}
+        className={`${Animations.animatedLetter} ${Animations.wiggle}`}
+      >
         {letter}
       </span>
     );

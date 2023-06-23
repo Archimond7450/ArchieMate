@@ -161,6 +161,15 @@ const TextToSpeechWidget = () => {
                 errorMessage: `Error while getting last message: ${error}`,
               })
             );
+            setTimeout(() => {
+              setState(
+                createUpdatedState({
+                  status: TextToSpeechWidgetStatus.GettingChannelId,
+                  channelId: null,
+                  errorMessage: "",
+                })
+              );
+            }, 1000);
           })
           .then((channelMessage) => {
             if (channelMessage !== null) {
@@ -172,7 +181,7 @@ const TextToSpeechWidget = () => {
               setState(
                 createUpdatedState({
                   status: TextToSpeechWidgetStatus.GettingNewestMessages,
-                  lastRetrievedMessage: channelMessage!,
+                  lastRetrievedMessage: channelMessage,
                   queue: [],
                   errorMessage: "",
                 })
@@ -209,6 +218,14 @@ const TextToSpeechWidget = () => {
                   errorMessage: `Error while getting newest messages: ${error}`,
                 })
               );
+              setTimeout(() => {
+                setState(
+                  createUpdatedState({
+                    status: TextToSpeechWidgetStatus.GettingLastMessage,
+                    errorMessage: "",
+                  })
+                );
+              }, 1000);
             }
           )
           .then((channelMessages) => {
@@ -216,7 +233,7 @@ const TextToSpeechWidget = () => {
               console.log(channelMessages);
               console.log("Newest messages retrieved");
               const prefix = `@${(channelName as string).toLowerCase()}`;
-              const filteredMessages = channelMessages!
+              const filteredMessages = channelMessages
                 .filter((messageData) => {
                   return true;
                   //return messageData.message.toLowerCase().startsWith(prefix);
