@@ -17,11 +17,16 @@ class MessagesRepository : IMessagesRepository
 
     public async Task AddAsync(Message message)
     {
-        if (await this.context.Messages.FindAsync(message.ChannelId) is Message existingMessage)
+        try
         {
-            this.context.Messages.Update(existingMessage);
+            var existingMessage = await this.context.Messages.SingleAsync(msg => msg.ChannelId == message.ChannelId);
+            if (existingMessage.Id != message.Id)
+            {
+                this.context.Messages.Remove(existingMessage);
+                await this.context.Messages.AddAsync(message);
+            }
         }
-        else
+        catch (System.InvalidOperationException)
         {
             await this.context.Messages.AddAsync(message);
         }

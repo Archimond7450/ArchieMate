@@ -33,14 +33,14 @@ namespace ArchieMate.Chatbot.Controllers
         [HttpGet("{channelId}/from/{messageFromId}")]
         public ActionResult<IEnumerable<ChannelMessageDTO>> GetAllChannelMessagesFromCertainMessage(Guid channelId, Guid messageFromId)
         {
-            if (this.channelMessageCacheService.GetChannelMessagesFrom(channelId, messageFromId) is IEnumerable<PrivMsg> messages)
+            if (this.channelMessageCacheService.GetChannelMessagesFrom(channelId, messageFromId) is IEnumerable<ChatMessage> messages)
             {
                 if (messages.Count() == 0)
                 {
                     return NoContent();
                 }
 
-                return Ok(messages.Select(msg => new ChannelMessageDTO { MessageId = msg.MessageId, DisplayName = msg.DisplayName, Message = msg.Message }));
+                return Ok(messages.Select(msg => new ChannelMessageDTO { MessageId = msg.Id, DisplayName = msg.DisplayName, Message = msg.Text }));
             }
 
             return NotFound();
