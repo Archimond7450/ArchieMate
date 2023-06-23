@@ -22,6 +22,7 @@ interface LinkType {
   icon: JSX.Element;
   text: string;
   href: string;
+  cy: string;
 }
 
 const iconStyles = {
@@ -31,11 +32,17 @@ const iconStyles = {
 };
 
 const pages: LinkType[] = [
-  { icon: <HomeIcon sx={iconStyles} />, text: "Home", href: "/" },
   {
-    icon: <ArticleIcon sx={iconStyles} />,
+    icon: <HomeIcon data-cy="appbar-home-icon" sx={iconStyles} />,
+    text: "Home",
+    href: "/",
+    cy: "appbar-home",
+  },
+  {
+    icon: <ArticleIcon data-cy="appbar-docs-icon" sx={iconStyles} />,
     text: "Docs",
     href: "/docs",
+    cy: "appbar-docs",
   },
 ];
 const settings: LinkType[] = [
@@ -43,11 +50,13 @@ const settings: LinkType[] = [
     icon: <DashboardIcon sx={iconStyles} />,
     text: "Dashboard",
     href: "/dashboard",
+    cy: "appbar-dashboard",
   },
   {
     icon: <LogoutIcon sx={iconStyles} />,
     text: "Logout",
     href: "/logout",
+    cy: "appbar-logout",
   },
 ];
 
@@ -80,7 +89,7 @@ const ResponsiveAppBar = () => {
         <Container maxWidth="xl">
           <Toolbar disableGutters>
             <AdbIcon sx={{ display: { xs: "none", md: "flex" }, mr: 1 }} />
-            <Link href="/" passHref>
+            <Link href="/" passHref data-cy="appbar-logo">
               <Typography
                 variant="h6"
                 noWrap
@@ -153,7 +162,7 @@ const ResponsiveAppBar = () => {
               </Menu>
             </Box>
             <AdbIcon sx={{ display: { xs: "flex", md: "none" }, mr: 1 }} />
-            <Link href="/" passHref>
+            <Link href="/" passHref data-cy="appbar-home">
               <Typography
                 variant="h5"
                 noWrap

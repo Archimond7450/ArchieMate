@@ -1,0 +1,97 @@
+# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP .NET Core service.
+
+version: "3.4"
+
+services:
+  archiemate_frontend_cypress:
+    image: archiemate/frontend_cypress
+    container_name: archiemate_frontend_cypress
+    build:
+      context: .
+      dockerfile: ./ArchieMate.Frontend/Dockerfile.dev
+    expose:
+      - 3000
+    volumes:
+      - ./ArchieMate.Frontend:/app:rw
+    depends_on:
+      archiemate_db_cypress:
+        condition: service_healthy
+      archiemate_backend_cypress:
+        condition: service_healthy
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://archiemate_frontend_cypress:3000 || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 1000
+    restart: unless-stopped
+
+  archiemate_backend_cypress:
+    image: archiemate/backend_cypress
+    container_name: archiemate_backend_cypress
+    build:
+      context: .
+      dockerfile: ./ArchieMate.Backend/Dockerfile.dev
+    expose:
+      - 8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - ~/.vsdbg:/remote_debugger:rw
+      - .:/src:rw
+    env_file: .env
+    depends_on:
+      archiemate_db_cypress:
+        condition: service_healthy
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://archiemate_backend:8080/health/live || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 1000
+    restart: unless-stopped
+
+  archiemate_nginx_cypress:
+    image: archiemate/nginx_cypress
+    container_name: archiemate_nginx_cypress
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile.dev
+    env_file: .env
+    volumes:
+      - ./vhosts:/etc/nginx/vhosts
+    ports:
+      - 8484:80
+    depends_on:
+      archiemate_frontend_cypress:
+        condition: service_healthy
+      archiemate_backend_cypress:
+        condition: service_healthy
+    restart: unless-stopped
+
+  archiemate_db_cypress:
+    image: postgres:14
+    container_name: archiemate_db_cypress
+    expose:
+      - 5432
+    ports:
+      - 5432:5432
+    env_file: .env
+    healthcheck:
+      test: pg_isready -U archiemate -d archiemate_db
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  archiemate_cypress:
+    image: archiemate/cypress
+    container_name: archiemate_cypress
+    build:
+      context: .
+      dockerfile: ./ArchieMate.Frontend/Dockerfile.dev
+    command: ["npm", "run", "cypress:run"]
+    network_mode: "host"
+    volumes:
+      - ./ArchieMate.Frontend:/app:rw
+    depends_on:
+      archiemate_nginx_cypress:
+        condition: service_healthy
