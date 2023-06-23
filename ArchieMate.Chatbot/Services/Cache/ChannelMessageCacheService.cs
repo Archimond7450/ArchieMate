@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using ChatMessage = ArchieMate.Chatbot.Models.Message;
@@ -42,10 +44,15 @@ namespace ArchieMate.Chatbot.Services.Cache
             }
         }
 
-        public ChatMessage GetLatestChannelMessage(Guid channelId)
+        public ChatMessage? GetLatestChannelMessage(Guid channelId)
         {
             this.logger.LogDebug($"ChannelMessageCacheService.GetLatestChannelMessage({channelId})");
-            return EnsureOneCacheIsCreated(channelId).Last();
+            try
+            {
+                return EnsureOneCacheIsCreated(channelId).Last();
+            }
+            this.logger.LogDebug($"No messages yet for channelId: {channelId");
+            return null;
         }
 
         public IEnumerable<ChatMessage>? GetChannelMessagesFrom(Guid channelId, Guid messageFromId)
