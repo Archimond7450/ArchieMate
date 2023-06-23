@@ -11,6 +11,8 @@ services:
       dockerfile: ./ArchieMate.Frontend/Dockerfile.dev
     expose:
       - 3000
+    ports:
+      - 9229:9229
     volumes:
       - ./ArchieMate.Frontend:/app:rw
       - /app/node_modules
