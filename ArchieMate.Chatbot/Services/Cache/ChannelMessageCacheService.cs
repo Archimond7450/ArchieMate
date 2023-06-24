@@ -47,16 +47,14 @@ namespace ArchieMate.Chatbot.Services.Cache
         public ChatMessage? GetLatestChannelMessage(Guid channelId)
         {
             this.logger.LogDebug($"ChannelMessageCacheService.GetLatestChannelMessage({channelId})");
-            try
-            {
-                return EnsureOneCacheIsCreated(channelId).Last();
-            }
-            catch (InvalidOperationException)
-            {
 
+            var cache = EnsureOneCacheIsCreated(channelId);
+            if (!cache.Any())
+            {
+                this.logger.LogDebug($"No messages yet for channelId: {channelId}");
+                return null;
             }
-            this.logger.LogDebug($"No messages yet for channelId: {channelId}");
-            return null;
+            return EnsureOneCacheIsCreated(channelId).Last();
         }
 
         public IEnumerable<ChatMessage>? GetChannelMessagesFrom(Guid channelId, Guid messageFromId)
