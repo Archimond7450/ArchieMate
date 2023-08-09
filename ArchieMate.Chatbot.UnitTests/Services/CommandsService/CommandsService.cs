@@ -2,7 +2,7 @@ using ArchieMate.Chatbot.Services;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Moq;
+using NSubstitute;
 
 namespace ArchieMate.Chatbot.UnitTests.Services;
 
@@ -19,9 +19,9 @@ public class CommandsServiceDecodeTests
 
     public CommandsServiceDecodeTests()
     {
-        var loggerMock = new Mock<ILogger<CommandsService>>();
-        var channelVariablesRepositoryMock = new Mock<IChannelVariablesRepository>();
-        this.commandsService = new CommandsService(loggerMock.Object, channelVariablesRepositoryMock.Object);
+        var loggerMock = Substitute.For<ILogger<CommandsService>>();
+        var channelVariablesRepositoryMock = Substitute.For<IChannelVariablesRepository>();
+        this.commandsService = new CommandsService(loggerMock, channelVariablesRepositoryMock);
     }
 
     [Fact]

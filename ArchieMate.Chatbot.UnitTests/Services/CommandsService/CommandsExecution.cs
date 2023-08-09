@@ -5,7 +5,7 @@ using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Moq;
+using NSubstitute;
 using TwitchMessage = ArchieMate.TwitchIRC.Messages.Incoming.Message;
 
 namespace ArchieMate.Chatbot.UnitTests.Services
@@ -28,23 +28,23 @@ namespace ArchieMate.Chatbot.UnitTests.Services
             ExpectedResponse = ""
         };
 
-        Mock<IChannelVariablesRepository> channelVariablesRepository;
-        Mock<ICommandsRepository> commandsRepository;
-        Mock<IChannelsRepository> channelsRepository;
+        IChannelVariablesRepository channelVariablesRepository;
+        ICommandsRepository commandsRepository;
+        IChannelsRepository channelsRepository;
         ICommandsService commandsService;
         IBuiltInCommandsService builtInCommandsService;
 
         public CommandsExecution()
         {
-            var channelVariablesRepositoryLogger = new Mock<ILogger<IChannelVariablesRepository>>();
-            var commandsServiceLogger = new Mock<ILogger<CommandsService>>();
-            var builtInCommandsServiceLogger = new Mock<ILogger<BuiltInCommandsService>>();
+            var channelVariablesRepositoryLogger = Substitute.For<ILogger<IChannelVariablesRepository>>();
+            var commandsServiceLogger = Substitute.For<ILogger<CommandsService>>();
+            var builtInCommandsServiceLogger = Substitute.For<ILogger<BuiltInCommandsService>>();
 
-            this.commandsRepository = new Mock<ICommandsRepository>();
-            this.channelsRepository = new Mock<IChannelsRepository>();
-            this.channelVariablesRepository = new Mock<IChannelVariablesRepository>();
-            this.commandsService = new CommandsService(commandsServiceLogger.Object, channelVariablesRepository.Object);
-            this.builtInCommandsService = new BuiltInCommandsService(builtInCommandsServiceLogger.Object, this.channelsRepository.Object, commandsRepository.Object);
+            this.commandsRepository = Substitute.For<ICommandsRepository>();
+            this.channelsRepository = Substitute.For<IChannelsRepository>();
+            this.channelVariablesRepository = Substitute.For<IChannelVariablesRepository>();
+            this.commandsService = new CommandsService(commandsServiceLogger, channelVariablesRepository);
+            this.builtInCommandsService = new BuiltInCommandsService(builtInCommandsServiceLogger, this.channelsRepository, commandsRepository);
         }
 
         [Fact]
@@ -61,7 +61,7 @@ namespace ArchieMate.Chatbot.UnitTests.Services
             };
 
             IEnumerable<ChannelVariable> channelVariables = new List<ChannelVariable>() { };
-            this.channelVariablesRepository.Setup(r => r.GetAllAsync()).ReturnsAsync(channelVariables);
+            this.channelVariablesRepository.GetAllAsync().Returns(channelVariables);
 
             var command = new Command
             {
@@ -87,8 +87,8 @@ namespace ArchieMate.Chatbot.UnitTests.Services
                 return;
             }
 
-            this.channelsRepository.Setup(r => r.GetByNameAsync(channel.Name)).ReturnsAsync(channel);
-            this.commandsRepository.Setup(r => r.GetByChannelAndNameAsync(channel.Name, TestCaseTime.CommandName)).ReturnsAsync(command);
+            this.channelsRepository.GetByNameAsync(channelName).Returns(channel);
+            this.commandsRepository.GetByChannelAndNameAsync(channel.Name, TestCaseTime.CommandName).Returns(command);
 
             // Act
             var commandDetail = this.commandsService.DecodeCommand(privMsg.Message);
@@ -105,7 +105,7 @@ namespace ArchieMate.Chatbot.UnitTests.Services
                 return;
             }
 
-            var commandFromDb = await this.commandsRepository.Object.GetByChannelAndNameAsync(privMsg.Channel, commandDetail.CommandName);
+            var commandFromDb = await this.commandsRepository.GetByChannelAndNameAsync(privMsg.Channel, commandDetail.CommandName);
             if (commandFromDb is null)
             {
                 commandFromDb.Should().BeOfType<Command>();

@@ -6,7 +6,7 @@ using ArchieMate.EventSub.Messages;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
+using NSubstitute;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
@@ -66,8 +66,8 @@ public class ChallengeTests
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers.Add(Headers.TwitchEventsubMessageType, NotificationMessageTypes.Verification);
-        var mockLogger = new Mock<ILogger<WebhookController>>();
-        var controller = new WebhookController(mockLogger.Object)
+        var mockLogger = Substitute.For<ILogger<WebhookController>>();
+        var controller = new WebhookController(mockLogger)
         {
             ControllerContext = new ControllerContext()
             {
