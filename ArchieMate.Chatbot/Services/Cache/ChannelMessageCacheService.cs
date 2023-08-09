@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using ChatMessage = ArchieMate.Chatbot.Models.Message;
@@ -42,9 +44,16 @@ namespace ArchieMate.Chatbot.Services.Cache
             }
         }
 
-        public ChatMessage GetLatestChannelMessage(Guid channelId)
+        public ChatMessage? GetLatestChannelMessage(Guid channelId)
         {
             this.logger.LogDebug($"ChannelMessageCacheService.GetLatestChannelMessage({channelId})");
+
+            var cache = EnsureOneCacheIsCreated(channelId);
+            if (!cache.Any())
+            {
+                this.logger.LogDebug($"No messages yet for channelId: {channelId}");
+                return null;
+            }
             return EnsureOneCacheIsCreated(channelId).Last();
         }
 
