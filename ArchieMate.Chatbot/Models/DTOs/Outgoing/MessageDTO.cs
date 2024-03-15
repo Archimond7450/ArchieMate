@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace ArchieMate.Chatbot.Models.DTOs.Outgoing;
 
 public record MessageDTO

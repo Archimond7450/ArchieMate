@@ -1,5 +1,3 @@
-using System;
-using System.Globalization;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using ChatMessage = ArchieMate.Chatbot.Models.Message;

@@ -2,10 +2,6 @@ using System.Text;
 using ArchieMate.Chatbot.Models;
 using ArchieMate.Chatbot.Services;
 using ArchieMate.Chatbot.Services.Database.Repositories;
-using ArchieMate.TwitchIRC.Messages.Incoming;
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
 using TwitchMessage = ArchieMate.TwitchIRC.Messages.Incoming.Message;
 
 namespace ArchieMate.Chatbot.UnitTests.Services

@@ -1,6 +1,5 @@
 using ArchieMate.Chatbot.Models;
 using ArchieMate.Chatbot.Models.DTOs.Incoming;
-using ArchieMate.Chatbot.Models.DTOs.Outgoing;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;

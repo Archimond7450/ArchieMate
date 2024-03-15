@@ -1,4 +1,3 @@
-using ArchieMate.TwitchIRC;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 
 namespace ArchieMate.Chatbot.Services;

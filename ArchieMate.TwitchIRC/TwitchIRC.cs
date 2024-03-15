@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Linq;
-using System.Net;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using Microsoft.Extensions.Logging;
 
@@ -125,7 +122,7 @@ public class IRC : IDisposable
         string msg = await ((now) ? this.socket.ReceiveNowAsync() : this.socket.ReceiveAsync());
 
         if (msg != string.Empty)
-        {            
+        {
             return await Task.FromResult(Message.Decode(msg));
         }
 

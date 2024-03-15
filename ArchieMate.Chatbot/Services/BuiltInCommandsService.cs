@@ -1,11 +1,9 @@
-using System.Globalization;
-using System.Text;
+using System.ComponentModel.Design;
 using ArchieMate.Chatbot.Models.DTOs.Incoming;
 using ArchieMate.Chatbot.Services.Database.Repositories;
 using ArchieMate.Helpers;
 using ArchieMate.TwitchIRC;
 using ArchieMate.TwitchIRC.Messages.Incoming;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace ArchieMate.Chatbot.Services;

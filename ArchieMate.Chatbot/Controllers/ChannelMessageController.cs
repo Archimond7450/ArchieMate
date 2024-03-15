@@ -1,6 +1,5 @@
 using ArchieMate.Chatbot.Models.DTOs.Outgoing;
 using ArchieMate.Chatbot.Services.Cache;
-using ArchieMate.TwitchIRC.Messages.Incoming;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ChatMessage = ArchieMate.Chatbot.Models.Message;

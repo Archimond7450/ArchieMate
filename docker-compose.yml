@@ -57,7 +57,7 @@ services:
       - /app/.next
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://archiemate_frontend:3000 || exit 1
-      interval: 30s
+      interval: 300s
       timeout: 5s
       retries: 10
     restart: unless-stopped
@@ -84,7 +84,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://archiemate_backend:8080/health/live || exit 1
-      interval: 30s
+      interval: 300s
       timeout: 5s
       retries: 10
     restart: unless-stopped
@@ -107,7 +107,7 @@ services:
     env_file: .env
     healthcheck:
       test: pg_isready -U archiemate -d archiemate_db
-      interval: 30s
+      interval: 300s
       timeout: 5s
       retries: 5
     restart: unless-stopped

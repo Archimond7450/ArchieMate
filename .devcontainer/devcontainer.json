@@ -30,7 +30,9 @@
         "oderwat.indent-rainbow",
         "patcx.vscode-nuget-gallery",
         "ckolkman.vscode-postgres",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "Codium.codium",
+        "ms-dotnettools.csdevkit"
       ]
     }
   },

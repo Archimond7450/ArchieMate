@@ -1,18 +1,13 @@
-using ArchieMate.Chatbot;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 using ArchieMate.EventSub.Controllers;
 using ArchieMate.EventSub.Messages;
-using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using NSubstitute;
-using System.Net;
-using Microsoft.Extensions.Configuration;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
-using static ArchieMate.EventSub.Constants;
 using ArchieMate.EventSub.Messages.Data;
+using FluentAssertions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using Xunit;
+using static ArchieMate.EventSub.Constants;
 
 namespace ArchieMate.EventSub.UnitTests.Messages;
 

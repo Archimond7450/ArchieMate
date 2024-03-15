@@ -1,6 +1,6 @@
-using Xunit;
 using ArchieMate.TwitchIRC.Messages.Incoming;
 using FluentAssertions;
+using Xunit;
 
 namespace ArchieMate.TwitchIRC.UnitTests.Messages.Incoming;
 

@@ -1,6 +1,5 @@
 namespace ArchieMate.TwitchIRC.Messages.Incoming;
 
-using System.ComponentModel;
 using BadgesClass = Badges;
 using EmotesClass = Emotes;
 using System.Text.RegularExpressions;
