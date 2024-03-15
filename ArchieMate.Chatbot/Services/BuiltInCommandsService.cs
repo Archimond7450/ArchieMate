@@ -175,7 +175,11 @@ public class BuiltInCommandsService : IBuiltInCommandsService
         }
         else if (String.Equals(commandDetail.CommandName, Commands.Name, StringComparison.OrdinalIgnoreCase))
         {
-            return $"@${{sender}}, the list of available commands for this channel is available here: https://archiemate.com/tables/commands/{channel}";
+            var commands = await this.commandsRepository.GetAllForChannelAsync(channel);
+            if (commands.Any())
+            {
+                return $"@${{sender}}, the list of available commands for this channel is available here: https://archiemate.com/tables/commands/{channel}";
+            }
         }
 
         return null;
