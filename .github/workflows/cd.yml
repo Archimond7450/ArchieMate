@@ -9,7 +9,6 @@ jobs:
   deploy:
     name: Deploy to Docker Hub
     runs-on: ubuntu-latest
-    needs: [test]
 
     steps:
       - name: Checkout code
