@@ -1,0 +1,384 @@
+{
+  "kind": "youtube#liveBroadcastListResponse",
+  "etag": "0X6R_gGnK2b0IeOM_MeDijQeJXI",
+  "nextPageToken": "CAUQAA",
+  "pageInfo": {
+    "totalResults": 44,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#liveBroadcast",
+      "etag": "PKSSuu9iltobC4uf2rk6PlSd8OU",
+      "id": "Rw9damIA33A",
+      "snippet": {
+        "publishedAt": "2021-04-26T18:05:11Z",
+        "channelId": "UCj_hcfqnLWGNXtBlwasdOOg",
+        "title": "Mon 26th Apr: More Hearthstone chilling",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Rw9damIA33A/default_live.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Rw9damIA33A/mqdefault_live.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Rw9damIA33A/hqdefault_live.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Rw9damIA33A/sddefault_live.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/Rw9damIA33A/maxresdefault_live.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "scheduledStartTime": "2021-04-26T18:05:29Z",
+        "isDefaultBroadcast": false,
+        "liveChatId": "KicKGFVDal9oY2ZxbkxXR05YdEJsd2FzZE9PZxILUnc5ZGFtSUEzM0E"
+      },
+      "status": {
+        "lifeCycleStatus": "ready",
+        "privacyStatus": "public",
+        "recordingStatus": "notRecording",
+        "madeForKids": false,
+        "selfDeclaredMadeForKids": false
+      },
+      "contentDetails": {
+        "boundStreamId": "j_hcfqnLWGNXtBlwasdOOg1619460312792676",
+        "boundStreamLastUpdateTimeMs": "2022-09-16T20:53:02Z",
+        "monitorStream": {
+          "enableMonitorStream": true,
+          "broadcastStreamDelayMs": 0,
+          "embedHtml": "\u003ciframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/Rw9damIA33A?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen\u003e\u003c/iframe\u003e"
+        },
+        "enableEmbed": true,
+        "enableDvr": true,
+        "enableContentEncryption": false,
+        "recordFromStart": true,
+        "enableClosedCaptions": false,
+        "closedCaptionsType": "closedCaptionsDisabled",
+        "enableLowLatency": false,
+        "latencyPreference": "normal",
+        "projection": "rectangular",
+        "enableAutoStart": true,
+        "enableAutoStop": true
+      },
+      "monetizationDetails": {
+        "cuepointSchedule": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "kind": "youtube#liveBroadcast",
+      "etag": "Ig5muWboG1bL4Ikk1vSwfLSHtG4",
+      "id": "NL798roEsiQ",
+      "snippet": {
+        "publishedAt": "2021-04-24T18:01:55Z",
+        "channelId": "UCj_hcfqnLWGNXtBlwasdOOg",
+        "title": "Sat 24th Apr: Hearthstone chilling",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/NL798roEsiQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/NL798roEsiQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/NL798roEsiQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/NL798roEsiQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/NL798roEsiQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "scheduledStartTime": "2021-04-24T18:02:11Z",
+        "actualStartTime": "2021-04-24T18:02:15Z",
+        "actualEndTime": "2021-04-24T21:53:57Z",
+        "isDefaultBroadcast": false,
+        "liveChatId": "KicKGFVDal9oY2ZxbkxXR05YdEJsd2FzZE9PZxILTkw3OThyb0VzaVE"
+      },
+      "status": {
+        "lifeCycleStatus": "complete",
+        "privacyStatus": "public",
+        "recordingStatus": "recorded",
+        "madeForKids": false,
+        "selfDeclaredMadeForKids": false
+      },
+      "contentDetails": {
+        "boundStreamId": "j_hcfqnLWGNXtBlwasdOOg1619287315791552",
+        "boundStreamLastUpdateTimeMs": "2022-09-16T02:58:37Z",
+        "monitorStream": {
+          "enableMonitorStream": true,
+          "broadcastStreamDelayMs": 0,
+          "embedHtml": "\u003ciframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/NL798roEsiQ?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen\u003e\u003c/iframe\u003e"
+        },
+        "enableEmbed": true,
+        "enableDvr": true,
+        "enableContentEncryption": false,
+        "recordFromStart": true,
+        "enableClosedCaptions": false,
+        "closedCaptionsType": "closedCaptionsDisabled",
+        "enableLowLatency": false,
+        "latencyPreference": "normal",
+        "projection": "rectangular",
+        "enableAutoStart": true,
+        "enableAutoStop": true
+      },
+      "monetizationDetails": {
+        "cuepointSchedule": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "kind": "youtube#liveBroadcast",
+      "etag": "G7m-wjO-8yq1-AtCK2oo28P89u0",
+      "id": "v-2vABF1e8E",
+      "snippet": {
+        "publishedAt": "2021-04-07T15:57:29Z",
+        "channelId": "UCj_hcfqnLWGNXtBlwasdOOg",
+        "title": "Wed 7th Apr: Hearthstone - Battlegrounds, then new standard decks for ranked",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/v-2vABF1e8E/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/v-2vABF1e8E/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/v-2vABF1e8E/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/v-2vABF1e8E/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/v-2vABF1e8E/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "scheduledStartTime": "2021-04-07T15:57:30Z",
+        "actualStartTime": "2021-04-07T15:57:48Z",
+        "actualEndTime": "2021-04-07T20:51:48Z",
+        "isDefaultBroadcast": false,
+        "liveChatId": "KicKGFVDal9oY2ZxbkxXR05YdEJsd2FzZE9PZxILdi0ydkFCRjFlOEU"
+      },
+      "status": {
+        "lifeCycleStatus": "complete",
+        "privacyStatus": "public",
+        "recordingStatus": "recorded",
+        "madeForKids": false,
+        "selfDeclaredMadeForKids": false
+      },
+      "contentDetails": {
+        "boundStreamId": "j_hcfqnLWGNXtBlwasdOOg1617811050752560",
+        "boundStreamLastUpdateTimeMs": "2022-09-19T12:13:22Z",
+        "monitorStream": {
+          "enableMonitorStream": true,
+          "broadcastStreamDelayMs": 0,
+          "embedHtml": "\u003ciframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/v-2vABF1e8E?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen\u003e\u003c/iframe\u003e"
+        },
+        "enableEmbed": true,
+        "enableDvr": true,
+        "enableContentEncryption": false,
+        "recordFromStart": true,
+        "enableClosedCaptions": false,
+        "closedCaptionsType": "closedCaptionsDisabled",
+        "enableLowLatency": false,
+        "latencyPreference": "normal",
+        "projection": "rectangular",
+        "enableAutoStart": true,
+        "enableAutoStop": true
+      },
+      "monetizationDetails": {
+        "cuepointSchedule": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "kind": "youtube#liveBroadcast",
+      "etag": "hHdpTwhXK9PyaWqYK11B09DiZBI",
+      "id": "_h_wGKlNnRs",
+      "snippet": {
+        "publishedAt": "2021-04-06T17:17:41Z",
+        "channelId": "UCj_hcfqnLWGNXtBlwasdOOg",
+        "title": "Tue 6th Apr: Hearthstone - Battlegrounds, then new standard decks for ranked",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/_h_wGKlNnRs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/_h_wGKlNnRs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/_h_wGKlNnRs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/_h_wGKlNnRs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/_h_wGKlNnRs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "scheduledStartTime": "2021-04-06T17:17:41Z",
+        "actualStartTime": "2021-04-06T17:18:01Z",
+        "actualEndTime": "2021-04-06T21:37:17Z",
+        "isDefaultBroadcast": false,
+        "liveChatId": "KicKGFVDal9oY2ZxbkxXR05YdEJsd2FzZE9PZxILX2hfd0dLbE5uUnM"
+      },
+      "status": {
+        "lifeCycleStatus": "complete",
+        "privacyStatus": "public",
+        "recordingStatus": "recorded",
+        "madeForKids": false,
+        "selfDeclaredMadeForKids": false
+      },
+      "contentDetails": {
+        "boundStreamId": "j_hcfqnLWGNXtBlwasdOOg1617729463472074",
+        "boundStreamLastUpdateTimeMs": "2022-09-17T03:49:58Z",
+        "monitorStream": {
+          "enableMonitorStream": true,
+          "broadcastStreamDelayMs": 0,
+          "embedHtml": "\u003ciframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/_h_wGKlNnRs?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen\u003e\u003c/iframe\u003e"
+        },
+        "enableEmbed": true,
+        "enableDvr": true,
+        "enableContentEncryption": false,
+        "recordFromStart": true,
+        "enableClosedCaptions": false,
+        "closedCaptionsType": "closedCaptionsDisabled",
+        "enableLowLatency": false,
+        "latencyPreference": "normal",
+        "projection": "rectangular",
+        "enableAutoStart": true,
+        "enableAutoStop": true
+      },
+      "monetizationDetails": {
+        "cuepointSchedule": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "kind": "youtube#liveBroadcast",
+      "etag": "hNNlybeUcQU8kTcxv9BYABiOEME",
+      "id": "3uBmr5PzqLs",
+      "snippet": {
+        "publishedAt": "2021-04-05T16:00:36Z",
+        "channelId": "UCj_hcfqnLWGNXtBlwasdOOg",
+        "title": "Mon 5th Apr: Hearthstone - Battlegrounds, then new standard decks for ranked, later maybe Duels",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/3uBmr5PzqLs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/3uBmr5PzqLs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/3uBmr5PzqLs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/3uBmr5PzqLs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/3uBmr5PzqLs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "scheduledStartTime": "2021-04-05T16:00:34Z",
+        "actualStartTime": "2021-04-05T16:00:57Z",
+        "actualEndTime": "2021-04-05T21:40:43Z",
+        "isDefaultBroadcast": false,
+        "liveChatId": "KicKGFVDal9oY2ZxbkxXR05YdEJsd2FzZE9PZxILM3VCbXI1UHpxTHM"
+      },
+      "status": {
+        "lifeCycleStatus": "complete",
+        "privacyStatus": "public",
+        "recordingStatus": "recorded",
+        "madeForKids": false,
+        "selfDeclaredMadeForKids": false
+      },
+      "contentDetails": {
+        "boundStreamId": "j_hcfqnLWGNXtBlwasdOOg1617638437551575",
+        "boundStreamLastUpdateTimeMs": "2022-09-19T16:59:32Z",
+        "monitorStream": {
+          "enableMonitorStream": true,
+          "broadcastStreamDelayMs": 0,
+          "embedHtml": "\u003ciframe width=\"425\" height=\"344\" src=\"https://www.youtube.com/embed/3uBmr5PzqLs?autoplay=1&livemonitor=1\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" referrerpolicy=\"strict-origin-when-cross-origin\" allowfullscreen\u003e\u003c/iframe\u003e"
+        },
+        "enableEmbed": true,
+        "enableDvr": true,
+        "enableContentEncryption": false,
+        "recordFromStart": true,
+        "enableClosedCaptions": false,
+        "closedCaptionsType": "closedCaptionsDisabled",
+        "enableLowLatency": false,
+        "latencyPreference": "normal",
+        "projection": "rectangular",
+        "enableAutoStart": true,
+        "enableAutoStop": true
+      },
+      "monetizationDetails": {
+        "cuepointSchedule": {
+          "enabled": false
+        }
+      }
+    }
+  ]
+}

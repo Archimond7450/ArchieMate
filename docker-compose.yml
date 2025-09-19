@@ -1,0 +1,28 @@
+services:
+  archiemate_db:
+    image: postgres:latest
+    container_name: archiemate_db
+    env_file: .env
+    expose:
+      - 5432
+    ports:
+      - "5432:5432"
+    volumes:
+      - "./sql:/docker-entrypoint-initdb.d:ro"
+    healthcheck:
+      test: pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  archiemate:
+    image: archiemate:latest
+    container_name: archiemate
+    depends_on:
+      archiemate_db:
+        condition: service_healthy
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./logs:/opt/docker/logs"
+    init: true

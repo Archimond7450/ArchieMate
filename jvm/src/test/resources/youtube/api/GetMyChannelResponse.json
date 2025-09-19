@@ -1,0 +1,85 @@
+{
+  "kind": "youtube#channelListResponse",
+  "etag": "CflM3Ykcf-c3fmmb6RSuq7TPHq0",
+  "pageInfo": {
+    "totalResults": 1,
+    "resultsPerPage": 5
+  },
+  "items": [
+    {
+      "kind": "youtube#channel",
+      "etag": "Gslb6y3-x9bKZH2pwkH84ek_twQ",
+      "id": "UCj_hcfqnLWGNXtBlwasdOOg",
+      "snippet": {
+        "title": "Archimond Gaming",
+        "description": "",
+        "customUrl": "@archimondgaming5298",
+        "publishedAt": "2017-09-03T12:15:58Z",
+        "thumbnails": {
+          "default": {
+            "url": "https://yt3.ggpht.com/ytc/AIdro_mB-TJwbUWdsCFxRKkm3ND96RKdIP1Gudsp58oQ4Kl-Yw=s88-c-k-c0x00ffffff-no-rj",
+            "width": 88,
+            "height": 88
+          },
+          "medium": {
+            "url": "https://yt3.ggpht.com/ytc/AIdro_mB-TJwbUWdsCFxRKkm3ND96RKdIP1Gudsp58oQ4Kl-Yw=s240-c-k-c0x00ffffff-no-rj",
+            "width": 240,
+            "height": 240
+          },
+          "high": {
+            "url": "https://yt3.ggpht.com/ytc/AIdro_mB-TJwbUWdsCFxRKkm3ND96RKdIP1Gudsp58oQ4Kl-Yw=s800-c-k-c0x00ffffff-no-rj",
+            "width": 800,
+            "height": 800
+          }
+        },
+        "localized": {
+          "title": "Archimond Gaming",
+          "description": ""
+        }
+      },
+      "contentDetails": {
+        "relatedPlaylists": {
+          "likes": "LL",
+          "uploads": "UUj_hcfqnLWGNXtBlwasdOOg"
+        }
+      },
+      "statistics": {
+        "viewCount": "1651",
+        "subscriberCount": "11",
+        "hiddenSubscriberCount": false,
+        "videoCount": "55"
+      },
+      "topicDetails": {
+        "topicIds": [
+          "/m/025zzc",
+          "/m/03hf_rm",
+          "/m/0bzvm2",
+          "/m/0403l3g",
+          "/m/04q1x3q",
+          "/m/02ntfj"
+        ],
+        "topicCategories": [
+          "https://en.wikipedia.org/wiki/Action_game",
+          "https://en.wikipedia.org/wiki/Strategy_video_game",
+          "https://en.wikipedia.org/wiki/Video_game_culture",
+          "https://en.wikipedia.org/wiki/Role-playing_video_game",
+          "https://en.wikipedia.org/wiki/Puzzle_video_game",
+          "https://en.wikipedia.org/wiki/Action-adventure_game"
+        ]
+      },
+      "status": {
+        "privacyStatus": "public",
+        "isLinked": true,
+        "longUploadsStatus": "allowed",
+        "isChannelMonetizationEnabled": false
+      },
+      "brandingSettings": {
+        "channel": {
+          "title": "Archimond Gaming",
+          "keywords": "Warcraft III"
+        }
+      },
+      "contentOwnerDetails": {}
+    }
+  ]
+}
