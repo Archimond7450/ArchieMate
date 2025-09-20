@@ -39,7 +39,7 @@ object FetchHelpers {
     dom.fetch(url, init).toFuture
   }
 
-  def fetchImmediateGetStream[Data](url: String)(using Decoder[Data]): EventStream[Status[String, Either[Throwable, Data]]] = {
+  def fetchGetStream[Data](url: String)(using Decoder[Data]): EventStream[Status[String, Either[Throwable, Data]]] = {
     EventStream.fromValue(url, emitOnce = true).flatMapWithStatus { url =>
       FetchStream
         .get(url, _.credentials(_ => dom.RequestCredentials.include))
