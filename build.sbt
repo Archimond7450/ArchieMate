@@ -18,7 +18,7 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
   .enablePlugins(BuildInfoPlugin)
   .settings(
     name := "ArchieMate",
-    version := "0.1.0",
+    version := "0.1.1",
     libraryDependencies ++= Seq(
       // Circe
       "io.circe" %%% "circe-core" % "0.14.10",
@@ -31,7 +31,7 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
       "org.scalatest" %%% "scalatest" % "3.2.9" % Test,
 
       // Scala mock
-      "org.scalamock" %%% "scalamock" % "7.4.1" % Test,
+      "org.scalamock" %%% "scalamock" % "7.4.1" % Test
     ),
     testFrameworks += new TestFramework("org.scalatest.tools.Framework"),
     buildInfoKeys := Seq(
@@ -77,7 +77,7 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
       "com.github.jwt-scala" %% "jwt-circe" % "11.0.3",
 
       // Circe
-      "com.github.pjfanning" %% "pekko-http-circe" % "3.3.0",
+      "com.github.pjfanning" %% "pekko-http-circe" % "3.3.0"
     )
   )
   .jsSettings(
@@ -88,19 +88,19 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
 
       // Routing
       "com.raquo" %%% "waypoint" % "10.0.0-M1"
-
-),
+    ),
     scalaJSUseMainModuleInitializer := true,
     scalaJSLinkerConfig ~= {
       _.withModuleKind(ModuleKind.ESModule)
     },
     jsEnv := new NodeJSEnv(),
-    externalNpm := baseDirectory.value / ".." / "vite",
+    externalNpm := baseDirectory.value / ".." / "vite"
   )
 
 lazy val ArchieMateFrontend = ArchieMateCross.js
 
-lazy val ArchieMateBackend = ArchieMateCross.jvm.enablePlugins(JavaAppPackaging, DockerPlugin)
+lazy val ArchieMateBackend = ArchieMateCross.jvm
+  .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     dockerBaseImage := "eclipse-temurin:17-jre",
     dockerExposedPorts := Seq(8080),
@@ -110,9 +110,11 @@ lazy val ArchieMateBackend = ArchieMateCross.jvm.enablePlugins(JavaAppPackaging,
     dockerUsername := Some("archimond7450"),
     Docker / packageName := "archiemate",
     Docker / daemonUser := "archiemate",
-    //Docker / commands += Cmd("RUN", "mkdir", "-p", "/opt/docker/logs"),
-    //Docker / commands += Cmd("RUN", "chmod", "-R", "740", "/opt/docker/logs"),
-    Compile / mainClass := Some("com.archimond7450.archiemate.ArchieMateBackend"),
+    // Docker / commands += Cmd("RUN", "mkdir", "-p", "/opt/docker/logs"),
+    // Docker / commands += Cmd("RUN", "chmod", "-R", "740", "/opt/docker/logs"),
+    Compile / mainClass := Some(
+      "com.archimond7450.archiemate.ArchieMateBackend"
+    ),
     Compile / resourceGenerators += Def.task {
       println("Frontend resource generator started")
 
@@ -124,7 +126,9 @@ lazy val ArchieMateBackend = ArchieMateCross.jvm.enablePlugins(JavaAppPackaging,
       println("Running `yarn build` in vite")
       val yarnBuildCode = Process("yarn build", viteDir).!
       if (yarnBuildCode != 0) {
-        throw new RuntimeException(s"Frontend resource generator failed because the 'yarn build' command failed with code $yarnBuildCode")
+        throw new RuntimeException(
+          s"Frontend resource generator failed because the 'yarn build' command failed with code $yarnBuildCode"
+        )
       }
 
       println(s"Cleaning public dir $publicDir and copying dist dir $distDir")

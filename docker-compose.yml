@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
   archiemate:
-    image: archiemate:latest
+    image: archimond7450/archiemate:latest
     container_name: archiemate
     depends_on:
       archiemate_db:

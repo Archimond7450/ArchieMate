@@ -1,13 +1,39 @@
 package com.archimond7450.archiemate.pages
 
 import com.archimond7450.archiemate.App.{Login, Page}
-import com.archimond7450.archiemate.components.{DashboardBasicChatbotConfiguration, DashboardConnections, DashboardTwitchInformation}
+import com.archimond7450.archiemate.components.{
+  DashboardAutomaticMessagesConfiguration,
+  DashboardBasicChatbotConfiguration,
+  DashboardBasicChatbotConfigurationUnavailable,
+  DashboardBuiltInCommandsConfiguration,
+  DashboardCommandsConfiguration,
+  DashboardConnections,
+  DashboardTwitchInformation,
+  DashboardVariablesConfiguration
+}
 import com.archimond7450.archiemate.{Loaded, Loading, LoadingState}
 import com.archimond7450.archiemate.elements.Buttons.asyncButton
-import com.archimond7450.archiemate.elements.StyledStandardElements.{h1Element, h1ElementMapped, h2Element, pElement}
+import com.archimond7450.archiemate.elements.StyledStandardElements.{
+  h1Element,
+  h1ElementMapped,
+  h2Element,
+  pElement
+}
 import com.archimond7450.archiemate.elements.Switches.switch
-import com.archimond7450.archiemate.helpers.FetchHelpers.{fetchAutomaticMessagesSettings, fetchBasicChatbotSettings, fetchBuiltInCommandsSettings, fetchCommandsSettings, fetchImmediateGetStream, fetchOverlaysSettings, fetchTimersSettings, fetchVariablesSettings}
-import com.archimond7450.archiemate.http.ChannelSettings.{BasicChatbotSettings, Settings}
+import com.archimond7450.archiemate.helpers.FetchHelpers.{
+  fetchAutomaticMessagesSettings,
+  fetchBasicChatbotSettings,
+  fetchBuiltInCommandsSettings,
+  fetchCommandsSettings,
+  fetchGetStream,
+  fetchOverlaysSettings,
+  fetchTimersSettings,
+  fetchVariablesSettings
+}
+import com.archimond7450.archiemate.http.ChannelSettings.{
+  BasicChatbotSettings,
+  Settings
+}
 import com.archimond7450.archiemate.http.Connections.Connections
 import com.archimond7450.archiemate.http.User.UserResponse
 import com.archimond7450.archiemate.models.AuthModel.LoggedOut
@@ -22,7 +48,10 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 object DashboardPage {
-  def render()(using authModel: AuthModel, router: Router[Page]): ReactiveHtmlElement[HTMLElement] = {
+  def render()(using
+      authModel: AuthModel,
+      router: Router[Page]
+  ): ReactiveHtmlElement[HTMLElement] = {
     given dashboardModel: DashboardModel = new DashboardModel
 
     sectionTag(
@@ -32,14 +61,18 @@ object DashboardPage {
       ),
       child <-- authModel.stateSignal.map {
         case Loaded(Success(AuthModel.LoggedIn(user))) =>
-          val connectionsStream: EventStream[Status[String, Either[Throwable, Connections]]] = fetchImmediateGetStream[Connections]("/api/v1/settings/connections")
-          val twitchConnectionExistsStream: EventStream[Boolean] = connectionsStream.splitStatus(
-            (resolved, _) => resolved.output match {
-              case Right(connections) => connections.twitchConnectionExists
-              case Left(_) => false
-            },
-            (_, _) => false
-          )
+          val connectionsStream
+              : EventStream[Status[String, Either[Throwable, Connections]]] =
+            fetchGetStream[Connections]("/api/v1/settings/connections")
+          val twitchConnectionExistsStream: EventStream[Boolean] =
+            connectionsStream.splitStatus(
+              (resolved, _) =>
+                resolved.output match {
+                  case Right(connections) => connections.twitchConnectionExists
+                  case Left(_)            => false
+                },
+              (_, _) => false
+            )
           div(
             DashboardTwitchInformation.render(user),
             div(
@@ -49,7 +82,14 @@ object DashboardPage {
             ),
             child(
               DashboardBasicChatbotConfiguration.render()
-            ) <-- twitchConnectionExistsStream
+            ) <-- twitchConnectionExistsStream,
+            child(
+              DashboardBasicChatbotConfigurationUnavailable.render()
+            ) <-- twitchConnectionExistsStream.map(!_),
+            DashboardBuiltInCommandsConfiguration.render(),
+            DashboardCommandsConfiguration.render(),
+            DashboardVariablesConfiguration.render(),
+            DashboardAutomaticMessagesConfiguration.render()
           )
 
         case Loaded(Success(LoggedOut)) | Loaded(Failure(_)) =>
