@@ -2,20 +2,61 @@ package com.archimond7450.archiemate.actors.chatbot
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
-import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
+import com.archimond7450.archiemate.actors.repositories.settings.{
+  AutomaticMessagesSettingsRepository,
+  BasicChatbotSettingsRepository,
+  BuiltInCommandsSettingsRepository,
+  CommandsSettingsRepository,
+  OverlaysSettingsRepository,
+  TimersSettingsRepository,
+  VariablesSettingsRepository
+}
 import com.archimond7450.archiemate.actors.services.TwitchCommandsService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.extensions.ListExtension.{randomOrDefault, toMapWithKey}
-import com.archimond7450.archiemate.extensions.StringExtensions.{asTwitchSubTier, asVariableRegex}
-import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, KnownGreetsMode, KnownGreetsSettings, ManualTimer, OverlaysSettings, TimersSettings, VariablesSettings, Settings as ChannelSettings}
+import com.archimond7450.archiemate.extensions.ListExtension.{
+  randomOrDefault,
+  toMapWithKey
+}
+import com.archimond7450.archiemate.extensions.StringExtensions.{
+  asTwitchSubTier,
+  asVariableRegex
+}
+import com.archimond7450.archiemate.http.ChannelSettings.{
+  AutomaticMessagesSettings,
+  BasicChatbotSettings,
+  BuiltInCommandsSettings,
+  CommandsSettings,
+  KnownGreetsMode,
+  KnownGreetsSettings,
+  ManualTimer,
+  OverlaysSettings,
+  TimersSettings,
+  VariablesSettings,
+  Settings as ChannelSettings
+}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
-import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{GetChatters, GetModerators, GetStream, GetSubs, GetTokenUser, GetVIPs}
+import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
+  GetChatters,
+  GetModerators,
+  GetStream,
+  GetSubs,
+  GetTokenUser,
+  GetVIPs
+}
 import com.archimond7450.archiemate.twitch.eventsub
-import com.archimond7450.archiemate.twitch.irc.{IncomingMessageDecoder, OutgoingMessageEncoder}
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
+import com.archimond7450.archiemate.twitch.irc.{
+  IncomingMessageDecoder,
+  OutgoingMessageEncoder
+}
+import org.apache.pekko.actor.typed.scaladsl.{
+  ActorContext,
+  Behaviors,
+  StashBuffer,
+  TimerScheduler
+}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.util.Timeout
 
@@ -27,50 +68,62 @@ object TwitchChatbot {
   sealed trait Command
   case object Leave extends Command
   final case class NewTokenId(tokenId: String) extends Command
-  private final case class NoToken(exceptionOption: Option[Throwable]) extends Command
-  final case class NewBasicChatbotSettings(settings: BasicChatbotSettings) extends Command
-  final case class NewBuiltInCommandsSettings(settings: BuiltInCommandsSettings) extends Command
-  final case class NewCommandsSettings(settings: CommandsSettings) extends Command
-  final case class NewVariablesSettings(settings: VariablesSettings) extends Command
+  private final case class NoToken(exceptionOption: Option[Throwable])
+      extends Command
+  final case class NewBasicChatbotSettings(settings: BasicChatbotSettings)
+      extends Command
+  final case class NewBuiltInCommandsSettings(settings: BuiltInCommandsSettings)
+      extends Command
+  final case class NewCommandsSettings(settings: CommandsSettings)
+      extends Command
+  final case class NewVariablesSettings(settings: VariablesSettings)
+      extends Command
   final case class NewTimersSettings(settings: TimersSettings) extends Command
-  final case class NewOverlaysSettings(settings: OverlaysSettings) extends Command
-  final case class NewAutomaticMessagesSettings(settings: AutomaticMessagesSettings) extends Command
+  final case class NewOverlaysSettings(settings: OverlaysSettings)
+      extends Command
+  final case class NewAutomaticMessagesSettings(
+      settings: AutomaticMessagesSettings
+  ) extends Command
   final case class Broadcaster(broadcaster: GetTokenUser) extends Command
   private final case class FailedToGetSettings(ex: Throwable) extends Command
   final case class Mods(mods: Option[GetModerators]) extends Command
   final case class VIPs(vips: Option[GetVIPs]) extends Command
   final case class Subs(subs: Option[GetSubs]) extends Command
   final case class Chatters(chatters: Option[GetChatters]) extends Command
-  final case class Stream(stream: Option[Option[TwitchApi.Stream]]) extends Command // TODO: Change outer Option to Try
+  final case class Stream(stream: Option[Option[TwitchApi.Stream]])
+      extends Command // TODO: Change outer Option to Try
   final case class EventSubEvent(event: eventsub.Event) extends Command
+  final case class Afk(chatterUserId: String) extends Command
   private case object ChattersTimer extends Command
   private case object MessageTimer extends Command
 
   final case class OperationalParameters(
-    tokenId: String,
-    channelSettings: ChannelSettings,
-    broadcaster: GetTokenUser,
-    eventSubListener: ActorRef[EventSubListener.Command],
-    ircListener: ActorRef[IRCListener.Command],
-    twitchCommandsService: ActorRef[TwitchCommandsService.Command],
-    mods: Map[String, TwitchApi.User],
-    vips: Map[String, TwitchApi.User],
-    subs: Map[String, TwitchApi.SubbedUser],
-    chatters: Map[String, TwitchApi.User],
-    stream: Option[TwitchApi.Stream],
-    allStreamChatters: Map[String, TwitchApi.User],
-    messagesAfterLastTimer: Int = 0,
-    lastTimers: Seq[Either[String, String]] = Seq.empty
+      tokenId: String,
+      channelSettings: ChannelSettings,
+      broadcaster: GetTokenUser,
+      eventSubListener: ActorRef[EventSubListener.Command],
+      ircListener: ActorRef[IRCListener.Command],
+      twitchCommandsService: ActorRef[TwitchCommandsService.Command],
+      mods: Map[String, TwitchApi.User],
+      vips: Map[String, TwitchApi.User],
+      subs: Map[String, TwitchApi.SubbedUser],
+      chatters: Map[String, TwitchApi.User],
+      stream: Option[TwitchApi.Stream],
+      allStreamChatters: Map[String, TwitchApi.User],
+      messagesAfterLastTimer: Int = 0,
+      lastTimers: Seq[Either[String, String]] = Seq.empty,
+      afkConversations: Map[String, List[String]] = Map.empty
   )
 
   def apply(twitchRoomId: String)(using
-            supervisor: ActorRef[TwitchChatbotsSupervisor.Command],
-            mediator: ActorRef[ArchieMateMediator.Command],
-            decoder: IncomingMessageDecoder,
-            encoder: OutgoingMessageEncoder,
-            randomProvider: RandomProvider,
-            timeProvider: TimeProvider,
-            settings: Settings): Behavior[Command] = {
+      supervisor: ActorRef[TwitchChatbotsSupervisor.Command],
+      mediator: ActorRef[ArchieMateMediator.Command],
+      decoder: IncomingMessageDecoder,
+      encoder: OutgoingMessageEncoder,
+      randomProvider: RandomProvider,
+      timeProvider: TimeProvider,
+      settings: Settings
+  ): Behavior[Command] = {
     Behaviors.withStash(100) { buffer =>
       given StashBuffer[Command] = buffer
       Behaviors.setup { ctx =>
@@ -85,16 +138,16 @@ object TwitchChatbot {
 }
 
 class TwitchChatbot(using
-  private val ctx: ActorContext[TwitchChatbot.Command],
-  private val buffer: StashBuffer[TwitchChatbot.Command],
-  private val timers: TimerScheduler[TwitchChatbot.Command],
-  private val supervisor: ActorRef[TwitchChatbotsSupervisor.Command],
-  private val mediator: ActorRef[ArchieMateMediator.Command],
-  private val decoder: IncomingMessageDecoder,
-  private val encoder: OutgoingMessageEncoder,
-  private val randomProvider: RandomProvider,
-  private val timeProvider: TimeProvider,
-  private val settings: Settings
+    private val ctx: ActorContext[TwitchChatbot.Command],
+    private val buffer: StashBuffer[TwitchChatbot.Command],
+    private val timers: TimerScheduler[TwitchChatbot.Command],
+    private val supervisor: ActorRef[TwitchChatbotsSupervisor.Command],
+    private val mediator: ActorRef[ArchieMateMediator.Command],
+    private val decoder: IncomingMessageDecoder,
+    private val encoder: OutgoingMessageEncoder,
+    private val randomProvider: RandomProvider,
+    private val timeProvider: TimeProvider,
+    private val settings: Settings
 ) {
   given Timeout = settings.askTimeout
   given ActorRef[TwitchChatbot.Command] = ctx.self
@@ -102,26 +155,44 @@ class TwitchChatbot(using
   given Ordering[Int] = Ordering.fromLessThan(_ < _)
 
   final case class InitialParameters(
-                                      twitchRoomId: String,
-                                      tokenIdOption: Option[String] = None,
-                                      basicChatbotSettingsOption: Option[BasicChatbotSettings] = None,
-                                      builtInCommandsSettingsOption: Option[BuiltInCommandsSettings] = None,
-                                      commandsSettingsOption: Option[CommandsSettings] = None,
-                                      variablesSettingsOption: Option[VariablesSettings] = None,
-                                      timersSettingsOption: Option[TimersSettings] = None,
-                                      overlaysSettingsOption: Option[OverlaysSettings] = None,
-                                      automaticMessagesSettingsOption: Option[AutomaticMessagesSettings] = None,
-                                      broadcasterOption: Option[GetTokenUser] = None
-                                    )
+      twitchRoomId: String,
+      tokenIdOption: Option[String] = None,
+      basicChatbotSettingsOption: Option[BasicChatbotSettings] = None,
+      builtInCommandsSettingsOption: Option[BuiltInCommandsSettings] = None,
+      commandsSettingsOption: Option[CommandsSettings] = None,
+      variablesSettingsOption: Option[VariablesSettings] = None,
+      timersSettingsOption: Option[TimersSettings] = None,
+      overlaysSettingsOption: Option[OverlaysSettings] = None,
+      automaticMessagesSettingsOption: Option[AutomaticMessagesSettings] = None,
+      broadcasterOption: Option[GetTokenUser] = None
+  )
 
-  def initial(twitchRoomId: String): Behavior[TwitchChatbot.Command] = initial1(InitialParameters(twitchRoomId))
+  def initial(twitchRoomId: String): Behavior[TwitchChatbot.Command] = initial1(
+    InitialParameters(twitchRoomId)
+  )
 
-  private def initial1(params: InitialParameters): Behavior[TwitchChatbot.Command] = {
-    ctx.ask[ArchieMateMediator.Command, TwitchUserSessionsRepository.ReturnedTokenIdForUserId](mediator, ref => ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(TwitchUserSessionsRepository.GetTokenIdForUserId(ref, params.twitchRoomId))) {
-      case Success(TwitchUserSessionsRepository.ReturnedTokenIdForUserId(Some(tokenId))) =>
+  private def initial1(
+      params: InitialParameters
+  ): Behavior[TwitchChatbot.Command] = {
+    ctx.ask[
+      ArchieMateMediator.Command,
+      TwitchUserSessionsRepository.ReturnedTokenIdForUserId
+    ](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(
+          TwitchUserSessionsRepository
+            .GetTokenIdForUserId(ref, params.twitchRoomId)
+        )
+    ) {
+      case Success(
+            TwitchUserSessionsRepository.ReturnedTokenIdForUserId(Some(tokenId))
+          ) =>
         TwitchChatbot.NewTokenId(tokenId)
 
-      case Success(TwitchUserSessionsRepository.ReturnedTokenIdForUserId(None)) =>
+      case Success(
+            TwitchUserSessionsRepository.ReturnedTokenIdForUserId(None)
+          ) =>
         TwitchChatbot.NoToken(None)
 
       case Failure(ex) =>
@@ -133,51 +204,112 @@ class TwitchChatbot(using
         Behaviors.stopped
 
       case TwitchChatbot.NewTokenId(tokenId) =>
-        ctx.ask[ArchieMateMediator.Command, BasicChatbotSettings](mediator, ref => ArchieMateMediator.SendBasicChatbotSettingsRepositoryCommand(BasicChatbotSettingsRepository.GetSettings(ref, params.twitchRoomId))) {
-          case Success(settings) => TwitchChatbot.NewBasicChatbotSettings(settings)
+        ctx.ask[ArchieMateMediator.Command, BasicChatbotSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendBasicChatbotSettingsRepositoryCommand(
+              BasicChatbotSettingsRepository
+                .GetSettings(ref, params.twitchRoomId)
+            )
+        ) {
+          case Success(settings) =>
+            TwitchChatbot.NewBasicChatbotSettings(settings)
           case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, BuiltInCommandsSettings](mediator, ref => ArchieMateMediator.SendBuiltInCommandsSettingsRepositoryCommand(BuiltInCommandsSettingsRepository.GetSettings(ref, params.twitchRoomId))) {
-          case Success(settings) => TwitchChatbot.NewBuiltInCommandsSettings(settings)
+        ctx.ask[ArchieMateMediator.Command, BuiltInCommandsSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendBuiltInCommandsSettingsRepositoryCommand(
+              BuiltInCommandsSettingsRepository
+                .GetSettings(ref, params.twitchRoomId)
+            )
+        ) {
+          case Success(settings) =>
+            TwitchChatbot.NewBuiltInCommandsSettings(settings)
           case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, CommandsSettings](mediator, ref => ArchieMateMediator.SendCommandsSettingsRepositoryCommand(CommandsSettingsRepository.GetCommandsSettings(ref, params.twitchRoomId))) {
+        ctx.ask[ArchieMateMediator.Command, CommandsSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
+              CommandsSettingsRepository
+                .GetCommandsSettings(ref, params.twitchRoomId)
+            )
+        ) {
           case Success(settings) => TwitchChatbot.NewCommandsSettings(settings)
-          case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
+          case Failure(ex)       => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, VariablesSettings](mediator, ref => ArchieMateMediator.SendVariablesSettingsRepositoryCommand(VariablesSettingsRepository.GetVariablesSettings(ref, params.twitchRoomId))) {
+        ctx.ask[ArchieMateMediator.Command, VariablesSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendVariablesSettingsRepositoryCommand(
+              VariablesSettingsRepository
+                .GetVariablesSettings(ref, params.twitchRoomId)
+            )
+        ) {
           case Success(settings) => TwitchChatbot.NewVariablesSettings(settings)
-          case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
+          case Failure(ex)       => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, TimersSettings](mediator, ref => ArchieMateMediator.SendTimersSettingsRepositoryCommand(TimersSettingsRepository.GetSettings(ref, params.twitchRoomId))) {
+        ctx.ask[ArchieMateMediator.Command, TimersSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendTimersSettingsRepositoryCommand(
+              TimersSettingsRepository.GetSettings(ref, params.twitchRoomId)
+            )
+        ) {
           case Success(settings) => TwitchChatbot.NewTimersSettings(settings)
-          case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
+          case Failure(ex)       => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, OverlaysSettings](mediator, ref => ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(OverlaysSettingsRepository.GetSettings(ref, params.twitchRoomId))) {
+        ctx.ask[ArchieMateMediator.Command, OverlaysSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(
+              OverlaysSettingsRepository.GetSettings(ref, params.twitchRoomId)
+            )
+        ) {
           case Success(settings) => TwitchChatbot.NewOverlaysSettings(settings)
+          case Failure(ex)       => TwitchChatbot.FailedToGetSettings(ex)
+        }
+
+        ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettings](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(
+              AutomaticMessagesSettingsRepository
+                .GetSettings(ref, params.twitchRoomId)
+            )
+        ) {
+          case Success(settings) =>
+            TwitchChatbot.NewAutomaticMessagesSettings(settings)
           case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
         }
 
-        ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettings](mediator, ref => ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(AutomaticMessagesSettingsRepository.GetSettings(ref, params.twitchRoomId))) {
-          case Success(settings) => TwitchChatbot.NewAutomaticMessagesSettings(settings)
-          case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
-        }
-
-        ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetTokenUser](mediator, ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetTokenUserFromTokenId(ref, tokenId))) {
+        ctx.askWithStatus[
+          ArchieMateMediator.Command,
+          TwitchApiResponse.GetTokenUser
+        ](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendTwitchApiClientCommand(
+              TwitchApiClient.GetTokenUserFromTokenId(ref, tokenId)
+            )
+        ) {
           case Success(broadcaster) => TwitchChatbot.Broadcaster(broadcaster)
-          case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
+          case Failure(ex)          => TwitchChatbot.FailedToGetSettings(ex)
         }
 
         initial2(params.copy(tokenIdOption = Some(tokenId)))
 
       case TwitchChatbot.NoToken(None) =>
         ctx.log.error("No token available!")
-        supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(params.twitchRoomId)
+        supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
+          params.twitchRoomId
+        )
         Behaviors.stopped
 
       case TwitchChatbot.NoToken(Some(ex)) =>
@@ -185,16 +317,50 @@ class TwitchChatbot(using
         Behaviors.stopped // TODO: Make the actor restart in this case as this can be a temporary problem
 
       case other =>
-        ctx.log.warn("Received unexpected message {} in initial1 {}", other, params)
+        ctx.log.warn(
+          "Received unexpected message {} in initial1 {}",
+          other,
+          params
+        )
         Behaviors.same
     }
   }
 
-  private def initial2(params: InitialParameters): Behavior[TwitchChatbot.Command] = (params.tokenIdOption, params.basicChatbotSettingsOption, params.builtInCommandsSettingsOption, params.commandsSettingsOption, params.variablesSettingsOption, params.timersSettingsOption, params.overlaysSettingsOption, params.automaticMessagesSettingsOption, params.broadcasterOption) match {
-    case (Some(tokenId), Some(basicChatbotSettings), Some(builtInCommandsSettings), Some(commandsSettings), Some(variablesSettings), Some(timersSettings), Some(overlaysSettings), Some(automaticMessagesSettings), Some(broadcaster)) =>
+  private def initial2(
+      params: InitialParameters
+  ): Behavior[TwitchChatbot.Command] = (
+    params.tokenIdOption,
+    params.basicChatbotSettingsOption,
+    params.builtInCommandsSettingsOption,
+    params.commandsSettingsOption,
+    params.variablesSettingsOption,
+    params.timersSettingsOption,
+    params.overlaysSettingsOption,
+    params.automaticMessagesSettingsOption,
+    params.broadcasterOption
+  ) match {
+    case (
+          Some(tokenId),
+          Some(basicChatbotSettings),
+          Some(builtInCommandsSettings),
+          Some(commandsSettings),
+          Some(variablesSettings),
+          Some(timersSettings),
+          Some(overlaysSettings),
+          Some(automaticMessagesSettings),
+          Some(broadcaster)
+        ) =>
       withSettings(
         tokenId,
-        ChannelSettings(basicChatbotSettings, builtInCommandsSettings, commandsSettings, variablesSettings, timersSettings, overlaysSettings, automaticMessagesSettings),
+        ChannelSettings(
+          basicChatbotSettings,
+          builtInCommandsSettings,
+          commandsSettings,
+          variablesSettings,
+          timersSettings,
+          overlaysSettings,
+          automaticMessagesSettings
+        ),
         broadcaster
       )
 
@@ -219,7 +385,9 @@ class TwitchChatbot(using
           initial2(params.copy(overlaysSettingsOption = Some(settings)))
 
         case TwitchChatbot.NewAutomaticMessagesSettings(settings) =>
-          initial2(params.copy(automaticMessagesSettingsOption = Some(settings)))
+          initial2(
+            params.copy(automaticMessagesSettingsOption = Some(settings))
+          )
 
         case TwitchChatbot.Broadcaster(broadcaster) =>
           initial2(params.copy(broadcasterOption = Some(broadcaster)))
@@ -228,14 +396,20 @@ class TwitchChatbot(using
           Behaviors.stopped // TODO: Restart capability
 
         case other =>
-          ctx.log.warn("Received unexpected message {} in initial2 {}", other, params)
+          ctx.log.warn(
+            "Received unexpected message {} in initial2 {}",
+            other,
+            params
+          )
           Behaviors.same
       }
   }
 
-  def withSettings(tokenId: String,
-              channelSettings: ChannelSettings,
-              broadcaster: GetTokenUser): Behavior[TwitchChatbot.Command] = {
+  def withSettings(
+      tokenId: String,
+      channelSettings: ChannelSettings,
+      broadcaster: GetTokenUser
+  ): Behavior[TwitchChatbot.Command] = {
     val eventSubListener = ctx.spawn(
       EventSubListener(
         tokenId,
@@ -261,26 +435,30 @@ class TwitchChatbot(using
         channelSettings,
         broadcaster,
         eventSubListener,
-        ircListener,
+        ircListener
       )
     )
   }
 
   final case class InitializingParameters(
-    tokenId: String,
-    channelSettings: ChannelSettings,
-    broadcaster: GetTokenUser,
-    eventSubListener: ActorRef[EventSubListener.Command],
-    ircListener: ActorRef[IRCListener.Command],
-    mods: Option[GetModerators] = None,
-    vips: Option[GetVIPs] = None,
-    subs: Option[GetSubs] = None,
-    chatters: Option[GetChatters] = None,
-    stream: Option[Option[TwitchApi.Stream]] = None
+      tokenId: String,
+      channelSettings: ChannelSettings,
+      broadcaster: GetTokenUser,
+      eventSubListener: ActorRef[EventSubListener.Command],
+      ircListener: ActorRef[IRCListener.Command],
+      mods: Option[GetModerators] = None,
+      vips: Option[GetVIPs] = None,
+      subs: Option[GetSubs] = None,
+      chatters: Option[GetChatters] = None,
+      stream: Option[Option[TwitchApi.Stream]] = None
   )
 
-  private def initializing(params: InitializingParameters): Behavior[TwitchChatbot.Command] = {
-    if (params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty) {
+  private def initializing(
+      params: InitializingParameters
+  ): Behavior[TwitchChatbot.Command] = {
+    if (
+      params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty
+    ) {
       supervisor ! TwitchChatbotsSupervisor.JoinOK(params.broadcaster.id)
 
       val twitchCommandsService = ctx.spawn(
@@ -288,9 +466,17 @@ class TwitchChatbot(using
         TwitchCommandsService.actorName
       )
 
-      timers.startTimerAtFixedRate(TwitchChatbot.ChattersTimer, TwitchChatbot.ChattersTimer, 1 minute)
+      timers.startTimerAtFixedRate(
+        TwitchChatbot.ChattersTimer,
+        TwitchChatbot.ChattersTimer,
+        1 minute
+      )
       if (params.channelSettings.timersSettings.enabled) {
-        timers.startTimerAtFixedRate(TwitchChatbot.MessageTimer, TwitchChatbot.MessageTimer, params.channelSettings.timersSettings.intervalMinutes minutes)
+        timers.startTimerAtFixedRate(
+          TwitchChatbot.MessageTimer,
+          TwitchChatbot.MessageTimer,
+          params.channelSettings.timersSettings.intervalMinutes minutes
+        )
       }
       val mods = params.mods.get.data.toMapWithKey(_.user_id)
       val vips = params.vips.get.data.toMapWithKey(_.user_id)
@@ -331,8 +517,12 @@ class TwitchChatbot(using
         case TwitchChatbot.Stream(Some(stream)) =>
           initializing(params.copy(stream = Some(stream)))
 
-        case TwitchChatbot.Mods(None) | TwitchChatbot.VIPs(None) | TwitchChatbot.Subs(None) | TwitchChatbot.Chatters(None) | TwitchChatbot.Stream(None) =>
-          supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(params.broadcaster.id)
+        case TwitchChatbot.Mods(None) | TwitchChatbot.VIPs(None) |
+            TwitchChatbot.Subs(None) | TwitchChatbot.Chatters(None) |
+            TwitchChatbot.Stream(None) =>
+          supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
+            params.broadcaster.id
+          )
           Behaviors.stopped
 
         case other =>
@@ -342,7 +532,9 @@ class TwitchChatbot(using
     }
   }
 
-  private def operational(params: TwitchChatbot.OperationalParameters): Behavior[TwitchChatbot.Command] = Behaviors.receiveAndLogMessage {
+  private def operational(
+      params: TwitchChatbot.OperationalParameters
+  ): Behavior[TwitchChatbot.Command] = Behaviors.receiveAndLogMessage {
     case TwitchChatbot.ChattersTimer =>
       askForChatters(params.tokenId, params.broadcaster)
       Behaviors.same
@@ -350,34 +542,48 @@ class TwitchChatbot(using
     case TwitchChatbot.MessageTimer =>
       val timersSettings = params.channelSettings.timersSettings
       if (params.messagesAfterLastTimer >= timersSettings.minimumMessages) {
-        val tempLastTimers = if (params.lastTimers.length >= timersSettings.timersUntilNextAllowedRepeat) {
-          params.lastTimers.tail
-        } else {
-          params.lastTimers
-        }
-        val availableCommands: List[String] = timersSettings.commands.filter { commandName =>
-          tempLastTimers.forall {
-            case Left(unavailableCommandName) => unavailableCommandName != commandName
-            case Right(_) => true
+        val tempLastTimers =
+          if (
+            params.lastTimers.length >= timersSettings.timersUntilNextAllowedRepeat
+          ) {
+            params.lastTimers.tail
+          } else {
+            params.lastTimers
           }
+        val availableCommands: List[String] = timersSettings.commands.filter {
+          commandName =>
+            tempLastTimers.forall {
+              case Left(unavailableCommandName) =>
+                unavailableCommandName != commandName
+              case Right(_) => true
+            }
         }.toList
-        val availableManualTimers: List[ManualTimer] = timersSettings.manualTimers.filter { manualTimer =>
-          tempLastTimers.forall {
-            case Left(_) => true
-            case Right(unavailableManualTimerId) => unavailableManualTimerId != manualTimer.id
+        val availableManualTimers: List[ManualTimer] =
+          timersSettings.manualTimers.filter { manualTimer =>
+            tempLastTimers.forall {
+              case Left(_) => true
+              case Right(unavailableManualTimerId) =>
+                unavailableManualTimerId != manualTimer.id
+            }
           }
-        }
-        val nextTimerId = randomProvider.between(0, availableCommands.length + availableManualTimers.length)
+        val nextTimerId = randomProvider.between(
+          0,
+          availableCommands.length + availableManualTimers.length
+        )
         val nextTimer: Either[String, String] = {
           if (nextTimerId < availableCommands.length) {
             Left(availableCommands(nextTimerId))
           } else {
-            Right(availableManualTimers(nextTimerId - availableCommands.length).id)
+            Right(
+              availableManualTimers(nextTimerId - availableCommands.length).id
+            )
           }
         }
         val newLastTimers = tempLastTimers :+ nextTimer
-        val nextParams = params.copy(messagesAfterLastTimer = 0, lastTimers = newLastTimers)
-        nextParams.twitchCommandsService ! TwitchCommandsService.RespondForTimer(nextParams)
+        val nextParams =
+          params.copy(messagesAfterLastTimer = 0, lastTimers = newLastTimers)
+        nextParams.twitchCommandsService ! TwitchCommandsService
+          .RespondForTimer(nextParams)
       }
 
       Behaviors.same
@@ -413,20 +619,22 @@ class TwitchChatbot(using
         params.copy(
           chatters = currentChattersMap,
           allStreamChatters = params.stream match {
-            case None => currentChattersMap
+            case None    => currentChattersMap
             case Some(_) => params.allStreamChatters ++ currentChattersMap
           }
         )
       )
 
     case TwitchChatbot.Chatters(None) =>
-      supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(params.broadcaster.id)
+      supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
+        params.broadcaster.id
+      )
       Behaviors.stopped
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelUpdateEvent) =>
       params.stream match {
         case Some(_) => askForStream(params.tokenId, params.broadcaster)
-        case None =>
+        case None    =>
       }
 
       operational(
@@ -449,7 +657,9 @@ class TwitchChatbot(using
       operational(params.copy(stream = stream))
 
     case TwitchChatbot.Stream(None) =>
-      supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(params.broadcaster.id)
+      supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
+        params.broadcaster.id
+      )
       Behaviors.stopped
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelFollowEvent) =>
@@ -465,13 +675,23 @@ class TwitchChatbot(using
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelChatClearEvent) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelChatClearUserMessagesEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelChatClearUserMessagesEvent
+        ) =>
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelChatMessageEvent) =>
-      val user = TwitchApi.User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName)
+      val user =
+        TwitchApi.User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName)
       params.channelSettings.automaticMessagesSettings.knownGreets match {
-        case Some(knownGreetsSettings) if shouldGreet(user, knownGreetsSettings, params.mods.values.toList, params.vips.values.toList, params.subs.values.toList) =>
+        case Some(knownGreetsSettings)
+            if shouldGreet(
+              user,
+              knownGreetsSettings,
+              params.mods.values.toList,
+              params.vips.values.toList,
+              params.subs.values.toList
+            ) =>
           val (greet, name) = getGreetAndName(user, knownGreetsSettings)
           val finalGreet = greet.replaceAll("name".asVariableRegex, name)
           params.ircListener ! IRCListener.SendMessage(finalGreet)
@@ -479,50 +699,168 @@ class TwitchChatbot(using
         case _ =>
       }
 
+      val mentionedAfks: Iterable[TwitchApi.User] = {
+        params.afkConversations.keys
+          .map {
+            case params.broadcaster.id =>
+              Some(
+                TwitchApi.User(
+                  params.broadcaster.id,
+                  params.broadcaster.login,
+                  params.broadcaster.display_name
+                )
+              )
+            case modId if params.mods.keys.exists(_ == modId) =>
+              Some(params.mods(modId))
+            case vipId if params.vips.keys.exists(_ == vipId) =>
+              Some(params.vips(vipId))
+            case subId if params.subs.keys.exists(_ == subId) =>
+              Some(
+                params.subs.map((id, sub) =>
+                  (id -> TwitchApi
+                    .User(sub.user_id, sub.user_login, sub.user_name))
+                )(subId)
+              )
+            case chatterId
+                if params.allStreamChatters.keys.exists(_ == chatterId) =>
+              Some(params.allStreamChatters(chatterId))
+            case _ => None
+          }
+          .filter(_.nonEmpty)
+          .map(_.get)
+          .toList
+      }
+
+      val updatedAfkConversations: Map[String, List[String]] = {
+        if (mentionedAfks.isEmpty) {
+          Map.empty
+        } else if (mentionedAfks.tail.isEmpty) {
+          IRCListener.SendReplyMessage(
+            s"@${e.chatterUserName}, ${mentionedAfks.head.user_name} is AFK. When they get back I'll notify them.",
+            e.messageId
+          )
+          Map(
+            mentionedAfks.head.user_id -> (params.afkConversations(
+              mentionedAfks.head.user_id
+            ) :+ e.messageId)
+          )
+        } else {
+          IRCListener.SendReplyMessage(
+            s"@${e.chatterUserName}, the following users are AFK: ${mentionedAfks.map(_.user_name).mkString} - when they get back I'll notify them.",
+            e.messageId
+          )
+          mentionedAfks
+            .map(_.user_id)
+            .map(uid => uid -> (params.afkConversations(uid) :+ e.messageId))
+            .toMap
+        }
+      }
+
+      val userId = e.chatterUserId
+      val userDisplayName: String = if (params.broadcaster.id == userId) {
+        params.broadcaster.display_name
+      } else if (params.mods.keys.exists(_ == userId)) {
+        params.mods(userId).user_name
+      } else if (params.vips.keys.exists(_ == userId)) {
+        params.vips(userId).user_name
+      } else if (params.subs.keys.exists(_ == userId)) {
+        params.subs(userId).user_name
+      } else {
+        params.allStreamChatters.get(userId).map(_.user_name).getOrElse("")
+      }
+
+      if (params.afkConversations.keys.exists(_ == userId)) {
+        params.afkConversations(userId).foreach { conversationId =>
+          params.ircListener ! IRCListener
+            .SendReplyMessage(s"@$userDisplayName", conversationId)
+        }
+      }
+
       val newParams = params.copy(
         allStreamChatters = params.stream match {
-          case None => params.allStreamChatters
+          case None    => params.allStreamChatters
           case Some(_) => params.allStreamChatters + (e.chatterUserId -> user)
-        }
+        },
+        afkConversations =
+          (params.afkConversations ++ updatedAfkConversations) - e.chatterUserId
       )
 
-      newParams.twitchCommandsService ! TwitchCommandsService.RespondToCommand(newParams, e)
+      newParams.twitchCommandsService ! TwitchCommandsService.RespondToCommand(
+        newParams,
+        e
+      )
 
       operational(newParams)
 
     case TwitchChatbot.NewBasicChatbotSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(basicChatbotSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(basicChatbotSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewBuiltInCommandsSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(builtInCommandsSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(builtInCommandsSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewCommandsSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(commandsSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(commandsSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewVariablesSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(variablesSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(variablesSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewTimersSettings(settings) =>
       if (settings.enabled) {
-        timers.startTimerAtFixedRate(TwitchChatbot.MessageTimer, TwitchChatbot.MessageTimer, params.channelSettings.timersSettings.intervalMinutes minutes)
+        timers.startTimerAtFixedRate(
+          TwitchChatbot.MessageTimer,
+          TwitchChatbot.MessageTimer,
+          params.channelSettings.timersSettings.intervalMinutes minutes
+        )
       } else {
         timers.cancel(TwitchChatbot.MessageTimer)
       }
-      operational(params.copy(channelSettings = params.channelSettings.copy(timersSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(timersSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewOverlaysSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(overlaysSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(overlaysSettings = settings)
+        )
+      )
 
     case TwitchChatbot.NewAutomaticMessagesSettings(settings) =>
-      operational(params.copy(channelSettings = params.channelSettings.copy(automaticMessagesSettings = settings)))
+      operational(
+        params.copy(channelSettings =
+          params.channelSettings.copy(automaticMessagesSettings = settings)
+        )
+      )
 
     case TwitchChatbot.Broadcaster(broadcaster) =>
       operational(params.copy(broadcaster = broadcaster))
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelChatMessageDeleteEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelChatMessageDeleteEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelChatNotificationEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          e: eventsub.ChannelChatNotificationEvent
+        ) =>
       e.noticeType match {
         case "sub" =>
           val sub = e.sub.get
@@ -682,7 +1020,10 @@ class TwitchChatbot(using
       }
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelSubscribeEvent) =>
-      ctx.log.debug("User {} added as a new subscriber after ChannelSubscribeEvent", e.userName)
+      ctx.log.debug(
+        "User {} added as a new subscriber after ChannelSubscribeEvent",
+        e.userName
+      )
       operational(
         params.copy(subs =
           params.subs + (e.userId -> TwitchApi.SubbedUser(
@@ -706,7 +1047,9 @@ class TwitchChatbot(using
       ctx.log.debug("User {} is no longer a subscriber", e.userName)
       operational(params.copy(subs = params.subs - e.userId))
 
-    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelSubscriptionGiftEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          e: eventsub.ChannelSubscriptionGiftEvent
+        ) =>
       ctx.log.debug("User {} gifted subscription(s)", e.userName)
 
       val gift =
@@ -717,17 +1060,21 @@ class TwitchChatbot(using
 
       gift.foreach { g =>
         val key = g.keys.filter(_ <= e.total).max
-        val message = g(key).replaceAll("gifter".asVariableRegex, e.userName.getOrElse(""))
+        val message =
+          g(key).replaceAll("gifter".asVariableRegex, e.userName.getOrElse(""))
         params.ircListener ! IRCListener.SendMessage(message)
       }
 
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelSubscriptionMessageEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          e: eventsub.ChannelSubscriptionMessageEvent
+        ) =>
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelCheerEvent) =>
-      val userInMessage = if (e.isAnonymous) "An anonymous user" else s"User ${e.userName}"
+      val userInMessage =
+        if (e.isAnonymous) "An anonymous user" else s"User ${e.userName}"
       ctx.log.debug("{} cheered for {} bit(s)", userInMessage, e.bits)
       val cheer = if (e.isAnonymous) {
         params.channelSettings.automaticMessagesSettings.anonymousCheer
@@ -736,19 +1083,30 @@ class TwitchChatbot(using
       }
       cheer.foreach { c =>
         val key = c.keys.filter(_ <= e.bits).max
-        val message = c(key).replaceAll("user".asVariableRegex, e.userName.getOrElse(""))
+        val message =
+          c(key).replaceAll("user".asVariableRegex, e.userName.getOrElse(""))
         params.ircListener ! IRCListener.SendMessage(message)
       }
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelRaidEvent) =>
-      val (otherBroadcaster, msgOption) = (e.fromBroadcasterUserId, e.toBroadcasterUserId) match {
-        case (params.broadcaster.id, _) => (e.toBroadcasterUserName, params.channelSettings.automaticMessagesSettings.outgoingRaid)
-        case (_, params.broadcaster.id) => (e.fromBroadcasterUserName, params.channelSettings.automaticMessagesSettings.incomingRaid)
-        case _ => ("", None)
-      }
+      val (otherBroadcaster, msgOption) =
+        (e.fromBroadcasterUserId, e.toBroadcasterUserId) match {
+          case (params.broadcaster.id, _) =>
+            (
+              e.toBroadcasterUserName,
+              params.channelSettings.automaticMessagesSettings.outgoingRaid
+            )
+          case (_, params.broadcaster.id) =>
+            (
+              e.fromBroadcasterUserName,
+              params.channelSettings.automaticMessagesSettings.incomingRaid
+            )
+          case _ => ("", None)
+        }
       msgOption.foreach { msg =>
-        val message = msg.replaceAll("broadcaster".asVariableRegex, otherBroadcaster)
+        val message =
+          msg.replaceAll("broadcaster".asVariableRegex, otherBroadcaster)
         params.ircListener ! IRCListener.SendMessage(message)
       }
       Behaviors.same
@@ -763,7 +1121,8 @@ class TwitchChatbot(using
       ctx.log.debug("User {} added as a new moderator", e.userName)
       operational(
         params.copy(mods =
-          params.mods + (e.userId -> TwitchApi.User(e.userId, e.userLogin, e.userName))
+          params.mods + (e.userId -> TwitchApi
+            .User(e.userId, e.userLogin, e.userName))
         )
       )
 
@@ -771,22 +1130,34 @@ class TwitchChatbot(using
       ctx.log.debug("User {} is no longer a moderator", e.userName)
       operational(params.copy(mods = params.mods - e.userId))
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsAutomaticRewardRedemptionAddEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsAutomaticRewardRedemptionAddEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsCustomRewardAddEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsCustomRewardAddEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsCustomRewardUpdateEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsCustomRewardUpdateEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsCustomRewardRemoveEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsCustomRewardRemoveEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsCustomRewardRedemptionAddEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsCustomRewardRedemptionAddEvent
+        ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPointsCustomRewardRedemptionUpdateEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPointsCustomRewardRedemptionUpdateEvent
+        ) =>
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPollBeginEvent) =>
@@ -801,7 +1172,9 @@ class TwitchChatbot(using
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionBeginEvent) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionProgressEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelPredictionProgressEvent
+        ) =>
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionLockEvent) =>
@@ -814,7 +1187,8 @@ class TwitchChatbot(using
       ctx.log.debug("User {} added as a new VIP", e.userName)
       operational(
         params.copy(vips =
-          params.vips + (e.userId -> TwitchApi.User(e.userId, e.userLogin, e.userName))
+          params.vips + (e.userId -> TwitchApi
+            .User(e.userId, e.userLogin, e.userName))
         )
       )
 
@@ -834,7 +1208,9 @@ class TwitchChatbot(using
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelHypeTrainBeginEvent) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelHypeTrainProgressEvent) =>
+    case TwitchChatbot.EventSubEvent(
+          _: eventsub.ChannelHypeTrainProgressEvent
+        ) =>
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelHypeTrainEndEvent) =>
@@ -844,26 +1220,36 @@ class TwitchChatbot(using
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(e: eventsub.StreamOnlineEvent) =>
-      ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
-        mediator,
-        ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetStream(ref, params.tokenId, params.broadcaster.id))
-      ) {
-        case Success(GetStream(streams, _)) =>
-          val optionStream = streams.lastOption
-          optionStream.foreach { stream =>
-            params.channelSettings.automaticMessagesSettings.streamStart.foreach { msg =>
-              val message = msg
-                .replaceAll("game".asVariableRegex, stream.gameName)
-                .replaceAll("title".asVariableRegex, stream.title)
-              params.ircListener ! IRCListener.SendMessage(message)
+      ctx
+        .askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendTwitchApiClientCommand(
+              TwitchApiClient
+                .GetStream(ref, params.tokenId, params.broadcaster.id)
+            )
+        ) {
+          case Success(GetStream(streams, _)) =>
+            val optionStream = streams.lastOption
+            optionStream.foreach { stream =>
+              params.channelSettings.automaticMessagesSettings.streamStart
+                .foreach { msg =>
+                  val message = msg
+                    .replaceAll("game".asVariableRegex, stream.gameName)
+                    .replaceAll("title".asVariableRegex, stream.title)
+                  params.ircListener ! IRCListener.SendMessage(message)
+                }
             }
-          }
-          TwitchChatbot.Stream(Some(optionStream))
+            TwitchChatbot.Stream(Some(optionStream))
 
-        case Failure(ex) =>
-          ctx.log.error("Could not retrieve whether the channel {} is live", params.broadcaster.login, ex)
-          TwitchChatbot.Stream(None)
-      }
+          case Failure(ex) =>
+            ctx.log.error(
+              "Could not retrieve whether the channel {} is live",
+              params.broadcaster.login,
+              ex
+            )
+            TwitchChatbot.Stream(None)
+        }
       operational(
         params.copy(stream =
           Some(
@@ -889,8 +1275,9 @@ class TwitchChatbot(using
       )
 
     case TwitchChatbot.EventSubEvent(e: eventsub.StreamOfflineEvent) =>
-      params.channelSettings.automaticMessagesSettings.streamEnd.foreach { msg =>
-        params.ircListener ! IRCListener.SendMessage(msg)
+      params.channelSettings.automaticMessagesSettings.streamEnd.foreach {
+        msg =>
+          params.ircListener ! IRCListener.SendMessage(msg)
       }
       operational(params.copy(stream = None))
 
@@ -905,77 +1292,130 @@ class TwitchChatbot(using
         )
       )
 
+    case TwitchChatbot.Afk(chatterUserId) =>
+      operational(
+        params.copy(afkConversations =
+          params.afkConversations + (chatterUserId -> Nil)
+        )
+      )
+
     case msg =>
       ctx.log.warn("Ignoring message {}", msg)
       Behaviors.same
   }
 
-  private def askForMods(tokenId: String, broadcaster: GetTokenUser): Unit = ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetModerators](
+  private def askForMods(tokenId: String, broadcaster: GetTokenUser): Unit = ctx
+    .askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetModerators](
       mediator,
-      ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetModerators(ref, tokenId, broadcaster.id))
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          TwitchApiClient.GetModerators(ref, tokenId, broadcaster.id)
+        )
     ) {
       case Success(mods: GetModerators) =>
         TwitchChatbot.Mods(Some(mods))
 
       case Failure(ex) =>
-        ctx.log.error("Could not retrieve moderators of channel {}", broadcaster.login, ex)
+        ctx.log.error(
+          "Could not retrieve moderators of channel {}",
+          broadcaster.login,
+          ex
+        )
         TwitchChatbot.Mods(None)
     }
 
-  private def askForVIPs(tokenId: String, broadcaster: GetTokenUser): Unit = ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetVIPs](
-    mediator,
-    ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetVIPs(ref, tokenId, broadcaster.id))
-  ) {
-    case Success(vips: GetVIPs) =>
-      TwitchChatbot.VIPs(Some(vips))
+  private def askForVIPs(tokenId: String, broadcaster: GetTokenUser): Unit =
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetVIPs](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          TwitchApiClient.GetVIPs(ref, tokenId, broadcaster.id)
+        )
+    ) {
+      case Success(vips: GetVIPs) =>
+        TwitchChatbot.VIPs(Some(vips))
 
-    case Failure(ex) =>
-      ctx.log.error("Could not retrieve VIPs of channel {}", broadcaster.login, ex)
-      TwitchChatbot.VIPs(None)
-  }
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve VIPs of channel {}",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.VIPs(None)
+    }
 
-  private def askForSubs(tokenId: String, broadcaster: GetTokenUser): Unit = ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetSubs](
-    mediator,
-    ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetSubs(ref, tokenId, broadcaster.id))
-  ) {
-    case Success(subs: GetSubs) =>
-      TwitchChatbot.Subs(Some(subs))
+  private def askForSubs(tokenId: String, broadcaster: GetTokenUser): Unit =
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetSubs](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          TwitchApiClient.GetSubs(ref, tokenId, broadcaster.id)
+        )
+    ) {
+      case Success(subs: GetSubs) =>
+        TwitchChatbot.Subs(Some(subs))
 
-    case Failure(ex) =>
-      ctx.log.error("Could not retrieve subs of channel {}", broadcaster.login, ex)
-      TwitchChatbot.Subs(None)
-  }
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve subs of channel {}",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.Subs(None)
+    }
 
-  private def askForChatters(tokenId: String, broadcaster: GetTokenUser): Unit = ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetChatters](
-    mediator,
-    ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetChatters(ref, tokenId, broadcaster.id, broadcaster.id))
-  ) {
-    case Success(chatters: GetChatters) =>
-      TwitchChatbot.Chatters(Some(chatters))
+  private def askForChatters(tokenId: String, broadcaster: GetTokenUser): Unit =
+    ctx
+      .askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetChatters](
+        mediator,
+        ref =>
+          ArchieMateMediator.SendTwitchApiClientCommand(
+            TwitchApiClient
+              .GetChatters(ref, tokenId, broadcaster.id, broadcaster.id)
+          )
+      ) {
+        case Success(chatters: GetChatters) =>
+          TwitchChatbot.Chatters(Some(chatters))
 
-    case Failure(ex) =>
-      ctx.log.error("Could not retrieve chatters of channel {}", broadcaster.login, ex)
-      TwitchChatbot.Chatters(None)
-  }
+        case Failure(ex) =>
+          ctx.log.error(
+            "Could not retrieve chatters of channel {}",
+            broadcaster.login,
+            ex
+          )
+          TwitchChatbot.Chatters(None)
+      }
 
-  private def askForStream(tokenId: String, broadcaster: GetTokenUser): Unit = ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
-    mediator,
-    ref => ArchieMateMediator.SendTwitchApiClientCommand(TwitchApiClient.GetStream(ref, tokenId, broadcaster.id))
-  ) {
-    case Success(GetStream(List(stream), _)) =>
-      TwitchChatbot.Stream(Some(Some(stream)))
+  private def askForStream(tokenId: String, broadcaster: GetTokenUser): Unit =
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          TwitchApiClient.GetStream(ref, tokenId, broadcaster.id)
+        )
+    ) {
+      case Success(GetStream(List(stream), _)) =>
+        TwitchChatbot.Stream(Some(Some(stream)))
 
-    case Success(GetStream(Nil, _)) =>
-      TwitchChatbot.Stream(Some(None))
+      case Success(GetStream(Nil, _)) =>
+        TwitchChatbot.Stream(Some(None))
 
-    case Success(GetStream(streams, _)) =>
-      ctx.log.warn("Received stream response for channel {} with unexpected amount of streams when expected one stream or none: {}", broadcaster.login, streams)
-      TwitchChatbot.Stream(Some(streams.lastOption))
+      case Success(GetStream(streams, _)) =>
+        ctx.log.warn(
+          "Received stream response for channel {} with unexpected amount of streams when expected one stream or none: {}",
+          broadcaster.login,
+          streams
+        )
+        TwitchChatbot.Stream(Some(streams.lastOption))
 
-    case Failure(ex) =>
-      ctx.log.error("Could not retrieve whether channel {} is live", broadcaster.login, ex)
-      TwitchChatbot.Stream(Some(None))
-  }
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve whether channel {} is live",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.Stream(Some(None))
+    }
 
   private def shouldGreet(
       user: TwitchApi.User,
@@ -984,19 +1424,32 @@ class TwitchChatbot(using
       vips: List[TwitchApi.User],
       subs: List[TwitchApi.SubbedUser]
   ): Boolean = settings.mode match {
-    case KnownGreetsMode.All => true
-    case KnownGreetsMode.Mods => isMod(user, mods)
+    case KnownGreetsMode.All      => true
+    case KnownGreetsMode.Mods     => isMod(user, mods)
     case KnownGreetsMode.ModsVips => isMod(user, mods) || isVip(user, vips)
-    case KnownGreetsMode.ModsVipsSubs => isMod(user, mods) || isVip(user, vips) || isSub(user, subs)
+    case KnownGreetsMode.ModsVipsSubs =>
+      isMod(user, mods) || isVip(user, vips) || isSub(user, subs)
   }
 
-  private def isMod(user: TwitchApi.User, mods: List[TwitchApi.User]): Boolean = mods.contains(user)
-  private def isVip(user: TwitchApi.User, vips: List[TwitchApi.User]): Boolean = vips.contains(user)
-  private def isSub(user: TwitchApi.User, subs: List[TwitchApi.SubbedUser]): Boolean = subs.exists(_.user_id == user.user_id)
+  private def isMod(user: TwitchApi.User, mods: List[TwitchApi.User]): Boolean =
+    mods.contains(user)
+  private def isVip(user: TwitchApi.User, vips: List[TwitchApi.User]): Boolean =
+    vips.contains(user)
+  private def isSub(
+      user: TwitchApi.User,
+      subs: List[TwitchApi.SubbedUser]
+  ): Boolean = subs.exists(_.user_id == user.user_id)
 
-  private def getGreetAndName(user: TwitchApi.User, settings: KnownGreetsSettings): (String, String) = {
-    val greet = settings.specificGreets.getOrElse(user.user_id, settings.standardGreets.randomOrDefault("Hey"))
-    val name = settings.specificNames.getOrElse(user.user_id, s"@${user.user_name}")
+  private def getGreetAndName(
+      user: TwitchApi.User,
+      settings: KnownGreetsSettings
+  ): (String, String) = {
+    val greet = settings.specificGreets.getOrElse(
+      user.user_id,
+      settings.standardGreets.randomOrDefault("Hey")
+    )
+    val name =
+      settings.specificNames.getOrElse(user.user_id, s"@${user.user_name}")
     (greet, name)
   }
 }
