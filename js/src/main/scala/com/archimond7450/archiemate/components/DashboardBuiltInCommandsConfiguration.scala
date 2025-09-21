@@ -42,9 +42,12 @@ object DashboardBuiltInCommandsConfiguration {
                   old.copy(uptime = uptime)
                 )
               val followage: Var[Boolean] =
-                state.zoomLazy(_.followage)((old, followage) =>
-                  old.copy(followage = followage)
+                state.zoomLazy(_.followage)((old, newFollowage) =>
+                  old.copy(followage = newFollowage)
                 )
+              val afk: Var[Boolean] =
+                state.zoomLazy(_.afk)((old, newAfk) => old.copy(afk = newAfk))
+
               form(
                 onSubmit.preventDefault --> { _ => },
                 div(
@@ -71,6 +74,11 @@ object DashboardBuiltInCommandsConfiguration {
                   cls("flex items-start flex-col md:flex-row"),
                   pElement("!followage"),
                   switch("followage", "Off", "On", followage)
+                ),
+                div(
+                  cls("flex items-start flex-col md:flex-row"),
+                  pElement("!afk"),
+                  switch("afk", "Off", "On", afk)
                 ),
                 SaveButton.render[BuiltInCommandsSettings](
                   state,

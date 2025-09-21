@@ -34,7 +34,8 @@ object ChannelSettings {
       title: Boolean = false,
       subs: Boolean = false,
       uptime: Boolean = false,
-      followage: Boolean = false
+      followage: Boolean = false,
+      afk: Boolean = false
   )
 
   case object BuiltInCommandsSettings {
