@@ -768,8 +768,32 @@ class TwitchChatbot(using
           )
       }
 
+      val formerAfk: Map[String, TwitchChatbot.UserState] =
+        if (
+          params.users.exists((userId, userState) =>
+            userId == e.chatterUserId && userState.flags
+              .contains(TwitchChatbot.UserFlag.Afk)
+          )
+        ) {
+          val userState = params.users(e.chatterUserId)
+          userState.afkConversations.foreach { messageId =>
+            params.ircListener ! IRCListener.SendReplyMessage(
+              s"@${userState.user.user_name}",
+              messageId
+            )
+          }
+          Map(
+            e.chatterUserId -> userState.copy(
+              flags = userState.flags - TwitchChatbot.UserFlag.Afk,
+              afkConversations = Set.empty
+            )
+          )
+        } else {
+          Map.empty
+        }
+
       val newParams = params.copy(
-        users = params.users ++ mentionedAfks
+        users = params.users ++ mentionedAfks ++ formerAfk
       )
 
       newParams.twitchCommandsService ! TwitchCommandsService.RespondToCommand(
