@@ -756,12 +756,13 @@ class TwitchChatbot(using
         )
 
       mentionedAfks.size match {
+        case never if never <= 0 =>
         case 1 =>
           IRCListener.SendReplyMessage(
             s"@${e.chatterUserName}, ${mentionedAfks(mentionedAfks.keySet.head).user.user_name} is AFK. When they get back I'll notify them.",
             e.messageId
           )
-        case 2 =>
+        case _ =>
           IRCListener.SendReplyMessage(
             s"@${e.chatterUserName}, the following users are AFK: ${mentionedAfks.map(_._2.user.user_name).mkString} - when they get back I'll notify them.",
             e.messageId
