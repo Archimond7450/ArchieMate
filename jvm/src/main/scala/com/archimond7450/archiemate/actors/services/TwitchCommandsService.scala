@@ -616,7 +616,7 @@ class TwitchCommandsService(using
           cmd,
           chatters,
           Some(
-            s"$${sender}, you can find the commands for this channel on https://archiemate.com/t/${cmd.chatbotParams.broadcaster.login}/commands"
+            s"$${sender}, you can find the commands for this channel on https://archiemate.com/t/commands/${cmd.chatbotParams.broadcaster.login}"
           )
         )
       }
