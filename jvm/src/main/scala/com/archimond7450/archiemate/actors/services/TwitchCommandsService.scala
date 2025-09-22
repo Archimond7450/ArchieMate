@@ -325,7 +325,11 @@ class TwitchCommandsService(using
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val channelName = cmd.chatbotParams.broadcaster.login
         val isBroadcaster = broadcasterId == cmd.e.chatterUserId
-        val isModerator = cmd.chatbotParams.mods.contains(cmd.e.chatterUserId)
+        val isModerator = cmd.chatbotParams.users.exists((userId, userState) =>
+          userId == cmd.e.chatterUserId && userState.flags.contains(
+            TwitchChatbot.UserFlag.Mod
+          )
+        )
         if (isBroadcaster || isModerator) {
           if (strParameters.nonEmpty) {
             val actionEnd = strParameters.indexOf(' ')
@@ -734,7 +738,7 @@ class TwitchCommandsService(using
                 cmd,
                 chatters,
                 Some(
-                  s"$${sender}, I cannot confirm the variables ${parameters.mkString} have been successsfully unset... $problemDiscord"
+                  s"$${sender}, I cannot confirm the variables ${parameters.mkString} have been successfully unset... $problemDiscord"
                 )
               )
           }
@@ -788,8 +792,10 @@ class TwitchCommandsService(using
               )
           }
         } else if (
-          chatterUserId == broadcasterId || cmd.chatbotParams.mods.contains(
-            chatterUserId
+          chatterUserId == broadcasterId || cmd.chatbotParams.users.exists(
+            (userId, userState) =>
+              userId == chatterUserId && userState.flags
+                .contains(TwitchChatbot.UserFlag.Mod)
           )
         ) {
           val newTitle = strParameters
@@ -873,8 +879,10 @@ class TwitchCommandsService(using
               )
           }
         } else if (
-          chatterUserId == broadcasterId || cmd.chatbotParams.mods.contains(
-            chatterUserId
+          chatterUserId == broadcasterId || cmd.chatbotParams.users.exists(
+            (userId, userState) =>
+              userId == chatterUserId && userState.flags
+                .contains(TwitchChatbot.UserFlag.Mod)
           )
         ) {
           val gameName = strParameters
@@ -898,7 +906,7 @@ class TwitchCommandsService(using
                 cmd,
                 chatters,
                 Some(
-                  s"$${sender}, the channel game has been successfully changed."
+                  s"$${sender}, the channel game has been successfully changed to $gameName."
                 )
               )
 
@@ -936,7 +944,9 @@ class TwitchCommandsService(using
           String,
           ActorRef[TwitchChatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
-        val subCount = cmd.chatbotParams.subs.size
+        val subCount = cmd.chatbotParams.users.count(
+          _._2.flags.contains(TwitchChatbot.UserFlag.Sub)
+        )
         val (isOrAre, subCountNum, subOrSubs) =
           if (subCount == 1) ("is", "one", "sub")
           else ("are", if (subCount == 0) "no" else subCount.toString, "subs")
@@ -1006,11 +1016,11 @@ class TwitchCommandsService(using
           if (strParameters.isEmpty) {
             Some(cmd.e.chatterUserId)
           } else {
-            cmd.chatbotParams.chatters
+            cmd.chatbotParams.users
               .find(
-                _._2.user_login == chatterName.stripPrefix("@").toLowerCase
+                _._2.user.user_login == chatterName.stripPrefix("@").toLowerCase
               )
-              .map(_._2.user_id)
+              .map(_._2.user.user_id)
           }
         }
 
@@ -1084,7 +1094,7 @@ class TwitchCommandsService(using
       override val name: String = "afk"
 
       private val replies =
-        Seq("see you soon!", "allright, then!", "I'll keep that in mind.")
+        Seq("see you soon!", "alright, then!", "I'll keep that in mind.")
 
       override val getCommandResponse: (
           TwitchCommandsService.RespondToCommand,
@@ -1101,10 +1111,13 @@ class TwitchCommandsService(using
         )
         val userId = cmd.e.chatterUserId
         if (
-          cmd.chatbotParams.broadcaster.id == userId || cmd.chatbotParams.mods.keys
-            .exists(_ == userId) || cmd.chatbotParams.vips.keys.exists(
-            _ == userId
-          ) || cmd.chatbotParams.subs.keys.exists(_ == userId)
+          cmd.chatbotParams.users.exists((userId, userState) =>
+            userId == userId && (userState.flags
+              .contains(TwitchChatbot.UserFlag.Streamer) || userState.flags
+              .contains(TwitchChatbot.UserFlag.Mod) || userState.flags.contains(
+              TwitchChatbot.UserFlag.Vip
+            ) || userState.flags.contains(TwitchChatbot.UserFlag.Sub))
+          )
         ) {
           chatbot ! TwitchChatbot.Afk(userId)
         }

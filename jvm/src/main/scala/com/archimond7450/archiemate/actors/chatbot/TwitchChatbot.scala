@@ -97,6 +97,25 @@ object TwitchChatbot {
   private case object ChattersTimer extends Command
   private case object MessageTimer extends Command
 
+  sealed trait UserFlag
+  object UserFlag {
+    object Streamer extends UserFlag
+    object Mod extends UserFlag
+    object Vip extends UserFlag
+    object Sub extends UserFlag
+    object Online extends UserFlag
+    object Spoke extends UserFlag
+    object Afk extends UserFlag
+    object Ignore extends UserFlag
+  }
+
+  final case class UserState(
+      user: TwitchApi.User,
+      flags: Set[UserFlag] = Set.empty,
+      subInfo: Option[TwitchApi.SubbedUser] = None,
+      afkConversations: Set[String] = Set.empty
+  )
+
   final case class OperationalParameters(
       tokenId: String,
       channelSettings: ChannelSettings,
@@ -104,15 +123,10 @@ object TwitchChatbot {
       eventSubListener: ActorRef[EventSubListener.Command],
       ircListener: ActorRef[IRCListener.Command],
       twitchCommandsService: ActorRef[TwitchCommandsService.Command],
-      mods: Map[String, TwitchApi.User],
-      vips: Map[String, TwitchApi.User],
-      subs: Map[String, TwitchApi.SubbedUser],
-      chatters: Map[String, TwitchApi.User],
+      users: Map[String, UserState],
       stream: Option[TwitchApi.Stream],
-      allStreamChatters: Map[String, TwitchApi.User],
       messagesAfterLastTimer: Int = 0,
-      lastTimers: Seq[Either[String, String]] = Seq.empty,
-      afkConversations: Map[String, List[String]] = Map.empty
+      lastTimers: Seq[Either[String, String]] = Seq.empty
   )
 
   def apply(twitchRoomId: String)(using
@@ -481,7 +495,27 @@ class TwitchChatbot(using
       val mods = params.mods.get.data.toMapWithKey(_.user_id)
       val vips = params.vips.get.data.toMapWithKey(_.user_id)
       val subs = params.subs.get.data.toMapWithKey(_.user_id)
+      val subsAsUser = subs.map((userId, sub) =>
+        userId -> TwitchApi.User(sub.user_id, sub.user_login, sub.user_name)
+      )
       val chatters = params.chatters.get.data.toMapWithKey(_.user_id)
+      val usersState: Map[String, TwitchChatbot.UserState] =
+        (mods ++ vips ++ subsAsUser ++ chatters).map { (userId, user) =>
+          val flags = Seq(
+            mods.get(userId).map(_ => TwitchChatbot.UserFlag.Mod),
+            vips.get(userId).map(_ => TwitchChatbot.UserFlag.Vip),
+            subs.get(userId).map(_ => TwitchChatbot.UserFlag.Sub),
+            chatters.get(userId).map(_ => TwitchChatbot.UserFlag.Online),
+            if (params.broadcaster.id == userId)
+              Some(TwitchChatbot.UserFlag.Streamer)
+            else None,
+            if (settings.twitchIRCUsername == user.user_login)
+              Some(TwitchChatbot.UserFlag.Ignore)
+            else None
+          ).filter(_.nonEmpty).map(_.get).toSet
+          val subInfo = subs.get(userId)
+          userId -> TwitchChatbot.UserState(user, flags, subInfo)
+        }
       buffer.unstashAll(
         operational(
           TwitchChatbot.OperationalParameters(
@@ -491,12 +525,8 @@ class TwitchChatbot(using
             params.eventSubListener,
             params.ircListener,
             twitchCommandsService,
-            mods,
-            vips,
-            subs,
-            chatters,
-            params.stream.get,
-            Map.empty
+            usersState,
+            params.stream.get
           )
         )
       )
@@ -591,21 +621,33 @@ class TwitchChatbot(using
     case TwitchChatbot.Chatters(Some(chattersResponse)) =>
       val currentChatters = chattersResponse.data
 
+      val newUsers =
+        currentChatters.toMapWithKey(_.user_id).map { (userId, user) =>
+          val existingUserOption = params.users.get(userId)
+          userId -> TwitchChatbot.UserState(
+            user,
+            existingUserOption
+              .map(_.flags)
+              .getOrElse(Set.empty) + TwitchChatbot.UserFlag.Online,
+            existingUserOption.flatMap(_.subInfo),
+            existingUserOption.map(_.afkConversations).getOrElse(Set.empty)
+          )
+        }
+
       params.channelSettings.automaticMessagesSettings.knownGreets match {
         case Some(knownGreetsSettings) =>
-          currentChatters
-            .filter(
+          newUsers
+            .filter((_, userState) =>
               shouldGreet(
-                _,
-                knownGreetsSettings,
-                params.mods.values.toList,
-                params.vips.values.toList,
-                params.subs.values.toList
+                userState,
+                knownGreetsSettings
               )
             )
-            .diff(params.allStreamChatters.values.toSeq)
-            .foreach { user =>
-              val (greet, name) = getGreetAndName(user, knownGreetsSettings)
+            .keySet
+            .diff(params.users.keySet)
+            .foreach { userId =>
+              val (greet, name) =
+                getGreetAndName(params.users(userId), knownGreetsSettings)
               val finalGreet = greet.replaceAll("name".asVariableRegex, name)
               params.ircListener ! IRCListener.SendMessage(finalGreet)
             }
@@ -613,15 +655,9 @@ class TwitchChatbot(using
         case None =>
       }
 
-      val currentChattersMap = currentChatters.toMapWithKey(_.user_id)
-
       operational(
         params.copy(
-          chatters = currentChattersMap,
-          allStreamChatters = params.stream match {
-            case None    => currentChattersMap
-            case Some(_) => params.allStreamChatters ++ currentChattersMap
-          }
+          users = params.users ++ newUsers
         )
       )
 
@@ -680,109 +716,60 @@ class TwitchChatbot(using
         ) =>
       Behaviors.same
 
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelChatMessageEvent)
+        if params.users.exists((userId, userState) =>
+          userId == e.chatterUserId && userState.flags
+            .contains(TwitchChatbot.UserFlag.Ignore)
+        ) =>
+      Behaviors.same
+
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelChatMessageEvent) =>
-      val user =
-        TwitchApi.User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName)
+      val userState = params.users.getOrElse(
+        e.chatterUserId,
+        TwitchChatbot.UserState(
+          TwitchApi.User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName)
+        )
+      )
       params.channelSettings.automaticMessagesSettings.knownGreets match {
         case Some(knownGreetsSettings)
             if shouldGreet(
-              user,
-              knownGreetsSettings,
-              params.mods.values.toList,
-              params.vips.values.toList,
-              params.subs.values.toList
+              userState,
+              knownGreetsSettings
             ) =>
-          val (greet, name) = getGreetAndName(user, knownGreetsSettings)
+          val (greet, name) =
+            getGreetAndName(userState, knownGreetsSettings)
           val finalGreet = greet.replaceAll("name".asVariableRegex, name)
           params.ircListener ! IRCListener.SendMessage(finalGreet)
 
         case _ =>
       }
 
-      val mentionedAfks: Iterable[TwitchApi.User] = {
-        params.afkConversations.keys
-          .map {
-            case params.broadcaster.id =>
-              Some(
-                TwitchApi.User(
-                  params.broadcaster.id,
-                  params.broadcaster.login,
-                  params.broadcaster.display_name
-                )
-              )
-            case modId if params.mods.keys.exists(_ == modId) =>
-              Some(params.mods(modId))
-            case vipId if params.vips.keys.exists(_ == vipId) =>
-              Some(params.vips(vipId))
-            case subId if params.subs.keys.exists(_ == subId) =>
-              Some(
-                params.subs.map((id, sub) =>
-                  (id -> TwitchApi
-                    .User(sub.user_id, sub.user_login, sub.user_name))
-                )(subId)
-              )
-            case chatterId
-                if params.allStreamChatters.keys.exists(_ == chatterId) =>
-              Some(params.allStreamChatters(chatterId))
-            case _ => None
-          }
-          .filter(_.nonEmpty)
-          .map(_.get)
-          .toList
-      }
+      val mentionedAfks = params.users
+        .filter((userId, userState) =>
+          userState.flags.contains(
+            TwitchChatbot.UserFlag.Afk
+          ) && e.message.text.toLowerCase.contains(userState.user.user_login)
+        )
+        .map((userId, userState) =>
+          userId -> userState
+            .copy(afkConversations = userState.afkConversations + e.messageId)
+        )
 
-      val updatedAfkConversations: Map[String, List[String]] = {
-        if (mentionedAfks.isEmpty) {
-          Map.empty
-        } else if (mentionedAfks.tail.isEmpty) {
+      mentionedAfks.size match {
+        case 1 =>
           IRCListener.SendReplyMessage(
-            s"@${e.chatterUserName}, ${mentionedAfks.head.user_name} is AFK. When they get back I'll notify them.",
+            s"@${e.chatterUserName}, ${mentionedAfks(mentionedAfks.keySet.head).user.user_name} is AFK. When they get back I'll notify them.",
             e.messageId
           )
-          Map(
-            mentionedAfks.head.user_id -> (params.afkConversations(
-              mentionedAfks.head.user_id
-            ) :+ e.messageId)
-          )
-        } else {
+        case 2 =>
           IRCListener.SendReplyMessage(
-            s"@${e.chatterUserName}, the following users are AFK: ${mentionedAfks.map(_.user_name).mkString} - when they get back I'll notify them.",
+            s"@${e.chatterUserName}, the following users are AFK: ${mentionedAfks.map(_._2.user.user_name).mkString} - when they get back I'll notify them.",
             e.messageId
           )
-          mentionedAfks
-            .map(_.user_id)
-            .map(uid => uid -> (params.afkConversations(uid) :+ e.messageId))
-            .toMap
-        }
-      }
-
-      val userId = e.chatterUserId
-      val userDisplayName: String = if (params.broadcaster.id == userId) {
-        params.broadcaster.display_name
-      } else if (params.mods.keys.exists(_ == userId)) {
-        params.mods(userId).user_name
-      } else if (params.vips.keys.exists(_ == userId)) {
-        params.vips(userId).user_name
-      } else if (params.subs.keys.exists(_ == userId)) {
-        params.subs(userId).user_name
-      } else {
-        params.allStreamChatters.get(userId).map(_.user_name).getOrElse("")
-      }
-
-      if (params.afkConversations.keys.exists(_ == userId)) {
-        params.afkConversations(userId).foreach { conversationId =>
-          params.ircListener ! IRCListener
-            .SendReplyMessage(s"@$userDisplayName", conversationId)
-        }
       }
 
       val newParams = params.copy(
-        allStreamChatters = params.stream match {
-          case None    => params.allStreamChatters
-          case Some(_) => params.allStreamChatters + (e.chatterUserId -> user)
-        },
-        afkConversations =
-          (params.afkConversations ++ updatedAfkConversations) - e.chatterUserId
+        users = params.users ++ mentionedAfks
       )
 
       newParams.twitchCommandsService ! TwitchCommandsService.RespondToCommand(
@@ -868,27 +855,36 @@ class TwitchChatbot(using
           val months = sub.durationMonths
 
           // TODO: send message
+          val userState = params.users.getOrElse(
+            e.chatterUserId,
+            TwitchChatbot.UserState(
+              TwitchApi
+                .User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName),
+              Set(TwitchChatbot.UserFlag.Online)
+            )
+          )
+          val subbedUser = e.chatterUserId -> userState.copy(
+            flags = userState.flags + TwitchChatbot.UserFlag.Sub,
+            subInfo = Some(
+              TwitchApi.SubbedUser(
+                broadcaster_id = e.broadcasterUserId,
+                broadcaster_login = e.broadcasterUserLogin,
+                broadcaster_name = e.broadcasterUserName,
+                gifter_id = "",
+                gifter_login = "",
+                gifter_name = "",
+                is_gift = false,
+                tier = sub.subTier,
+                plan_name = "",
+                user_id = e.chatterUserId,
+                user_login = e.chatterUserLogin,
+                user_name = e.chatterUserName
+              )
+            )
+          )
 
           operational(
-            params.copy(subs =
-              params.subs + (e.chatterUserId -> params.subs.getOrElse(
-                e.chatterUserId,
-                TwitchApi.SubbedUser(
-                  broadcaster_id = e.broadcasterUserId,
-                  broadcaster_login = e.broadcasterUserLogin,
-                  broadcaster_name = e.broadcasterUserName,
-                  gifter_id = "",
-                  gifter_login = "",
-                  gifter_name = "",
-                  is_gift = false,
-                  tier = sub.subTier,
-                  plan_name = "",
-                  user_id = e.chatterUserId,
-                  user_login = e.chatterUserLogin,
-                  user_name = e.chatterUserName
-                )
-              ))
-            )
+            params.copy(users = params.users + subbedUser)
           )
 
         case "resub" =>
@@ -897,26 +893,37 @@ class TwitchChatbot(using
           val months = resub.cumulativeMonths
 
           // TODO: send message
+          val userState = params.users.getOrElse(
+            e.chatterUserId,
+            TwitchChatbot.UserState(
+              TwitchApi
+                .User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName),
+              Set(TwitchChatbot.UserFlag.Online)
+            )
+          )
+          val subbedUser = e.chatterUserId -> userState.copy(
+            flags = userState.flags + TwitchChatbot.UserFlag.Sub,
+            subInfo = Some(
+              TwitchApi.SubbedUser(
+                broadcaster_id = e.broadcasterUserId,
+                broadcaster_login = e.broadcasterUserLogin,
+                broadcaster_name = e.broadcasterUserName,
+                gifter_id = resub.gifterUserId.getOrElse(""),
+                gifter_login = resub.gifterUserLogin.getOrElse(""),
+                gifter_name = resub.gifterUserName.getOrElse(""),
+                is_gift = resub.isGift,
+                tier = resub.subTier,
+                plan_name = "",
+                user_id = e.chatterUserId,
+                user_login = e.chatterUserLogin,
+                user_name = e.chatterUserName
+              )
+            )
+          )
 
           operational(
-            params.copy(subs =
-              params.subs + (e.chatterUserId -> params.subs.getOrElse(
-                e.chatterUserId,
-                TwitchApi.SubbedUser(
-                  broadcaster_id = e.broadcasterUserId,
-                  broadcaster_login = e.broadcasterUserLogin,
-                  broadcaster_name = e.broadcasterUserName,
-                  gifter_id = resub.gifterUserId.getOrElse(""),
-                  gifter_login = resub.gifterUserLogin.getOrElse(""),
-                  gifter_name = resub.gifterUserName.getOrElse(""),
-                  is_gift = resub.isGift,
-                  tier = resub.subTier,
-                  plan_name = "",
-                  user_id = e.chatterUserId,
-                  user_login = e.chatterUserLogin,
-                  user_name = e.chatterUserName
-                )
-              ))
+            params.copy(
+              users = params.users + subbedUser
             )
           )
 
@@ -926,26 +933,42 @@ class TwitchChatbot(using
           val totalGifts = subGift.cumulativeTotal
 
           // TODO: send message only if not part of community sub gift
+          val userState = params.users.getOrElse(
+            subGift.recipientUserId,
+            TwitchChatbot.UserState(
+              TwitchApi
+                .User(
+                  subGift.recipientUserId,
+                  subGift.recipientUserLogin,
+                  subGift.recipientUserName
+                ),
+              Set(TwitchChatbot.UserFlag.Online)
+            )
+          )
+
+          val subbedUser = subGift.recipientUserId -> userState.copy(
+            flags = userState.flags + TwitchChatbot.UserFlag.Sub,
+            subInfo = Some(
+              TwitchApi.SubbedUser(
+                broadcaster_id = e.broadcasterUserId,
+                broadcaster_login = e.broadcasterUserLogin,
+                broadcaster_name = e.broadcasterUserName,
+                gifter_id = e.chatterUserId,
+                gifter_login = e.chatterUserLogin,
+                gifter_name = e.chatterUserName,
+                is_gift = true,
+                tier = subGift.subTier,
+                plan_name = "",
+                user_id = subGift.recipientUserId,
+                user_login = subGift.recipientUserLogin,
+                user_name = subGift.recipientUserName
+              )
+            )
+          )
 
           operational(
-            params.copy(subs =
-              params.subs + (subGift.recipientUserId -> params.subs.getOrElse(
-                subGift.recipientUserId,
-                TwitchApi.SubbedUser(
-                  broadcaster_id = e.broadcasterUserId,
-                  broadcaster_login = e.broadcasterUserLogin,
-                  broadcaster_name = e.broadcasterUserName,
-                  gifter_id = e.chatterUserId,
-                  gifter_login = e.chatterUserLogin,
-                  gifter_name = e.chatterUserName,
-                  is_gift = true,
-                  tier = subGift.subTier,
-                  plan_name = "",
-                  user_id = subGift.recipientUserId,
-                  user_login = subGift.recipientUserLogin,
-                  user_name = subGift.recipientUserName
-                )
-              ))
+            params.copy(
+              users = params.users + subbedUser
             )
           )
 
@@ -1024,9 +1047,18 @@ class TwitchChatbot(using
         "User {} added as a new subscriber after ChannelSubscribeEvent",
         e.userName
       )
-      operational(
-        params.copy(subs =
-          params.subs + (e.userId -> TwitchApi.SubbedUser(
+      val userState = params.users.getOrElse(
+        e.userId,
+        TwitchChatbot.UserState(
+          TwitchApi
+            .User(e.userId, e.userLogin, e.userName),
+          Set(TwitchChatbot.UserFlag.Online)
+        )
+      )
+      val subbedUser = e.userId -> userState.copy(
+        flags = userState.flags + TwitchChatbot.UserFlag.Sub,
+        subInfo = Some(
+          TwitchApi.SubbedUser(
             broadcaster_id = e.broadcasterUserId,
             broadcaster_login = e.broadcasterUserLogin,
             broadcaster_name = e.broadcasterUserName,
@@ -1039,13 +1071,34 @@ class TwitchChatbot(using
             user_id = e.userId,
             user_login = e.userLogin,
             user_name = e.userName
-          ))
+          )
+        )
+      )
+      operational(
+        params.copy(
+          users = params.users + subbedUser
         )
       )
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelSubscriptionEndEvent) =>
       ctx.log.debug("User {} is no longer a subscriber", e.userName)
-      operational(params.copy(subs = params.subs - e.userId))
+      val userState = params.users.getOrElse(
+        e.userId,
+        TwitchChatbot.UserState(
+          TwitchApi
+            .User(e.userId, e.userLogin, e.userName),
+          Set(TwitchChatbot.UserFlag.Online)
+        )
+      )
+      val unsubbedUser = e.userId -> userState.copy(
+        flags = userState.flags - TwitchChatbot.UserFlag.Sub,
+        subInfo = None
+      )
+      operational(
+        params.copy(
+          users = params.users + unsubbedUser
+        )
+      )
 
     case TwitchChatbot.EventSubEvent(
           e: eventsub.ChannelSubscriptionGiftEvent
@@ -1119,16 +1172,34 @@ class TwitchChatbot(using
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelModeratorAddEvent) =>
       ctx.log.debug("User {} added as a new moderator", e.userName)
+      val userState = params.users.getOrElse(
+        e.userId,
+        TwitchChatbot.UserState(
+          TwitchApi.User(e.userId, e.userLogin, e.userName)
+        )
+      )
+      val newMod = e.userId -> userState.copy(
+        user = TwitchApi.User(e.userId, e.userLogin, e.userName),
+        flags = userState.flags + TwitchChatbot.UserFlag.Mod
+      )
+
       operational(
-        params.copy(mods =
-          params.mods + (e.userId -> TwitchApi
-            .User(e.userId, e.userLogin, e.userName))
+        params.copy(
+          users = params.users + newMod
         )
       )
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelModeratorRemoveEvent) =>
       ctx.log.debug("User {} is no longer a moderator", e.userName)
-      operational(params.copy(mods = params.mods - e.userId))
+      val userState = params.users(e.userId)
+      val formerMod = e.userId -> userState.copy(flags =
+        userState.flags - TwitchChatbot.UserFlag.Mod
+      )
+      operational(
+        params.copy(
+          users = params.users + formerMod
+        )
+      )
 
     case TwitchChatbot.EventSubEvent(
           _: eventsub.ChannelPointsAutomaticRewardRedemptionAddEvent
@@ -1185,16 +1256,34 @@ class TwitchChatbot(using
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelVIPAddEvent) =>
       ctx.log.debug("User {} added as a new VIP", e.userName)
+      val userState = params.users.getOrElse(
+        e.userId,
+        TwitchChatbot.UserState(
+          TwitchApi.User(e.userId, e.userLogin, e.userName)
+        )
+      )
+      val newVip = e.userId -> userState.copy(
+        user = TwitchApi.User(e.userId, e.userLogin, e.userName),
+        flags = userState.flags + TwitchChatbot.UserFlag.Vip
+      )
+
       operational(
-        params.copy(vips =
-          params.vips + (e.userId -> TwitchApi
-            .User(e.userId, e.userLogin, e.userName))
+        params.copy(
+          users = params.users + newVip
         )
       )
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelVIPRemoveEvent) =>
       ctx.log.debug("User {} is no longer a VIP", e.userName)
-      operational(params.copy(vips = params.vips - e.userId))
+      val userState = params.users(e.userId)
+      val formerVip = e.userId -> userState.copy(flags =
+        userState.flags - TwitchChatbot.UserFlag.Vip
+      )
+      operational(
+        params.copy(
+          users = params.users + formerVip
+        )
+      )
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelGoalBeginEvent) =>
       Behaviors.same
@@ -1293,9 +1382,13 @@ class TwitchChatbot(using
       )
 
     case TwitchChatbot.Afk(chatterUserId) =>
+      val userState = params.users(chatterUserId)
+      val afkUser = chatterUserId -> userState.copy(flags =
+        userState.flags + TwitchChatbot.UserFlag.Afk
+      )
       operational(
-        params.copy(afkConversations =
-          params.afkConversations + (chatterUserId -> Nil)
+        params.copy(
+          users = params.users + afkUser
         )
       )
 
@@ -1418,38 +1511,42 @@ class TwitchChatbot(using
     }
 
   private def shouldGreet(
-      user: TwitchApi.User,
-      settings: KnownGreetsSettings,
-      mods: List[TwitchApi.User],
-      vips: List[TwitchApi.User],
-      subs: List[TwitchApi.SubbedUser]
+      userState: TwitchChatbot.UserState,
+      settings: KnownGreetsSettings
   ): Boolean = settings.mode match {
     case KnownGreetsMode.All      => true
-    case KnownGreetsMode.Mods     => isMod(user, mods)
-    case KnownGreetsMode.ModsVips => isMod(user, mods) || isVip(user, vips)
+    case KnownGreetsMode.Mods     => isMod(userState)
+    case KnownGreetsMode.ModsVips => isMod(userState) || isVip(userState)
     case KnownGreetsMode.ModsVipsSubs =>
-      isMod(user, mods) || isVip(user, vips) || isSub(user, subs)
+      isMod(userState) || isVip(userState) || isSub(userState)
   }
 
-  private def isMod(user: TwitchApi.User, mods: List[TwitchApi.User]): Boolean =
-    mods.contains(user)
-  private def isVip(user: TwitchApi.User, vips: List[TwitchApi.User]): Boolean =
-    vips.contains(user)
+  private def isMod(
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Mod)
+  private def isVip(
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Vip)
   private def isSub(
-      user: TwitchApi.User,
-      subs: List[TwitchApi.SubbedUser]
-  ): Boolean = subs.exists(_.user_id == user.user_id)
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Sub)
 
   private def getGreetAndName(
-      user: TwitchApi.User,
+      userState: TwitchChatbot.UserState,
       settings: KnownGreetsSettings
   ): (String, String) = {
     val greet = settings.specificGreets.getOrElse(
-      user.user_id,
+      userState.user.user_id,
       settings.standardGreets.randomOrDefault("Hey")
     )
     val name =
-      settings.specificNames.getOrElse(user.user_id, s"@${user.user_name}")
+      settings.specificNames.getOrElse(
+        userState.user.user_id,
+        s"@${userState.user.user_name}"
+      )
     (greet, name)
   }
 }
