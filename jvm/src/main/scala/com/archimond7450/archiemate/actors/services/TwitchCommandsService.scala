@@ -1011,14 +1011,14 @@ class TwitchCommandsService(using
           String,
           ActorRef[TwitchChatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
-        val chatterName = strParameters.split("\\s+").head
+        val chatterName = strParameters.split("\\s+").head.stripPrefix("@")
         val chatterUserIdOption = {
           if (strParameters.isEmpty) {
             Some(cmd.e.chatterUserId)
           } else {
             cmd.chatbotParams.users
               .find(
-                _._2.user.user_login == chatterName.stripPrefix("@").toLowerCase
+                _._2.user.user_login == chatterName.toLowerCase
               )
               .map(_._2.user.user_id)
           }
