@@ -4,9 +4,10 @@ import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.services.controllerhelpers.SettingsControllerHelperService.{GetConnectionsOKResponse, InvalidJWT}
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.services.controllerhelpers.SettingsControllerHelperService
+import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.failWithoutSessionCookie
 import com.archimond7450.archiemate.http.Connections.{Connections, YouTubeConnection}
-import com.archimond7450.archiemate.http.ChannelSettings.*
+import com.archimond7450.archiemate.http.ChannelSettings.{Settings as ChannelSettings, *}
 import com.archimond7450.archiemate.http.{ChannelSettings, IController}
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
@@ -20,7 +21,7 @@ import org.apache.pekko.util.Timeout
 
 import scala.util.{Failure, Success}
 
-final class SettingsController(using mediator: ActorRef[ArchieMateMediator.Command])(using Scheduler, Timeout) extends IController("settings") with FailFastCirceSupport {
+final class SettingsController(using mediator: ActorRef[ArchieMateMediator.Command])(using Settings, Scheduler, Timeout) extends IController("settings") with FailFastCirceSupport {
   override def routes: Route = extractLog { log =>
     given LoggingAdapter = log
     connections

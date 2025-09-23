@@ -1,19 +1,42 @@
 package com.archimond7450.archiemate.actors
 
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.sessions.{TwitchUserSessionsRepository, YouTubeChannelSessionsRepository}
-import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
+import com.archimond7450.archiemate.actors.repositories.sessions.{
+  TwitchUserSessionsRepository,
+  YouTubeChannelSessionsRepository
+}
+import com.archimond7450.archiemate.actors.repositories.settings.{
+  AutomaticMessagesSettingsRepository,
+  BasicChatbotSettingsRepository,
+  BuiltInCommandsSettingsRepository,
+  CommandsSettingsRepository,
+  OverlaysSettingsRepository,
+  TimersSettingsRepository,
+  VariablesSettingsRepository
+}
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
-import com.archimond7450.archiemate.actors.services.controllerhelpers.{CommandsControllerHelperService, OAuthControllerHelperService, SettingsControllerHelperService, UserControllerHelperService}
-import com.archimond7450.archiemate.actors.services.{JWTService, TwitchLoginValidatorService}
+import com.archimond7450.archiemate.actors.services.controllerhelpers.{
+  CommandsControllerHelperService,
+  OAuthControllerHelperService,
+  SettingsControllerHelperService,
+  UserControllerHelperService
+}
+import com.archimond7450.archiemate.actors.services.{
+  JWTService,
+  TwitchLoginValidatorService
+}
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, Scheduler}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import com.archimond7450.archiemate.extensions.*
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
+import com.archimond7450.archiemate.helpers.HttpControllerHelpers.logoutSessionCookie
 import com.archimond7450.archiemate.http.OAuthController
-import com.archimond7450.archiemate.http.api.v1.{SettingsController, V1BaseController}
+import com.archimond7450.archiemate.http.api.v1.{
+  SettingsController,
+  V1BaseController
+}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import org.apache.pekko.actor.ClassicActorSystemProvider
 import org.apache.pekko.http.scaladsl.Http
@@ -28,10 +51,11 @@ import scala.concurrent.duration.DurationInt
 
 object UserGuardian {
   val actorName = "user"
-  
+
   sealed trait Command
   private case object StartHttp extends Command
-  private final case class HttpBound(binding: Http.ServerBinding) extends Command
+  private final case class HttpBound(binding: Http.ServerBinding)
+      extends Command
   private final case class HttpFailed(ex: Throwable) extends Command
   private case object Stop extends Command
 
@@ -50,7 +74,10 @@ object UserGuardian {
     }
   }
 
-  private def withSettings(using ctx: ActorContext[Command], settings: Settings): Behavior[Command] = Behaviors.receiveAndLogMessage {
+  private def withSettings(using
+      ctx: ActorContext[Command],
+      settings: Settings
+  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
     case StartHttp =>
       val (interface, port) = (settings.httpInterface, settings.httpPort)
       ctx.log.info("Starting HTTP server at {}:{}", interface, port)
@@ -64,33 +91,26 @@ object UserGuardian {
 
       given Settings = settings
 
-      given ActorRef[ArchieMateMediator.Command] = ctx.spawn(ArchieMateMediator(), ArchieMateMediator.actorName)
+      given ActorRef[ArchieMateMediator.Command] =
+        ctx.spawn(ArchieMateMediator(), ArchieMateMediator.actorName)
 
       val v1BaseController = new V1BaseController
       val OAuthController = new OAuthController
 
       def logout: Route = (get & path("logout" / "confirm")) {
-        optionalCookie("session") {
-          case Some(jwt) =>
-            setCookie(
-              HttpCookie("session", jwt.value)
-                .withPath("/")
-                .withSecure(settings.secureCookies)
-                .withHttpOnly(true)
-                .withMaxAge(0)
-            ) {
-              redirect("/", StatusCodes.TemporaryRedirect)
-            }
-          case None =>
-            redirect("/", StatusCodes.TemporaryRedirect)
+        logoutSessionCookie {
+          redirect("/", StatusCodes.TemporaryRedirect)
         }
       }
 
-      val routes = logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ getFromResourceDirectory("public") ~ getFromResource("public/index.html")
+      val routes =
+        logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ getFromResourceDirectory(
+          "public"
+        ) ~ getFromResource("public/index.html")
 
       ctx.pipeToSelf(server.bind(routes)) {
         case Success(binding) => HttpBound(binding)
-        case Failure(ex) => HttpFailed(ex)
+        case Failure(ex)      => HttpFailed(ex)
       }
 
       Behaviors.same
@@ -109,7 +129,10 @@ object UserGuardian {
       Behaviors.stopped
   }
 
-  private def ready(using ctx: ActorContext[Command], settings: Settings): Behavior[Command] = Behaviors.receiveAndLogMessage {
+  private def ready(using
+      ctx: ActorContext[Command],
+      settings: Settings
+  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
     case Stop =>
       ctx.log.info("Stopping ArchieMate!")
       Behaviors.stopped

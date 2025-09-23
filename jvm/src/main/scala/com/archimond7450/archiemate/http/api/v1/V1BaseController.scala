@@ -2,9 +2,14 @@ package com.archimond7450.archiemate.http.api.v1
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
-import com.archimond7450.archiemate.actors.services.controllerhelpers.{CommandsControllerHelperService, SettingsControllerHelperService, UserControllerHelperService}
+import com.archimond7450.archiemate.actors.services.controllerhelpers.{
+  CommandsControllerHelperService,
+  SettingsControllerHelperService,
+  UserControllerHelperService
+}
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
+import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.failWithoutSessionCookie
 import com.archimond7450.archiemate.http.IController
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
@@ -18,7 +23,12 @@ import org.apache.pekko.util.Timeout
 
 import scala.util.{Failure, Success}
 
-final class V1BaseController(using ActorRef[ArchieMateMediator.Command], Scheduler, Timeout) extends IController("api" / "v1") {
+final class V1BaseController(using
+    ActorRef[ArchieMateMediator.Command],
+    Settings,
+    Scheduler,
+    Timeout
+) extends IController("api" / "v1") {
   private val healthController = new HealthController
   private val userController = new UserController
   private val settingsController = new SettingsController
@@ -29,4 +39,3 @@ final class V1BaseController(using ActorRef[ArchieMateMediator.Command], Schedul
     healthController.getAllRoutes ~ userController.getAllRoutes ~ settingsController.getAllRoutes ~ commandsController.getAllRoutes
   }
 }
-
