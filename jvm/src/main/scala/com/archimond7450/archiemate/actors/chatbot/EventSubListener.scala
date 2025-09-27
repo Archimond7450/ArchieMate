@@ -199,6 +199,14 @@ private class EventSubListener(
   }
 
   private def reconnecting(webSocketClientOld: ActorRef[WebSocketClient.Command], webSocketClientNew: ActorRef[WebSocketClient.Command]): Behavior[Command] = Behaviors.receiveAndLogMessage {
+    case StreamTextMessage(msg) =>
+      decodeAndProcess(msg)
+      Behaviors.same
+
+    case StreamBinaryMessage(data) =>
+      logIgnoreBinary(data, "reconnecting")
+      Behaviors.same
+    
     case StreamDecodedMessage(IncomingMessage(metadata, Payload(Some(_), _, _))) if metadata.messageType == "session_welcome" =>
       ctx.stop(webSocketClientOld)
       given ActorRef[WebSocketClient.Command] = webSocketClientNew
@@ -212,6 +220,14 @@ private class EventSubListener(
 
   private def reconnected(using webSocketClient: ActorRef[WebSocketClient.Command]): Behavior[Command] = Behaviors.withStash(64) { buffer =>
     Behaviors.receiveAndLogMessage {
+      case StreamTextMessage(msg) =>
+        decodeAndProcess(msg)
+        Behaviors.same
+
+      case StreamBinaryMessage(data) =>
+        logIgnoreBinary(data, "reconnected")
+        Behaviors.same
+      
       case Done =>
         ctx.log.debug("Old WebSocket connection closed, returning to operational state")
         buffer.unstashAll(operational)
