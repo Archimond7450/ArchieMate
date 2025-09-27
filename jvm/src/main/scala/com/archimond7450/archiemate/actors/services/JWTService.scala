@@ -7,7 +7,7 @@ import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import pdi.jwt.algorithms.JwtHmacAlgorithm
 import pdi.jwt.{JwtAlgorithm, JwtCirce, JwtClaim}
 
-import java.time.{Clock, Instant}
+import java.time.{Clock, Instant, OffsetDateTime, ZoneId}
 import scala.util.{Failure, Success}
 
 object JWTService {
@@ -24,7 +24,6 @@ object JWTService {
   case object InvalidJWT extends DecodeJWTResponse
 
   val algorithm: JwtHmacAlgorithm = JwtAlgorithm.HS256
-  private given Clock = Clock.systemUTC()
 
   def apply(): Behavior[Command] = Behaviors.setup { ctx =>
     given ActorContext[Command] = ctx
@@ -32,13 +31,14 @@ object JWTService {
 
     Behaviors.receiveAndLogMessage {
       case GenerateJWT(replyTo, userId, sessionId) =>
+        val nowSeconds = OffsetDateTime.now(ZoneId.of("Z")).toEpochSecond
         val claim = JwtClaim()
           .withId(sessionId)
-          .issuedNow
+          .issuedAt(nowSeconds)
           .by(settings.jwtIssuer)
           .to(userId)
-          .startsNow
-          .expiresIn(settings.jwtExpiration.toSeconds)
+          .startsAt(nowSeconds)
+          .expiresAt(nowSeconds + settings.jwtExpiration.toSeconds)
         val jwt = JwtCirce.encode(claim, settings.jwtSecret, algorithm)
         replyTo ! GeneratedJWT(jwt)
         Behaviors.same
@@ -46,6 +46,7 @@ object JWTService {
       case DecodeJWT(replyTo, jwt) =>
         val response: DecodeJWTResponse = {
           if (JwtCirce.isValid(jwt, settings.jwtSecret, Seq(algorithm))) {
+            given Clock = Clock.fixed(Instant.ofEpochSecond(OffsetDateTime.now(ZoneId.of("Z")).toEpochSecond), ZoneId.of("Z"))
             JwtCirce.decode(jwt, settings.jwtSecret, Seq(algorithm)) match {
               case Success(claims) if claims.isValid && claims.issuer.contains(settings.jwtIssuer) && claims.audience.nonEmpty && claims.jwtId.nonEmpty =>
                 DecodedJWT(claims.audience.get.head, claims.jwtId.get)
