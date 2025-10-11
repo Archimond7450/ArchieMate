@@ -236,8 +236,8 @@ object SettingsControllerHelperService {
             Behaviors.same
 
           case ChangeBasicChatbotSettings(replyTo, _, settings) =>
-            ctx.ask[ArchieMateMediator.Command, GenericSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendBasicChatbotSettingsRepositoryCommand(BasicChatbotSettingsRepository.ChangeSettings(ref, userId, settings))) {
-              case Success(GenericSettingsRepository.Acknowledged) =>
+            ctx.ask[ArchieMateMediator.Command, BasicChatbotSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendBasicChatbotSettingsRepositoryCommand(BasicChatbotSettingsRepository.ChangeSettings(ref, userId, settings))) {
+              case Success(BasicChatbotSettingsRepository.Acknowledged) =>
                 SendReply(replyTo, SettingsChanged)
 
               case Failure(ex) =>
@@ -246,8 +246,8 @@ object SettingsControllerHelperService {
             Behaviors.same
 
           case ChangeBuiltInChatbotSettings(replyTo, _, settings) =>
-            ctx.ask[ArchieMateMediator.Command, GenericSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendBuiltInCommandsSettingsRepositoryCommand(BuiltInCommandsSettingsRepository.ChangeSettings(ref, userId, settings))) {
-              case Success(GenericSettingsRepository.Acknowledged) =>
+            ctx.ask[ArchieMateMediator.Command, BuiltInCommandsSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendBuiltInCommandsSettingsRepositoryCommand(BuiltInCommandsSettingsRepository.ChangeSettings(ref, userId, settings))) {
+              case Success(BuiltInCommandsSettingsRepository.Acknowledged) =>
                 SendReply(replyTo, SettingsChanged)
 
               case Failure(ex) =>
@@ -276,8 +276,8 @@ object SettingsControllerHelperService {
             Behaviors.same
 
           case ChangeTimersSettings(replyTo, _, settings) =>
-            ctx.ask[ArchieMateMediator.Command, GenericSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendTimersSettingsRepositoryCommand(TimersSettingsRepository.ChangeSettings(ref, userId, settings))) {
-              case Success(GenericSettingsRepository.Acknowledged) =>
+            ctx.ask[ArchieMateMediator.Command, TimersSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendTimersSettingsRepositoryCommand(TimersSettingsRepository.ChangeSettings(ref, userId, settings))) {
+              case Success(TimersSettingsRepository.Acknowledged) =>
                 SendReply(replyTo, SettingsChanged)
 
               case Failure(ex) =>
@@ -286,8 +286,8 @@ object SettingsControllerHelperService {
             Behaviors.same
 
           case ChangeOverlaysSettings(replyTo, _, settings) =>
-            ctx.ask[ArchieMateMediator.Command, GenericSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(OverlaysSettingsRepository.ChangeSettings(ref, userId, settings))) {
-              case Success(GenericSettingsRepository.Acknowledged) =>
+            ctx.ask[ArchieMateMediator.Command, OverlaysSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(OverlaysSettingsRepository.ChangeSettings(ref, userId, settings))) {
+              case Success(OverlaysSettingsRepository.Acknowledged) =>
                 SendReply(replyTo, SettingsChanged)
 
               case Failure(ex) =>
@@ -296,8 +296,8 @@ object SettingsControllerHelperService {
             Behaviors.same
 
           case ChangeAutomaticMessagesSettings(replyTo, _, settings) =>
-            ctx.ask[ArchieMateMediator.Command, GenericSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(AutomaticMessagesSettingsRepository.ChangeSettings(ref, userId, settings))) {
-              case Success(GenericSettingsRepository.Acknowledged) =>
+            ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettingsRepository.Acknowledged.type](mediator, ref => ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(AutomaticMessagesSettingsRepository.ChangeSettings(ref, userId, settings))) {
+              case Success(AutomaticMessagesSettingsRepository.Acknowledged) =>
                 SendReply(replyTo, SettingsChanged)
 
               case Failure(ex) =>
