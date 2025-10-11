@@ -2,12 +2,19 @@ package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.GenericRepository
+import com.archimond7450.archiemate.actors.repositories.{
+  GenericRepository,
+  GenericSerializer
+}
 import com.archimond7450.archiemate.http.ChannelSettings.{
   ChannelVariable,
   VariablesSettings
 }
 import com.archimond7450.archiemate.providers.RandomProvider
+import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
+import com.archimond7450.archiemate.SerializerIDs
+import io.circe.{Decoder, Encoder}
+import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.persistence.typed.scaladsl.Effect
@@ -51,21 +58,56 @@ object VariablesSettingsRepository {
 
   case object Acknowledged
 
-  sealed trait Event
-  final case class VariableSet(
+  private sealed trait Event
+  private object Event {
+    given Decoder[Event] = ConfiguredDecoder.derived
+    given Encoder[Event] = ConfiguredEncoder.derived
+  }
+
+  private final case class VariableSet(
       twitchRoomId: String,
       variableName: String,
       variableValueNew: String
   ) extends Event
-  final case class VariablesUnset(
+  private object VariableSet {
+    given Decoder[VariableSet] = ConfiguredDecoder.derived
+    given Encoder[VariableSet] = ConfiguredEncoder.derived
+  }
+
+  private final case class VariablesUnset(
       twitchRoomId: String,
       variableNames: List[String]
   ) extends Event
-  final case class VariablesSettingsSet(
+  private object VariablesUnset {
+    given Decoder[VariablesUnset] = ConfiguredDecoder.derived
+    given Encoder[VariablesUnset] = ConfiguredEncoder.derived
+  }
+
+  private final case class VariablesSettingsSet(
       twitchRoomId: String,
       variablesSettings: VariablesSettings
   ) extends Event
-  final case class VariablesSettingsReset(twitchRoomId: String) extends Event
+  private object VariablesSettingsSet {
+    given Decoder[VariablesSettingsSet] = ConfiguredDecoder.derived
+    given Encoder[VariablesSettingsSet] = ConfiguredEncoder.derived
+  }
+
+  private final case class VariablesSettingsReset(twitchRoomId: String)
+      extends Event
+  private object VariablesSettingsReset {
+    given Decoder[VariablesSettingsReset] = ConfiguredDecoder.derived
+    given Encoder[VariablesSettingsReset] = ConfiguredEncoder.derived
+  }
+
+  private class EventSerializer
+      extends GenericSerializer[Event](
+        actorName,
+        SerializerIDs.variablesSettingsRepositoryId
+      ) {
+    override val toEvent: PartialFunction[AnyRef, Event] = {
+      case event: Event => event
+    }
+  }
 
   /** Repository state
     * @param twitchRoomIdToVariables

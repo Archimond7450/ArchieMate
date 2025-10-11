@@ -2,12 +2,19 @@ package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.GenericRepository
+import com.archimond7450.archiemate.actors.repositories.{
+  GenericRepository,
+  GenericSerializer
+}
 import com.archimond7450.archiemate.http.ChannelSettings.{
   ChannelCommand,
   CommandsSettings
 }
 import com.archimond7450.archiemate.providers.RandomProvider
+import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
+import com.archimond7450.archiemate.SerializerIDs
+import io.circe.{Decoder, Encoder}
+import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.persistence.typed.scaladsl.Effect
@@ -79,29 +86,76 @@ object CommandsSettingsRepository {
       with EditCommandResponse
       with RemoveCommandResponse
 
-  sealed trait Event
-  final case class CommandAdded(
+  private sealed trait Event
+  private object Event {
+    given Decoder[Event] = ConfiguredDecoder.derived
+    given Encoder[Event] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandAdded(
       twitchRoomId: String,
       commandName: String,
       commandResponse: String
   ) extends Event
-  final case class CommandRenamed(
+  private object CommandAdded {
+    given Decoder[CommandAdded] = ConfiguredDecoder.derived
+    given Encoder[CommandAdded] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandRenamed(
       twitchRoomId: String,
       commandNameOld: String,
       commandNameNew: String
   ) extends Event
-  final case class CommandEdited(
+  private object CommandRenamed {
+    given Decoder[CommandRenamed] = ConfiguredDecoder.derived
+    given Encoder[CommandRenamed] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandEdited(
       twitchRoomId: String,
       commandName: String,
       commandResponseNew: String
   ) extends Event
-  final case class CommandRemoved(twitchRoomId: String, commandName: String)
-      extends Event
-  final case class CommandsSettingsSet(
+  private object CommandEdited {
+    given Decoder[CommandEdited] = ConfiguredDecoder.derived
+    given Encoder[CommandEdited] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandRemoved(
+      twitchRoomId: String,
+      commandName: String
+  ) extends Event
+  private object CommandRemoved {
+    given Decoder[CommandRemoved] = ConfiguredDecoder.derived
+    given Encoder[CommandRemoved] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandsSettingsSet(
       twitchRoomId: String,
       commandsSettings: CommandsSettings
   ) extends Event
-  final case class CommandsSettingsReset(twitchRoomId: String) extends Event
+  private object CommandsSettingsSet {
+    given Decoder[CommandsSettingsSet] = ConfiguredDecoder.derived
+    given Encoder[CommandsSettingsSet] = ConfiguredEncoder.derived
+  }
+
+  private final case class CommandsSettingsReset(twitchRoomId: String)
+      extends Event
+  private object CommandsSettingsReset {
+    given Decoder[CommandsSettingsReset] = ConfiguredDecoder.derived
+    given Encoder[CommandsSettingsReset] = ConfiguredEncoder.derived
+  }
+
+  private class EventSerializer
+      extends GenericSerializer[Event](
+        actorName,
+        SerializerIDs.commandsSettingsRepositoryId
+      ) {
+    override val toEvent: PartialFunction[AnyRef, Event] = {
+      case event: Event => event
+    }
+  }
 
   /** Repository state
     * @param twitchRoomIdToCommands
