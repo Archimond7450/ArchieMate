@@ -74,7 +74,7 @@ object YouTubeChannelSessionsRepository {
 
     new GenericRepository[Command, Event, State] {
       override protected val actorName: String =
-        TwitchUserSessionsRepository.actorName
+        YouTubeChannelSessionsRepository.actorName
       override protected val emptyState: State = State()
       override protected val commandHandler
           : (State, Command) => Effect[Event, State] = { (state, command) =>
