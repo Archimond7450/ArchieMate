@@ -54,7 +54,7 @@ object TwitchUserSessionsRepository {
   }
 
   private final case class TokenSet(
-      tokenId: String,
+      twitchTokenId: String,
       userId: String,
       token: GetToken
   ) extends Event
@@ -63,8 +63,10 @@ object TwitchUserSessionsRepository {
     given Encoder[TokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenRefreshed(tokenId: String, token: GetToken)
-      extends Event
+  private final case class TokenRefreshed(
+      twitchTokenId: String,
+      token: GetToken
+  ) extends Event
   private object TokenRefreshed {
     given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
     given Encoder[TokenRefreshed] = ConfiguredEncoder.derived

@@ -42,7 +42,7 @@ object YouTubeChannelSessionsRepository {
   }
 
   private final case class TokenSet(
-      tokenId: String,
+      youtubeTokenId: String,
       userId: String,
       token: GetToken
   ) extends Event
@@ -51,7 +51,7 @@ object YouTubeChannelSessionsRepository {
     given Encoder[TokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenRefreshed(tokenId: String, token: GetToken)
+  private final case class TokenRefreshed(youtubeTokenId: String, token: GetToken)
       extends Event
   private object TokenRefreshed {
     given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
