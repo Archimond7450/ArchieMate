@@ -149,6 +149,7 @@ object WebSocketClient {
           buffer.unstashAll(
             active(
               parent,
+              connectedNotification,
               textMessageTransform,
               binaryMessageTransform,
               doneNotification,
