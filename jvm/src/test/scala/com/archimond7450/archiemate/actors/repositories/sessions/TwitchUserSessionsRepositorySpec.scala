@@ -78,7 +78,7 @@ class TwitchUserSessionsRepositorySpec
 
       mediatorProbe.expectNoMessage()
       twitchApiClientProbe
-        .expectNoMessage() // TestKit doesn't support RecoveryCompleted
+        .expectNoMessage()
     }
 
     "return the correct token from the correct id when there is second session added, nothing for others" in {
@@ -86,6 +86,11 @@ class TwitchUserSessionsRepositorySpec
         TwitchUserSessionsRepository(),
         s"${TwitchUserSessionsRepository.actorName}2"
       )
+
+      val mediatorTwitchApiClientMessage = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId1))
+
       val probe = testKit
         .createTestProbe[TwitchUserSessionsRepository.ReturnedTokenFromId]()
 
@@ -114,7 +119,7 @@ class TwitchUserSessionsRepositorySpec
 
       mediatorProbe.expectNoMessage()
       twitchApiClientProbe
-        .expectNoMessage() // TestKit doesn't support RecoveryCompleted
+        .expectNoMessage()
     }
 
     "return the correct token from the correct id when there is third session added, nothing for others" in {
@@ -122,6 +127,15 @@ class TwitchUserSessionsRepositorySpec
         TwitchUserSessionsRepository(),
         s"${TwitchUserSessionsRepository.actorName}3"
       )
+
+      val mediatorTwitchApiClientMessage1 = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage1.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId1))
+
+      val mediatorTwitchApiClientMessage2 = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage2.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId2))
+
       val probe = testKit
         .createTestProbe[TwitchUserSessionsRepository.ReturnedTokenFromId]()
 
@@ -150,7 +164,30 @@ class TwitchUserSessionsRepositorySpec
 
       mediatorProbe.expectNoMessage()
       twitchApiClientProbe
-        .expectNoMessage() // TestKit doesn't support RecoveryCompleted
+        .expectNoMessage()
+    }
+
+    "" in {
+      val twitchUserSessionsRepository = testKit.spawn(
+        TwitchUserSessionsRepository(),
+        s"${TwitchUserSessionsRepository.actorName}4"
+      )
+
+      val mediatorTwitchApiClientMessage1 = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage1.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId1))
+
+      val mediatorTwitchApiClientMessage2 = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage2.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId2))
+
+      val mediatorTwitchApiClientMessage3 = mediatorProbe.expectMessageType[ArchieMateMediator.SendTwitchApiClientCommand]
+      twitchApiClient ! mediatorTwitchApiClientMessage3.cmd
+      twitchApiClientProbe.expectMessage(TwitchApiClient.GetTokenUserFromTokenId(system.ignoreRef, tokenId3))
+
+      mediatorProbe.expectNoMessage()
+      twitchApiClientProbe
+        .expectNoMessage()
     }
   }
 }
@@ -164,6 +201,7 @@ object TwitchUserSessionsRepositorySpec {
   val userId3 = "u3"
   val wrongTokenId = "0"
   val wrongUserId = "0"
+  val noScopes: Option[List[String]] = None
   val scopes: Option[List[String]] = Some(
     List("channel:moderate", "chat:edit", "chat:read")
   )
@@ -179,7 +217,7 @@ object TwitchUserSessionsRepositorySpec {
     access_token = "456",
     expires_in = 14253,
     refresh_token = "4d5e6f",
-    scope = scopes,
+    scope = noScopes,
     token_type = tokenType
   )
   val sessionId3Token: TwitchApiResponse.GetToken = TwitchApiResponse.GetToken(

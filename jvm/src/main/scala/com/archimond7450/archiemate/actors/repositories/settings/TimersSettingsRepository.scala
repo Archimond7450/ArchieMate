@@ -5,15 +5,17 @@ import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
 import com.archimond7450.archiemate.http.ChannelSettings.TimersSettings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
 import com.archimond7450.archiemate.SerializerIDs
-import com.archimond7450.archiemate.actors.repositories.{
-  GenericRepository,
-  GenericSerializer
-}
+import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.persistence.typed.scaladsl.Effect
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  ReplyEffect
+}
 
 object TimersSettingsRepository {
   val actorName = "TimersSettingsRepository"
@@ -51,7 +53,6 @@ object TimersSettingsRepository {
 
   private object SettingsChanged {
     given Decoder[SettingsChanged] = ConfiguredDecoder.derived
-
     given Encoder[SettingsChanged] = ConfiguredEncoder.derived
   }
 
@@ -59,7 +60,6 @@ object TimersSettingsRepository {
 
   private object SettingsReset {
     given Decoder[SettingsReset] = ConfiguredDecoder.derived
-
     given Encoder[SettingsReset] = ConfiguredEncoder.derived
   }
 
@@ -79,62 +79,62 @@ object TimersSettingsRepository {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
+  ): Behavior[Command] =
+    EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
+      persistenceId = PersistenceId.ofUniqueId(actorName),
+      emptyState = State(),
+      commandHandler = commandHandler,
+      eventHandler = eventHandler
+    )
 
-    new GenericRepository[Command, Event, State] {
-      val newStateSender: (String, TimersSettings) => State => Unit =
-        (twitchRoomId, newSettings) =>
-          state => {
-            val event = TwitchChatbotsSupervisor
-              .TimersSettingsChanged(newSettings)
-            mediator ! ArchieMateMediator
-              .SendTwitchChatbotsSupervisorCommand(
-                TwitchChatbotsSupervisor
-                  .NewChannelSettingsEvent(twitchRoomId, event)
-              )
-          }
+  private def newStateSender(using
+      mediator: ActorRef[ArchieMateMediator.Command]
+  ): (String, TimersSettings) => State => Unit =
+    (twitchRoomId, newSettings) =>
+      state => {
+        val event = TwitchChatbotsSupervisor
+          .TimersSettingsChanged(newSettings)
+        mediator ! ArchieMateMediator
+          .SendTwitchChatbotsSupervisorCommand(
+            TwitchChatbotsSupervisor
+              .NewChannelSettingsEvent(twitchRoomId, event)
+          )
+      }
 
-      override protected val actorName: String =
-        TimersSettingsRepository.actorName
+  private def commandHandler(using
+      mediator: ActorRef[ArchieMateMediator.Command]
+  ): (State, Command) => ReplyEffect[Event, State] = (state, command) =>
+    command match {
+      case GetSettings(replyTo, twitchRoomId) =>
+        Effect.none.thenReply(replyTo)(
+          _.twitchRoomIdToSettings.getOrElse(
+            twitchRoomId,
+            TimersSettings()
+          )
+        )
 
-      override protected val emptyState: State = State()
+      case ChangeSettings(replyTo, twitchRoomId, newSettings) =>
+        Effect
+          .persist(SettingsChanged(twitchRoomId, newSettings))
+          .thenRun(newStateSender(twitchRoomId, newSettings))
+          .thenReply(replyTo)(_ => Acknowledged)
 
-      override protected val commandHandler
-          : (State, Command) => Effect[Event, State] = (state, command) =>
-        command match {
-          case GetSettings(replyTo, twitchRoomId) =>
-            Effect.none.thenReply(replyTo)(
-              _.twitchRoomIdToSettings.getOrElse(
-                twitchRoomId,
-                TimersSettings()
-              )
-            )
+      case ResetSettings(replyTo, twitchRoomId) =>
+        Effect
+          .persist(SettingsReset(twitchRoomId))
+          .thenRun(newStateSender(twitchRoomId, TimersSettings()))
+          .thenReply(replyTo)(_ => Acknowledged)
+    }
 
-          case ChangeSettings(replyTo, twitchRoomId, newSettings) =>
-            Effect
-              .persist(SettingsChanged(twitchRoomId, newSettings))
-              .thenRun(newStateSender(twitchRoomId, newSettings))
-              .thenReply(replyTo)(_ => Acknowledged)
+  private val eventHandler: (State, Event) => State =
+    (state, event) =>
+      event match {
+        case SettingsChanged(twitchRoomId, newSettings) =>
+          State(
+            state.twitchRoomIdToSettings + (twitchRoomId -> newSettings)
+          )
 
-          case ResetSettings(replyTo, twitchRoomId) =>
-            Effect
-              .persist(SettingsReset(twitchRoomId))
-              .thenRun(newStateSender(twitchRoomId, TimersSettings()))
-              .thenReply(replyTo)(_ => Acknowledged)
-        }
-
-      override protected val eventHandler: (State, Event) => State =
-        (state, event) =>
-          event match {
-            case SettingsChanged(twitchRoomId, newSettings) =>
-              State(
-                state.twitchRoomIdToSettings + (twitchRoomId -> newSettings)
-              )
-
-            case SettingsReset(twitchRoomId) =>
-              State(state.twitchRoomIdToSettings - twitchRoomId)
-          }
-    }.eventSourcedBehavior()
-  }
+        case SettingsReset(twitchRoomId) =>
+          State(state.twitchRoomIdToSettings - twitchRoomId)
+      }
 }

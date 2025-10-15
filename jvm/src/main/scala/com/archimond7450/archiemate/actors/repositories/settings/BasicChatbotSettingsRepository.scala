@@ -2,11 +2,7 @@ package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.{
-  GenericRepository,
-  GenericSerializer,
-  settings
-}
+import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.http.ChannelSettings.BasicChatbotSettings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
 import com.archimond7450.archiemate.SerializerIDs
@@ -14,12 +10,21 @@ import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.persistence.typed.scaladsl.Effect
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  ReplyEffect
+}
 
 object BasicChatbotSettingsRepository {
   val actorName = "BasicChatbotSettingsRepository"
 
   sealed trait Command
+
+  final case class GetAllSettings(
+      replyTo: ActorRef[Map[String, BasicChatbotSettings]]
+  ) extends Command
 
   final case class GetSettings(
       replyTo: ActorRef[BasicChatbotSettings],
@@ -78,71 +83,65 @@ object BasicChatbotSettingsRepository {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
+  ): Behavior[Command] =
+    EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
+      persistenceId = PersistenceId.ofUniqueId(actorName),
+      emptyState = State(),
+      commandHandler = commandHandler,
+      eventHandler = eventHandler
+    )
 
-    new GenericRepository[Command, Event, State] {
-      val newStateSender: (String, BasicChatbotSettings) => State => Unit =
-        (twitchRoomId, newSettings) =>
-          state => {
-            val event = TwitchChatbotsSupervisor
-              .BasicChatbotSettingsChanged(newSettings)
-            mediator ! ArchieMateMediator
-              .SendTwitchChatbotsSupervisorCommand(
-                TwitchChatbotsSupervisor
-                  .NewChannelSettingsEvent(twitchRoomId, event)
-              )
-          }
+  private def newStateSender(using
+      mediator: ActorRef[ArchieMateMediator.Command]
+  ): (String, BasicChatbotSettings) => State => Unit =
+    (twitchRoomId, newSettings) =>
+      state => {
+        val event = TwitchChatbotsSupervisor
+          .BasicChatbotSettingsChanged(newSettings)
+        mediator ! ArchieMateMediator
+          .SendTwitchChatbotsSupervisorCommand(
+            TwitchChatbotsSupervisor
+              .NewChannelSettingsEvent(twitchRoomId, event)
+          )
+      }
 
-      override protected val actorName: String =
-        BasicChatbotSettingsRepository.actorName
+  private def commandHandler(using
+      mediator: ActorRef[ArchieMateMediator.Command]
+  ): (State, Command) => ReplyEffect[Event, State] = (state, command) =>
+    command match {
+      case GetAllSettings(replyTo) =>
+        Effect.none.thenReply(replyTo)(_.twitchRoomIdToSettings)
 
-      override protected val emptyState: State = State()
+      case GetSettings(replyTo, twitchRoomId) =>
+        Effect.none.thenReply(replyTo)(
+          _.twitchRoomIdToSettings.getOrElse(
+            twitchRoomId,
+            BasicChatbotSettings()
+          )
+        )
 
-      override protected val commandHandler
-          : (State, Command) => Effect[Event, State] = (state, command) =>
-        command match {
-          case GetSettings(replyTo, twitchRoomId) =>
-            Effect.none.thenReply(replyTo)(
-              _.twitchRoomIdToSettings.getOrElse(
-                twitchRoomId,
-                BasicChatbotSettings()
-              )
-            )
+      case ChangeSettings(replyTo, twitchRoomId, newSettings) =>
+        Effect
+          .persist(SettingsChanged(twitchRoomId, newSettings))
+          .thenRun(newStateSender(twitchRoomId, newSettings))
+          .thenReply(replyTo)(_ => Acknowledged)
 
-          case ChangeSettings(replyTo, twitchRoomId, newSettings) =>
-            Effect
-              .persist(SettingsChanged(twitchRoomId, newSettings))
-              .thenRun(newStateSender(twitchRoomId, newSettings))
-              .thenReply(replyTo)(_ => Acknowledged)
+      case ResetSettings(replyTo, twitchRoomId) =>
+        Effect
+          .persist(SettingsReset(twitchRoomId))
+          .thenRun(newStateSender(twitchRoomId, BasicChatbotSettings()))
+          .thenReply(replyTo)(_ => Acknowledged)
+    }
 
-          case ResetSettings(replyTo, twitchRoomId) =>
-            Effect
-              .persist(SettingsReset(twitchRoomId))
-              .thenRun(newStateSender(twitchRoomId, BasicChatbotSettings()))
-              .thenReply(replyTo)(_ => Acknowledged)
-        }
+  private val eventHandler: (State, Event) => State =
+    (state, event) =>
+      event match {
+        case SettingsChanged(twitchRoomId, newSettings) =>
+          State(
+            state.twitchRoomIdToSettings + (twitchRoomId -> newSettings)
+          )
 
-      override protected val eventHandler: (State, Event) => State =
-        (state, event) =>
-          event match {
-            case SettingsChanged(twitchRoomId, newSettings) =>
-              State(
-                state.twitchRoomIdToSettings + (twitchRoomId -> newSettings)
-              )
-
-            case SettingsReset(twitchRoomId) =>
-              State(state.twitchRoomIdToSettings - twitchRoomId)
-          }
-
-      override protected val onRecoveryCompleted: State => Unit = state =>
-        state.twitchRoomIdToSettings
-          .filter((_, settings) => settings.join)
-          .foreach { (roomId, _) =>
-            mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
-              TwitchChatbotsSupervisor.Join(roomId)
-            )
-          }
-    }.eventSourcedBehavior()
-  }
+        case SettingsReset(twitchRoomId) =>
+          State(state.twitchRoomIdToSettings - twitchRoomId)
+      }
 }

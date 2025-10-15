@@ -3,10 +3,7 @@ package com.archimond7450.archiemate.actors.repositories.sessions
 import com.archimond7450.archiemate.CirceConfiguration.twitchConfiguration
 import com.archimond7450.archiemate.SerializerIDs
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.repositories.{
-  GenericRepository,
-  GenericSerializer
-}
+import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.GetToken
@@ -16,7 +13,12 @@ import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
-import org.apache.pekko.persistence.typed.scaladsl.Effect
+import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  ReplyEffect
+}
 import org.apache.pekko.serialization.Serializer
 
 import java.io.NotSerializableException
@@ -86,59 +88,15 @@ object TwitchUserSessionsRepository {
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
   ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-
-    new GenericRepository[Command, Event, State] {
-      override protected val actorName: String =
-        TwitchUserSessionsRepository.actorName
-      override protected val emptyState: State = State()
-      override protected val commandHandler
-          : (State, Command) => Effect[Event, State] = { (state, command) =>
-        command match {
-          case SetToken(tokenId, userId, token) =>
-            Effect.persist(TokenSet(tokenId, userId, token))
-
-          case RefreshToken(tokenId, token) =>
-            val userOption = state.users.find(_._2.tokens.contains(tokenId))
-            if (userOption.nonEmpty) {
-              Effect.persist(TokenRefreshed(tokenId, token))
-            } else {
-              Effect.none
-            }
-
-          case GetTokenFromId(replyTo, tokenId) =>
-            val userOption = state.users.find(_._2.tokens.contains(tokenId))
-            val userStateOption =
-              userOption.flatMap(_._2.tokens.find(_._1 == tokenId))
-            val tokenOption = userStateOption.map(_._2)
-            replyTo ! ReturnedTokenFromId(tokenOption)
-            Effect.none
-
-          case GetTokenIdForUserId(replyTo, userId) =>
-            val userStateOption = state.users.get(userId)
-            val tokenOption =
-              userStateOption.flatMap(_.tokens.find(_._2.scope.nonEmpty))
-            replyTo ! ReturnedTokenIdForUserId(tokenOption.map(_._1))
-            Effect.none
-        }
-      }
-
-      override protected val eventHandler: (State, Event) => State = {
-        (state, event) =>
-          event match {
-            case TokenSet(tokenId, userId, token) =>
-              val userState = state.users.getOrElse(userId, UserState())
-              updatedState(state, tokenId, userId, token, userState)
-
-            case TokenRefreshed(tokenId, token) =>
-              val (userId, userState) =
-                state.users.find(_._2.tokens.contains(tokenId)).get
-              updatedState(state, tokenId, userId, token, userState)
-          }
-      }
-
-      override protected val onRecoveryCompleted: State => Unit =
-        _.users.foreach { (userId, userState) =>
+    EventSourcedBehavior
+      .withEnforcedReplies[Command, Event, State](
+        persistenceId = PersistenceId.ofUniqueId(actorName),
+        emptyState = State(),
+        commandHandler = commandHandler,
+        eventHandler = eventHandler
+      )
+      .receiveSignal { case (state, RecoveryCompleted) =>
+        state.users.foreach { (userId, userState) =>
           val tokenId = userState.tokens
             .find(_._2.scope.nonEmpty)
             .getOrElse(userState.tokens.last)
@@ -155,18 +113,64 @@ object TwitchUserSessionsRepository {
             tokenId
           )
         }
-
-      def updatedState(
-          state: State,
-          tokenId: String,
-          userId: String,
-          token: GetToken,
-          userState: UserState
-      ): State = {
-        val newTokens = userState.tokens + (tokenId -> token)
-        val newUserState = UserState(newTokens)
-        State(state.users + (userId -> newUserState))
       }
-    }.eventSourcedBehavior()
+  }
+
+  private val commandHandler: (State, Command) => ReplyEffect[Event, State] = {
+    (state, command) =>
+      command match {
+        case SetToken(tokenId, userId, token) =>
+          Effect.persist(TokenSet(tokenId, userId, token)).thenNoReply()
+
+        case RefreshToken(tokenId, token) =>
+          val userOption = state.users.find(_._2.tokens.contains(tokenId))
+          if (userOption.nonEmpty) {
+            Effect.persist(TokenRefreshed(tokenId, token)).thenNoReply()
+          } else {
+            Effect.none.thenNoReply()
+          }
+
+        case GetTokenFromId(replyTo, tokenId) =>
+          Effect.none.thenReply(replyTo) { state =>
+            val userOption = state.users.find(_._2.tokens.contains(tokenId))
+            val userStateOption =
+              userOption.flatMap(_._2.tokens.find(_._1 == tokenId))
+            val tokenOption = userStateOption.map(_._2)
+            ReturnedTokenFromId(tokenOption)
+          }
+
+        case GetTokenIdForUserId(replyTo, userId) =>
+          Effect.none.thenReply(replyTo) { state =>
+            val userStateOption = state.users.get(userId)
+            val tokenOption =
+              userStateOption.flatMap(_.tokens.find(_._2.scope.nonEmpty))
+            ReturnedTokenIdForUserId(tokenOption.map(_._1))
+          }
+      }
+  }
+
+  private val eventHandler: (State, Event) => State = { (state, event) =>
+    event match {
+      case TokenSet(tokenId, userId, token) =>
+        val userState = state.users.getOrElse(userId, UserState())
+        updatedState(state, tokenId, userId, token, userState)
+
+      case TokenRefreshed(tokenId, token) =>
+        val (userId, userState) =
+          state.users.find(_._2.tokens.contains(tokenId)).get
+        updatedState(state, tokenId, userId, token, userState)
+    }
+  }
+
+  private def updatedState(
+      state: State,
+      tokenId: String,
+      userId: String,
+      token: GetToken,
+      userState: UserState
+  ): State = {
+    val newTokens = userState.tokens + (tokenId -> token)
+    val newUserState = UserState(newTokens)
+    State(state.users + (userId -> newUserState))
   }
 }
