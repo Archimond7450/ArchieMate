@@ -175,6 +175,7 @@ object WebSocketClient {
 
   private def active[T](
       parent: ActorRef[T],
+      connectedNotification: () => T,
       textMessageTransform: TextMessage.Strict => T,
       binaryMessageTransform: BinaryMessage.Strict => T,
       doneNotification: () => T,
@@ -202,6 +203,7 @@ object WebSocketClient {
 
       case InternalUpgradeSucceeded =>
         ctx.log.debug("WebSocket upgrade succeeded")
+        parent ! connectedNotification()
         Behaviors.same
 
       case StreamToTextFailed(ex) =>
