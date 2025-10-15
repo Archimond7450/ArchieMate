@@ -134,6 +134,15 @@ object BasicChatbotSettingsRepository {
             case SettingsReset(twitchRoomId) =>
               State(state.twitchRoomIdToSettings - twitchRoomId)
           }
+
+      override protected val onRecoveryCompleted: State => Unit = state =>
+        state.twitchRoomIdToSettings
+          .filter((_, settings) => settings.join)
+          .foreach { (roomId, _) =>
+            mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
+              TwitchChatbotsSupervisor.Join(roomId)
+            )
+          }
     }.eventSourcedBehavior()
   }
 }
