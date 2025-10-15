@@ -75,6 +75,8 @@ class WebSocketClientIntegrationSpec
         )
       )
 
+      parent.expectMessage(Connected)
+
       // --- Step 3: Send and verify strict text/binary
       client ! WebSocketClient.SendText("hello")
       client ! WebSocketClient.SendBinary(ByteString("world"))

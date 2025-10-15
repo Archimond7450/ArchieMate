@@ -82,6 +82,19 @@ class BasicChatbotSettingsRepositorySpec
         BasicChatbotSettingsRepository(),
         s"${BasicChatbotSettingsRepository.actorName}2"
       )
+
+      val mediatorTwitchChatbotsSupervisorCommand1 = mediatorProbe.expectMessageType[
+        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+      ]
+      twitchChatbotsSupervisor ! mediatorTwitchChatbotsSupervisorCommand1.cmd
+      twitchChatbotsSupervisorProbe.expectMessage(TwitchChatbotsSupervisor.Join(firstRoomId))
+
+      val mediatorTwitchChatbotsSupervisorCommand2 = mediatorProbe.expectMessageType[
+        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+      ]
+      twitchChatbotsSupervisor ! mediatorTwitchChatbotsSupervisorCommand2.cmd
+      twitchChatbotsSupervisorProbe.expectMessage(TwitchChatbotsSupervisor.Join(thirdRoomId))
+
       val probe = testKit.createTestProbe[BasicChatbotSettings]()
 
       for (roomId <- Seq(firstRoomId, secondRoomId, thirdRoomId)) {
@@ -104,6 +117,19 @@ class BasicChatbotSettingsRepositorySpec
         BasicChatbotSettingsRepository(),
         s"${BasicChatbotSettingsRepository.actorName}3"
       )
+
+      val mediatorTwitchChatbotsSupervisorCommand1 = mediatorProbe.expectMessageType[
+        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+      ]
+      twitchChatbotsSupervisor ! mediatorTwitchChatbotsSupervisorCommand1.cmd
+      twitchChatbotsSupervisorProbe.expectMessage(TwitchChatbotsSupervisor.Join(firstRoomId))
+
+      val mediatorTwitchChatbotsSupervisorCommand2 = mediatorProbe.expectMessageType[
+        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+      ]
+      twitchChatbotsSupervisor ! mediatorTwitchChatbotsSupervisorCommand2.cmd
+      twitchChatbotsSupervisorProbe.expectMessage(TwitchChatbotsSupervisor.Join(thirdRoomId))
+
       val probe = testKit
         .createTestProbe[BasicChatbotSettingsRepository.Acknowledged.type]()
 
@@ -136,6 +162,13 @@ class BasicChatbotSettingsRepositorySpec
         BasicChatbotSettingsRepository(),
         s"${BasicChatbotSettingsRepository.actorName}4"
       )
+
+      val mediatorTwitchChatbotsSupervisorCommand = mediatorProbe.expectMessageType[
+        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+      ]
+      twitchChatbotsSupervisor ! mediatorTwitchChatbotsSupervisorCommand.cmd
+      twitchChatbotsSupervisorProbe.expectMessage(TwitchChatbotsSupervisor.Join(firstRoomId))
+
       val probe = testKit.createTestProbe[BasicChatbotSettings]()
 
       for (roomId <- Seq(firstRoomId, secondRoomId, thirdRoomId)) {

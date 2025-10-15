@@ -10,7 +10,7 @@ import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
   EventSourcedBehavior,
@@ -84,12 +84,24 @@ object BasicChatbotSettingsRepository {
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
   ): Behavior[Command] =
-    EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
-      persistenceId = PersistenceId.ofUniqueId(actorName),
-      emptyState = State(),
-      commandHandler = commandHandler,
-      eventHandler = eventHandler
-    )
+    EventSourcedBehavior
+      .withEnforcedReplies[Command, Event, State](
+        persistenceId = PersistenceId.ofUniqueId(actorName),
+        emptyState = State(),
+        commandHandler = commandHandler,
+        eventHandler = eventHandler
+      )
+      .receiveSignal { case (state, RecoveryCompleted) =>
+        val sender = newStateSender
+        state.twitchRoomIdToSettings
+          .filter((_, settings) => settings.join)
+          .keys
+          .foreach { twitchRoomId =>
+            mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
+              TwitchChatbotsSupervisor.Join(twitchRoomId)
+            )
+          }
+      }
 
   private def newStateSender(using
       mediator: ActorRef[ArchieMateMediator.Command]
