@@ -202,6 +202,7 @@ object WebSocketClient {
 
       case InternalUpgradeSucceeded =>
         ctx.log.debug("WebSocket upgrade succeeded")
+        parent ! doneNotification()
         Behaviors.same
 
       case StreamToTextFailed(ex) =>
