@@ -26,28 +26,28 @@ import java.io.NotSerializableException
 object TwitchUserSessionsRepository {
   val actorName = "TwitchUserSessionsRepository"
 
-  private case class State(
+  final private case class State(
       users: Map[String, UserState] = Map.empty
   )
-  private case class UserState(
+  final private case class UserState(
       tokens: Map[String, GetToken] = Map.empty
   )
 
   sealed trait Command
-  case class SetToken(tokenId: String, userId: String, token: GetToken)
+  final case class SetToken(tokenId: String, userId: String, token: GetToken)
       extends Command
-  case class RefreshToken(tokenId: String, token: GetToken) extends Command
-  case class GetTokenFromId(
+  final case class RefreshToken(tokenId: String, token: GetToken) extends Command
+  final case class GetTokenFromId(
       replyTo: ActorRef[ReturnedTokenFromId],
       tokenId: String
   ) extends Command
-  case class GetTokenIdForUserId(
+  final case class GetTokenIdForUserId(
       replyTo: ActorRef[ReturnedTokenIdForUserId],
       userId: String
   ) extends Command
 
-  case class ReturnedTokenFromId(token: Option[GetToken])
-  case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
+  final case class ReturnedTokenFromId(token: Option[GetToken])
+  final case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
 
   private sealed trait Event
   private object Event {

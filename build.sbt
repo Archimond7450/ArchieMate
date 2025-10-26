@@ -18,7 +18,7 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
   .enablePlugins(BuildInfoPlugin)
   .settings(
     name := "ArchieMate",
-    version := "0.2.0.4",
+    version := "0.2.1.0",
     libraryDependencies ++= Seq(
       // Circe
       "io.circe" %%% "circe-core" % "0.14.10",
@@ -52,32 +52,31 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
     name := "ArchieMate Backend",
     libraryDependencies ++= Seq(
       // Pekko
-      "org.apache.pekko" %% "pekko-actor-typed" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence-typed" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence-testkit" % "1.2.0" % Test,
-      "org.apache.pekko" %% "pekko-stream" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http-spray-json" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http-testkit" % "1.2.0" % Test,
-      "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.2.0" % Test,
+      "org.apache.pekko" %% "pekko-actor-typed" % "1.2.1",
+      //"org.apache.pekko" %% "pekko-persistence" % "1.2.1",
+      "org.apache.pekko" %% "pekko-persistence-typed" % "1.2.1",
+      "org.apache.pekko" %% "pekko-persistence-testkit" % "1.2.1" % Test,
+      "org.apache.pekko" %% "pekko-stream-typed" % "1.2.1",
+      "org.apache.pekko" %% "pekko-http" % "1.3.0",
+      "org.apache.pekko" %% "pekko-http-testkit" % "1.3.0" % Test,
+      "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.2.1" % Test,
       "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.1.1",
-      "org.apache.pekko" %% "pekko-persistence-query" % "1.2.0",
+      "org.apache.pekko" %% "pekko-persistence-query" % "1.2.1",
 
       // Logback
-      "ch.qos.logback" % "logback-classic" % "1.5.18",
+      "ch.qos.logback" % "logback-classic" % "1.5.20",
 
       // Typesafe Config
       "com.typesafe" % "config" % "1.4.5",
 
       // PostgreSQL
-      "org.postgresql" % "postgresql" % "42.7.7",
+      "org.postgresql" % "postgresql" % "42.7.8",
 
       // JWT
       "com.github.jwt-scala" %% "jwt-circe" % "11.0.3",
 
       // Circe
-      "com.github.pjfanning" %% "pekko-http-circe" % "3.3.0"
+      "com.github.pjfanning" %% "pekko-http-circe" % "3.5.0"
     )
   )
   .jsSettings(
@@ -87,7 +86,11 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
       "com.raquo" %%% "laminar" % "17.2.0",
 
       // Routing
-      "com.raquo" %%% "waypoint" % "10.0.0-M1"
+      "com.raquo" %%% "waypoint" % "10.0.0-M1",
+
+      // Laminext (WebSockets)
+      "dev.laminext" %%% "websocket" % "0.17.1",
+      "dev.laminext" %%% "websocket-circe" % "0.17.1"
     ),
     scalaJSUseMainModuleInitializer := true,
     scalaJSLinkerConfig ~= {

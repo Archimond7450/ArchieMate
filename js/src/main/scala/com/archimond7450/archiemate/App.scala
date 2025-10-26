@@ -24,7 +24,7 @@ object App {
   case object Logout extends PageWithHeaderAndFooter("Logout")
   case object Dashboard extends PageWithHeaderAndFooter("Dashboard")
   case class BroadcasterCommands(userName: String) extends PageWithHeaderAndFooter(s"Commands in the $userName channel")
-  case class Overlay(overlayId: String) extends Page("Overlay")
+  case class Overlay(twitchRoomId: String, secret: String) extends Page("Overlay")
   case class NotFound(url: String) extends Page("Page Not Found")
 
   given router: Router[Page] = new Router[Page](
@@ -38,6 +38,11 @@ object App {
         encode = _.userName,
         decode = BroadcasterCommands(_),
         pattern = root / "t" / "commands" / segment[String] / endOfSegments
+      ),
+      Route[Overlay, (String, String)](
+        encode = overlay => (overlay.twitchRoomId, overlay.secret),
+        decode = Overlay(_, _),
+        pattern = root / "overlay" / segment[String] / segment[String] / endOfSegments
       )
     ),
     getPageTitle = page => s"ArchieMate | ${page.title}",
@@ -48,7 +53,7 @@ object App {
       case Logout => "Logout"
       case Dashboard => "Dashboard"
       case BroadcasterCommands(userName) => s"BroadcasterCommands|$userName"
-      case Overlay(overlayId) => s"Overlay|$overlayId"
+      case Overlay(twitchRoomId, secret) => s"Overlay|$twitchRoomId|$secret"
       case NotFound(path) => s"NotFound|$path"
     },
     deserializePage = {
@@ -58,7 +63,7 @@ object App {
       case "Logout" => Logout
       case "Dashboard" => Dashboard
       case s"BroadcasterCommands|$userName" => BroadcasterCommands(userName)
-      case s"Overlay|$overlayId" => Overlay(overlayId)
+      case s"Overlay|$twitchRoomId|$secret" => Overlay(twitchRoomId, secret)
       case s"NotFound|$path" => NotFound(path)
     },
     routeFallback = NotFound.apply

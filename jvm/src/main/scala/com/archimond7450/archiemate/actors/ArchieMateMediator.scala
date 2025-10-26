@@ -1,10 +1,11 @@
 package com.archimond7450.archiemate.actors
 
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.repositories.OverlaySecretsRepository
 import com.archimond7450.archiemate.actors.repositories.sessions.{TwitchUserSessionsRepository, YouTubeChannelSessionsRepository}
 import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
 import com.archimond7450.archiemate.actors.services.{JWTService, TwitchLoginValidatorService}
-import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
+import com.archimond7450.archiemate.actors.services.caches.{TwitchEventsCacheService, TwitchTokenUserCacheService}
 import com.archimond7450.archiemate.actors.services.controllerhelpers.{CommandsControllerHelperService, OAuthControllerHelperService, SettingsControllerHelperService, UserControllerHelperService}
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
@@ -32,6 +33,8 @@ object ArchieMateMediator {
   final case class SendOverlaysSettingsRepositoryCommand(cmd: OverlaysSettingsRepository.Command) extends Command
   final case class SendTimersSettingsRepositoryCommand(cmd: TimersSettingsRepository.Command) extends Command
   final case class SendVariablesSettingsRepositoryCommand(cmd: VariablesSettingsRepository.Command) extends Command
+  final case class SendOverlaySecretsRepositoryCommand(cmd: OverlaySecretsRepository.Command) extends Command
+  final case class SendTwitchEventsCacheServiceCommand(cmd: TwitchEventsCacheService.Command) extends Command
   final case class SendTwitchTokenUserCacheServiceCommand(cmd: TwitchTokenUserCacheService.Command) extends Command
   final case class SendCommandsControllerHelperServiceCommand(Cmd: CommandsControllerHelperService.Command) extends Command
   final case class SendOAuthControllerHelperServiceCommand(cmd: OAuthControllerHelperService.Command) extends Command
@@ -72,6 +75,8 @@ final class ArchieMateMediator(using
       overlaysSettingsRepository: ActorRef[OverlaysSettingsRepository.Command],
       timersSettingsRepository: ActorRef[TimersSettingsRepository.Command],
       variablesSettingsRepository: ActorRef[VariablesSettingsRepository.Command],
+      overlaySecretsRepository: ActorRef[OverlaySecretsRepository.Command],
+      twitchEventsCacheService: ActorRef[TwitchEventsCacheService.Command],
       twitchTokenUserCacheService: ActorRef[TwitchTokenUserCacheService.Command],
       commandsControllerHelperService: ActorRef[CommandsControllerHelperService.Command],
       oauthControllerHelperService: ActorRef[OAuthControllerHelperService.Command],
@@ -96,6 +101,8 @@ final class ArchieMateMediator(using
       overlaysSettingsRepository = ctx.spawn(OverlaysSettingsRepository(), OverlaysSettingsRepository.actorName),
       timersSettingsRepository = ctx.spawn(TimersSettingsRepository(), TimersSettingsRepository.actorName),
       variablesSettingsRepository = ctx.spawn(VariablesSettingsRepository(), VariablesSettingsRepository.actorName),
+      overlaySecretsRepository = ctx.spawn(OverlaySecretsRepository(), OverlaySecretsRepository.actorName),
+      twitchEventsCacheService = ctx.spawn(TwitchEventsCacheService(), TwitchEventsCacheService.actorName),
       twitchTokenUserCacheService = ctx.spawn(TwitchTokenUserCacheService(), TwitchTokenUserCacheService.actorName),
       commandsControllerHelperService = ctx.spawn(CommandsControllerHelperService(), CommandsControllerHelperService.actorName),
       oauthControllerHelperService = ctx.spawn(OAuthControllerHelperService(), OAuthControllerHelperService.actorName),
@@ -154,6 +161,14 @@ final class ArchieMateMediator(using
 
     case SendVariablesSettingsRepositoryCommand(cmd) =>
       state.variablesSettingsRepository ! cmd
+      Behaviors.same
+
+    case SendOverlaySecretsRepositoryCommand(cmd) =>
+      state.overlaySecretsRepository ! cmd
+      Behaviors.same
+
+    case SendTwitchEventsCacheServiceCommand(cmd) =>
+      state.twitchEventsCacheService ! cmd
       Behaviors.same
 
     case SendTwitchTokenUserCacheServiceCommand(cmd) =>
