@@ -108,7 +108,8 @@ object ChannelSettings {
   final case class ChannelCommand(
       id: Option[String],
       name: String,
-      response: String
+      response: String,
+      isAlias: Boolean = false
   )
 
   object ChannelCommand {
