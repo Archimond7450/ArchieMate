@@ -634,7 +634,8 @@ class TwitchChatbot(using
           )
         }
 
-      params.channelSettings.automaticMessagesSettings.knownGreets match {
+      // TODO: Uncomment when proper frontend settings are implemented
+      /*params.channelSettings.automaticMessagesSettings.knownGreets match {
         case Some(knownGreetsSettings) =>
           newUsers
             .filter((_, userState) =>
@@ -653,7 +654,24 @@ class TwitchChatbot(using
             }
 
         case None =>
-      }
+      }*/
+      val knownGreetsSettings = KnownGreetsSettings()
+      newUsers
+        .filter((_, userState) =>
+          shouldGreet(
+            userState,
+            knownGreetsSettings
+          )
+        )
+        .keySet
+        .diff(params.users.keySet)
+        .foreach { userId =>
+          val (greet, name) =
+            getGreetAndName(params.users(userId), knownGreetsSettings)
+          val finalGreet = greet.replaceAll("name".asVariableRegex, name)
+          params.ircListener ! IRCListener.SendMessage(finalGreet)
+        }
+      // TODO: And remove until here
 
       operational(
         params.copy(
@@ -730,7 +748,8 @@ class TwitchChatbot(using
           TwitchApi.User(e.chatterUserId, e.chatterUserLogin, e.chatterUserName)
         )
       )
-      params.channelSettings.automaticMessagesSettings.knownGreets match {
+      // TODO: uncomment when the proper frontend settings is implemented
+      /*params.channelSettings.automaticMessagesSettings.knownGreets match {
         case Some(knownGreetsSettings)
             if shouldGreet(
               userState,
@@ -742,7 +761,21 @@ class TwitchChatbot(using
           params.ircListener ! IRCListener.SendMessage(finalGreet)
 
         case _ =>
+      }*/
+
+      val knownGreetsSettings = KnownGreetsSettings()
+      if (
+        !params.users.keySet.contains(userState.user.user_id) && shouldGreet(
+          userState,
+          knownGreetsSettings
+        )
+      ) {
+        val (greet, name) =
+          getGreetAndName(userState, knownGreetsSettings)
+        val finalGreet = greet.replaceAll("name".asVariableRegex, name)
+        params.ircListener ! IRCListener.SendMessage(finalGreet)
       }
+      // TODO: And remove until here
 
       val mentionedAfks = params.users
         .filter((userId, userState) =>
@@ -1184,7 +1217,9 @@ class TwitchChatbot(using
         }
       msgOption.foreach { msg =>
         val message =
-          msg.replaceAll("broadcaster".asVariableRegex, otherBroadcaster)
+          msg
+            .replaceAll("broadcaster".asVariableRegex, otherBroadcaster)
+            .replaceAll("viewerCount".asVariableRegex, e.viewers.toString)
         params.ircListener ! IRCListener.SendMessage(message)
       }
       Behaviors.same
@@ -1316,18 +1351,29 @@ class TwitchChatbot(using
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelGoalProgressEvent) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelGoalEndEvent) =>
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelGoalEndEvent) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelHypeTrainBeginEvent) =>
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelHypeTrainBeginEvent) =>
+      params.channelSettings.automaticMessagesSettings.hypeTrainBegin
+        .foreach(params.ircListener ! IRCListener.SendMessage(_))
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(
           _: eventsub.ChannelHypeTrainProgressEvent
         ) =>
+      params.channelSettings.automaticMessagesSettings.hypeTrainLevelUp
+        .foreach { thresholds =>
+          val maxThreshold = thresholds.max(Ordering.by(_._1))
+          val message =
+            thresholds.getOrElse(maxThreshold._1, thresholds.last._2)
+          params.ircListener ! IRCListener.SendMessage(message)
+        }
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelHypeTrainEndEvent) =>
+      params.channelSettings.automaticMessagesSettings.hypeTrainEnd
+        .foreach(params.ircListener ! IRCListener.SendMessage(_))
       Behaviors.same
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelShoutoutReceiveEvent) =>
