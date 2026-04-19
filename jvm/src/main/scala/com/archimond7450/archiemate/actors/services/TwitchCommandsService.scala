@@ -12,7 +12,10 @@ import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLog
 import com.archimond7450.archiemate.twitch.eventsub
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.http.ChannelSettings
-import com.archimond7450.archiemate.http.ChannelSettings.BuiltInCommandsSettings
+import com.archimond7450.archiemate.http.ChannelSettings.{
+  BuiltInCommandsSettings,
+  ChannelCommand
+}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.eventsub.{
@@ -1175,13 +1178,24 @@ class TwitchCommandsService(using
                   .getCommandResponse(cmd, chatters, parameters, chatbot)
 
               case channelCommandName =>
-                ctx.self ! TwitchCommandsService.ReturnCommandResponse(
-                  cmd,
-                  chatters,
-                  chatbotParams.channelSettings.commandsSettings.commands
-                    .find(_.name == channelCommandName)
-                    .map(_.response)
-                )
+                chatbotParams.channelSettings.commandsSettings.commands
+                  .find(_.name == channelCommandName) match {
+                  case Some(
+                        ChannelCommand(id, name, response, true)
+                      ) => // alias
+                    ctx.self ! cmd.copy(e =
+                      cmd.e.copy(message =
+                        cmd.e.message
+                          .copy(text = s"$strChatters $response $strParameters")
+                      )
+                    )
+                  case normalCommand =>
+                    ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      normalCommand.map(_.response)
+                    )
+                }
             }
             Behaviors.same
 

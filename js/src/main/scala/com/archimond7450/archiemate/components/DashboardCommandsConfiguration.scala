@@ -2,6 +2,7 @@ package com.archimond7450.archiemate.components
 
 import com.archimond7450.archiemate.CustomAttrs.scope
 import com.archimond7450.archiemate.elements.StyledStandardElements.h2Element
+import com.archimond7450.archiemate.elements.Switches
 import com.archimond7450.archiemate.helpers.FetchHelpers.{
   fetchGetStream,
   fetchPostStream
@@ -61,6 +62,13 @@ object DashboardCommandsConfiguration {
                                   "text-sm font-medium text-gray-900 px-6 py-4 text-left"
                                 ),
                                 "Response"
+                              ),
+                              th(
+                                scope("col"),
+                                cls(
+                                  "text-sm font-medium text-gray-900 px-6 py-4 text-left"
+                                ),
+                                "Alias"
                               ),
                               th(
                                 scope("col"),
@@ -132,6 +140,22 @@ object DashboardCommandsConfiguration {
                                                   )
                                                 )
                                             }
+                                          )
+                                        )
+                                      ),
+                                      td(
+                                        Switches.switch(
+                                          s"$index-alias",
+                                          "No",
+                                          "Yes",
+                                          commands.zoomLazy(cmds =>
+                                            cmds(index).isAlias
+                                          )((oldCommands, newAlias) =>
+                                            oldCommands.updated(
+                                              index,
+                                              oldCommands(index)
+                                                .copy(isAlias = newAlias)
+                                            )
                                           )
                                         )
                                       ),
