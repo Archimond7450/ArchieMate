@@ -1,62 +1,22 @@
 package com.archimond7450.archiemate.actors.chatbot
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
+import com.archimond7450.archiemate.actors.chatbot.TwitchChatbot.UserFlag
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
-import com.archimond7450.archiemate.actors.repositories.settings.{
-  AutomaticMessagesSettingsRepository,
-  BasicChatbotSettingsRepository,
-  BuiltInCommandsSettingsRepository,
-  CommandsSettingsRepository,
-  OverlaysSettingsRepository,
-  TimersSettingsRepository,
-  VariablesSettingsRepository
-}
+import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
 import com.archimond7450.archiemate.actors.services.TwitchCommandsService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.extensions.ListExtension.{
-  randomOrDefault,
-  toMapWithKey
-}
-import com.archimond7450.archiemate.extensions.StringExtensions.{
-  asTwitchSubTier,
-  asVariableRegex
-}
-import com.archimond7450.archiemate.http.ChannelSettings.{
-  AutomaticMessagesSettings,
-  BasicChatbotSettings,
-  BuiltInCommandsSettings,
-  CommandsSettings,
-  KnownGreetsMode,
-  KnownGreetsSettings,
-  ManualTimer,
-  OverlaysSettings,
-  TimersSettings,
-  VariablesSettings,
-  Settings as ChannelSettings
-}
+import com.archimond7450.archiemate.extensions.ListExtension.{randomOrDefault, toMapWithKey}
+import com.archimond7450.archiemate.extensions.StringExtensions.{asTwitchSubTier, asVariableRegex}
+import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, KnownGreetsMode, KnownGreetsSettings, ManualTimer, OverlaysSettings, TimersSettings, VariablesSettings, Settings as ChannelSettings}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
-import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
-  GetChatters,
-  GetModerators,
-  GetStream,
-  GetSubs,
-  GetTokenUser,
-  GetVIPs
-}
+import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{GetChatters, GetModerators, GetStream, GetSubs, GetTokenUser, GetVIPs}
 import com.archimond7450.archiemate.twitch.eventsub
-import com.archimond7450.archiemate.twitch.irc.{
-  IncomingMessageDecoder,
-  OutgoingMessageEncoder
-}
-import org.apache.pekko.actor.typed.scaladsl.{
-  ActorContext,
-  Behaviors,
-  StashBuffer,
-  TimerScheduler
-}
+import com.archimond7450.archiemate.twitch.irc.{IncomingMessageDecoder, OutgoingMessageEncoder}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.util.Timeout
 
@@ -621,7 +581,7 @@ class TwitchChatbot(using
     case TwitchChatbot.Chatters(Some(chattersResponse)) =>
       val currentChatters = chattersResponse.data
 
-      val newUsers =
+      val newUsers = {
         currentChatters.toMapWithKey(_.user_id).map { (userId, user) =>
           val existingUserOption = params.users.get(userId)
           userId -> TwitchChatbot.UserState(
@@ -633,6 +593,23 @@ class TwitchChatbot(using
             existingUserOption.map(_.afkConversations).getOrElse(Set.empty)
           )
         }
+      }
+
+      ctx.log.info("New users from chatters request: {}", newUsers.map((userId, newUser) => newUser.user.user_name).mkString(", "))
+      ctx.log.info("Current users: {}", params.users.map((userId, user) => user.user.user_name).mkString(", "))
+
+      val shouldGreetUsersId = newUsers
+        .filter((_, userState) =>
+          shouldGreet(
+            userState,
+            KnownGreetsSettings()
+          )
+        )
+        .keySet
+      ctx.log.info("Should greet users: {}", shouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
+
+      val newShouldGreetUsersId = shouldGreetUsersId.diff(params.users.keySet)
+      ctx.log.info("New should greet users: {}", newShouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
 
       // TODO: Uncomment when proper frontend settings are implemented
       /*params.channelSettings.automaticMessagesSettings.knownGreets match {
@@ -764,8 +741,14 @@ class TwitchChatbot(using
       }*/
 
       val knownGreetsSettings = KnownGreetsSettings()
+      val isNew = !params.users.keySet.contains(userState.user.user_id)
+      val isNewlyOnline = !isNew && !params.users(userState.user.user_id).flags.contains(UserFlag.Online) // !isNew included only to not evaluate the second part
+      ctx.log.info("Chatting user {} | is new: {} | is newly online: {}",
+        isNew,
+        isNewlyOnline
+      )
       if (
-        !params.users.keySet.contains(userState.user.user_id) && shouldGreet(
+        (isNew || isNewlyOnline) && shouldGreet(
           userState,
           knownGreetsSettings
         )
