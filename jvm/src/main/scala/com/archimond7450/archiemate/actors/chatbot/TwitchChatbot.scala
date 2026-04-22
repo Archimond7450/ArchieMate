@@ -588,28 +588,12 @@ class TwitchChatbot(twitchRoomId: String)(using
             user,
             existingUserOption
               .map(_.flags)
-              .getOrElse(Set.empty) + TwitchChatbot.UserFlag.Online,
+              .getOrElse(Set.empty),
             existingUserOption.flatMap(_.subInfo),
             existingUserOption.map(_.afkConversations).getOrElse(Set.empty)
           )
         }
       }
-
-      ctx.log.info("New users from chatters request: {}", newUsers.map((userId, newUser) => newUser.user.user_name).mkString(", "))
-      ctx.log.info("Current users: {}", params.users.map((userId, user) => user.user.user_name).mkString(", "))
-
-      val shouldGreetUsersId = newUsers
-        .filter((_, userState) =>
-          shouldGreet(
-            userState,
-            KnownGreetsSettings()
-          )
-        )
-        .keySet
-      ctx.log.info("Should greet users: {}", shouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
-
-      val newShouldGreetUsersId = shouldGreetUsersId.diff(params.users.keySet)
-      ctx.log.info("New should greet users: {}", newShouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
 
       // TODO: Uncomment when proper frontend settings are implemented
       /*params.channelSettings.automaticMessagesSettings.knownGreets match {
@@ -633,7 +617,11 @@ class TwitchChatbot(twitchRoomId: String)(using
         case None =>
       }*/
       val knownGreetsSettings = KnownGreetsSettings()
-      newUsers
+
+      ctx.log.info("New users from chatters request: {}", newUsers.map((userId, newUser) => newUser.user.user_name).mkString(", "))
+      ctx.log.info("Current users: {}", params.users.map((userId, user) => user.user.user_name).mkString(", "))
+
+      val shouldGreetUsersId = newUsers
         .filter((_, userState) =>
           shouldGreet(
             userState,
@@ -641,7 +629,16 @@ class TwitchChatbot(twitchRoomId: String)(using
           )
         )
         .keySet
-        .diff(params.users.keySet)
+      ctx.log.info("Should greet users: {}", shouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
+
+      val newShouldGreetUsersId = shouldGreetUsersId.diff(params.users.keySet)
+      ctx.log.info("New should greet users: {}", newShouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
+
+      val newlyOnlineShouldGreetUsersId = shouldGreetUsersId.filter(greetUserId => params.users.exists((userId, user) => greetUserId == userId && !user.flags.contains(UserFlag.Online) && !user.flags.contains(UserFlag.Ignore)))
+      ctx.log.info("Newly online should greet users: {}", newlyOnlineShouldGreetUsersId.map(newUsers(_).user.user_name).mkString(", "))
+
+      newShouldGreetUsersId
+        .++(newlyOnlineShouldGreetUsersId)
         .foreach { userId =>
           val (greet, name) =
             getGreetAndName(params.users(userId), knownGreetsSettings)
@@ -652,7 +649,7 @@ class TwitchChatbot(twitchRoomId: String)(using
 
       operational(
         params.copy(
-          users = params.users ++ newUsers
+          users = params.users ++ newUsers.map((userId, userState) => userId -> userState.copy(flags = userState.flags + UserFlag.Online))
         )
       )
 
@@ -809,8 +806,10 @@ class TwitchChatbot(twitchRoomId: String)(using
           Map.empty
         }
 
+      val newUsers = params.users ++ mentionedAfks ++ formerAfk
+
       val newParams = params.copy(
-        users = params.users ++ mentionedAfks ++ formerAfk
+        users = newUsers.map((userId, userState) => userId -> userState.copy(flags = userState.flags ++ (if (userId == e.chatterUserId) Set(UserFlag.Online) else Set.empty)))
       )
 
       newParams.twitchCommandsService ! TwitchCommandsService.RespondToCommand(
@@ -1393,6 +1392,11 @@ class TwitchChatbot(twitchRoomId: String)(using
             )
             TwitchChatbot.Stream(None)
         }
+
+      val newUsers = params.users.map((userId, userState) =>
+        userId -> userState.copy(flags = userState.flags - UserFlag.Online)
+      )
+
       operational(
         params.copy(stream =
           Some(
@@ -1413,7 +1417,7 @@ class TwitchChatbot(twitchRoomId: String)(using
               tagIds = Nil,
               isMature = false
             )
-          )
+          ), users = newUsers
         )
       )
 
