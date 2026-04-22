@@ -104,14 +104,14 @@ object TwitchChatbot {
         given ActorContext[Command] = ctx
         Behaviors.withTimers { timers =>
           given TimerScheduler[Command] = timers
-          (new TwitchChatbot).initial(twitchRoomId)
+          (new TwitchChatbot(twitchRoomId)).initial
         }
       }
     }
   }
 }
 
-class TwitchChatbot(using
+class TwitchChatbot(twitchRoomId: String)(using
     private val ctx: ActorContext[TwitchChatbot.Command],
     private val buffer: StashBuffer[TwitchChatbot.Command],
     private val timers: TimerScheduler[TwitchChatbot.Command],
@@ -141,7 +141,7 @@ class TwitchChatbot(using
       broadcasterOption: Option[GetTokenUser] = None
   )
 
-  def initial(twitchRoomId: String): Behavior[TwitchChatbot.Command] = initial1(
+  def initial: Behavior[TwitchChatbot.Command] = initial1(
     InitialParameters(twitchRoomId)
   )
 
@@ -645,7 +645,7 @@ class TwitchChatbot(using
         .foreach { userId =>
           val (greet, name) =
             getGreetAndName(params.users(userId), knownGreetsSettings)
-          val finalGreet = greet.replaceAll("name".asVariableRegex, name)
+          val finalGreet = greet.replaceAll("user".asVariableRegex, name)
           params.ircListener ! IRCListener.SendMessage(finalGreet)
         }
       // TODO: And remove until here
@@ -755,7 +755,7 @@ class TwitchChatbot(using
       ) {
         val (greet, name) =
           getGreetAndName(userState, knownGreetsSettings)
-        val finalGreet = greet.replaceAll("name".asVariableRegex, name)
+        val finalGreet = greet.replaceAll("user".asVariableRegex, name)
         params.ircListener ! IRCListener.SendMessage(finalGreet)
       }
       // TODO: And remove until here
@@ -1568,13 +1568,16 @@ class TwitchChatbot(using
       userState: TwitchChatbot.UserState,
       settings: KnownGreetsSettings
   ): Boolean = settings.mode match {
-    case KnownGreetsMode.All      => true
+    case KnownGreetsMode.All      => !isBroadcaster(userState)
     case KnownGreetsMode.Mods     => isMod(userState)
     case KnownGreetsMode.ModsVips => isMod(userState) || isVip(userState)
     case KnownGreetsMode.ModsVipsSubs =>
-      isMod(userState) || isVip(userState) || isSub(userState)
+      !isBroadcaster(userState) && (isMod(userState) || isVip(userState) || isSub(userState))
   }
 
+  private def isBroadcaster(
+      userState: TwitchChatbot.UserState
+  ): Boolean = userState.user.user_id == twitchRoomId
   private def isMod(
       userState: TwitchChatbot.UserState
   ): Boolean =
