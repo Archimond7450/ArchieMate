@@ -1198,7 +1198,7 @@ class TwitchCommandsService(using
         val action =
           if (strParameters.isEmpty) Actions.HELP
           else strParameters.substring(0, actionEnd).toLowerCase()
-        val afterAction = strParameters.substring(actionEnd).trim
+        val afterAction = strParameters.substring(if (actionEnd == -1) strParameters.length else actionEnd).trim
         val automaticMessagesSettings =
           cmd.chatbotParams.channelSettings.automaticMessagesSettings
         val greetsSettings = automaticMessagesSettings.knownGreets
