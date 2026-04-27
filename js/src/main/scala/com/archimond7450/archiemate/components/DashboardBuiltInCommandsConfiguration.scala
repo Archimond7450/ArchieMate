@@ -47,6 +47,8 @@ object DashboardBuiltInCommandsConfiguration {
                 )
               val afk: Var[Boolean] =
                 state.zoomLazy(_.afk)((old, newAfk) => old.copy(afk = newAfk))
+              val greets: Var[Boolean] =
+                state.zoomLazy(_.greets)((old, newGreets) => old.copy(greets = newGreets))
 
               form(
                 onSubmit.preventDefault --> { _ => },
@@ -79,6 +81,11 @@ object DashboardBuiltInCommandsConfiguration {
                   cls("flex items-start flex-col md:flex-row"),
                   pElement("!afk"),
                   switch("afk", "Off", "On", afk)
+                ),
+                div(
+                  cls("flex items-start flex-col md:flex-row"),
+                  pElement("!greets"),
+                  switch("greets", "Off", "On", greets)
                 ),
                 SaveButton.render[BuiltInCommandsSettings](
                   state,
