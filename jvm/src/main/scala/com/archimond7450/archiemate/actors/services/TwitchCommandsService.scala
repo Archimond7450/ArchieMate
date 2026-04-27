@@ -1182,7 +1182,7 @@ class TwitchCommandsService(using
       }
 
       private val usage =
-        s"$${sender} Usage: !greets (${Actions.ALL_GREETS_ACTIONS.mkString("|")}) (index|position|) (greet|)"
+        s"$${sender} Usage: !greets (${Actions.ALL_GREETS_ACTIONS.mkString("|")}) (name|index|position|) (greet|)"
 
       override val getCommandResponse: (
           TwitchCommandsService.RespondToCommand,
@@ -1196,8 +1196,9 @@ class TwitchCommandsService(using
 
         val actionEnd = strParameters.indexOf(' ')
         val (action, afterAction) =
-          if (actionEnd == -1) (Actions.HELP, strParameters)
+          if (actionEnd == -1) (Actions.HELP, "")
           else (strParameters.substring(0, actionEnd).toLowerCase(), strParameters.substring(actionEnd).trim)
+        ctx.log.debug(s"!greets strParameters = $strParameters |action = $action, afterAction = $afterAction")
         val automaticMessagesSettings =
           cmd.chatbotParams.channelSettings.automaticMessagesSettings
         val greetsSettings = automaticMessagesSettings.knownGreets
