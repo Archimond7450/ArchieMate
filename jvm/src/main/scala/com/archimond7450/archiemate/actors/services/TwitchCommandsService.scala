@@ -127,6 +127,9 @@ class TwitchCommandsService(using
                 .flatMap(_.toLongOption)
                 .getOrElse(Random.defaultTo)
               Random.getResponse(from, to)
+
+            case other =>
+              s"$${$other}"
           }
 
       // params: " separator = ', ' , something"
