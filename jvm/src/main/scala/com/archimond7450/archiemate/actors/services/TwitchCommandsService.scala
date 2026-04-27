@@ -1195,9 +1195,11 @@ class TwitchCommandsService(using
         val channelName = cmd.chatbotParams.broadcaster.display_name
 
         val actionEnd = strParameters.indexOf(' ')
-        val (action, afterAction) =
-          if (actionEnd == -1) (Actions.HELP, "")
+        val (action, afterAction) = {
+          if (actionEnd == -1 && strParameters.isEmpty) (Actions.HELP, "")
+          else if (actionEnd == -1) (strParameters, "")
           else (strParameters.substring(0, actionEnd).toLowerCase(), strParameters.substring(actionEnd).trim)
+        }
         ctx.log.debug(s"!greets strParameters = $strParameters |action = $action, afterAction = $afterAction")
         val automaticMessagesSettings =
           cmd.chatbotParams.channelSettings.automaticMessagesSettings
