@@ -1236,6 +1236,7 @@ class TwitchCommandsService(using
           )
         } else {
           (action, isBroadcaster, greetsSettings) match {
+            case (Actions.HELP, _, _) => ctx.self ! TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(usage))
             case (Actions.ON, true, None) =>
               ctx.ask[
                 ArchieMateMediator.Command,
