@@ -3,21 +3,30 @@ package com.archimond7450.archiemate.actors.services
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.{IRCListener, TwitchChatbot}
 import com.archimond7450.archiemate.actors.repositories.settings.{
+  AutomaticMessagesSettingsRepository,
   CommandsSettingsRepository,
   VariablesSettingsRepository
 }
+import com.archimond7450.archiemate.actors.services.TwitchCommandsService.actorName
 import com.archimond7450.archiemate.actors.twitch.api
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
+import com.archimond7450.archiemate.extensions.ListExtension.randomOrDefault
 import com.archimond7450.archiemate.twitch.eventsub
 import com.archimond7450.archiemate.extensions.Settings
+import com.archimond7450.archiemate.extensions.StringExtensions.{
+  asIndex,
+  asVariableRegex
+}
 import com.archimond7450.archiemate.http.ChannelSettings
 import com.archimond7450.archiemate.http.ChannelSettings.{
   BuiltInCommandsSettings,
-  ChannelCommand
+  ChannelCommand,
+  KnownGreetsMode,
+  KnownGreetsSettings
 }
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
-import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
+import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
 import com.archimond7450.archiemate.twitch.eventsub.{
   ChannelChatMessageEvent,
   ChatMessage
@@ -49,6 +58,10 @@ object TwitchCommandsService {
   ) extends Command
   final case class RespondForTimer(
       chatbotParams: TwitchChatbot.OperationalParameters
+  ) extends Command
+  final case class GreetUsers(
+      chatbotParams: TwitchChatbot.OperationalParameters,
+      userStateMap: Map[String, TwitchChatbot.UserState]
   ) extends Command
 
   def apply()(using
@@ -1127,6 +1140,788 @@ class TwitchCommandsService(using
       }
     }
 
+    object Greets extends BuiltInCommand {
+      override val name: String = "greets"
+
+      object Actions {
+        val HELP = "help"
+        val ON = "on"
+        val OFF = "off"
+        val SHOW = "show"
+        val NAME = "name"
+        val ADD = "add"
+        val CREATE = "create"
+        val EDIT = "edit"
+        val UPDATE = "update"
+        val CHANGE = "change"
+        val DELETE = "delete"
+        val REMOVE = "remove"
+        val RESET = "reset"
+        val TEST = "test"
+
+        val ALL_GREETS_ACTIONS: List[String] = List(
+          HELP,
+          ON,
+          OFF,
+          SHOW,
+          NAME,
+          ADD,
+          CREATE,
+          EDIT,
+          UPDATE,
+          CHANGE,
+          DELETE,
+          REMOVE,
+          RESET,
+          TEST
+        )
+
+        val ALL_ADDS: List[String] = List(ADD, CREATE)
+        val ALL_EDITS: List[String] = List(EDIT, UPDATE, CHANGE)
+        val ALL_DELETES: List[String] = List(DELETE, REMOVE)
+      }
+
+      private val usage =
+        s"$${sender} Usage: !greets (${Actions.ALL_GREETS_ACTIONS.mkString("|")}) (index|position|) (greet|)"
+
+      override val getCommandResponse: (
+          TwitchCommandsService.RespondToCommand,
+          List[String],
+          String,
+          ActorRef[TwitchChatbot.Command]
+      ) => Unit = (cmd, chatters, strParameters, _) => {
+        val broadcasterId = cmd.chatbotParams.broadcaster.id
+        val isBroadcaster = broadcasterId == cmd.e.chatterUserId
+        val channelName = cmd.chatbotParams.broadcaster.display_name
+
+        val actionEnd = strParameters.indexOf(' ')
+        val action =
+          if (strParameters.isEmpty) Actions.HELP
+          else strParameters.substring(0, actionEnd).toLowerCase()
+        val afterAction = strParameters.substring(actionEnd).trim
+        val automaticMessagesSettings =
+          cmd.chatbotParams.channelSettings.automaticMessagesSettings
+        val greetsSettings = automaticMessagesSettings.knownGreets
+        val isMod = cmd.chatbotParams.users
+          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Mod))
+          .keySet
+          .contains(cmd.e.chatterUserId)
+        val isVip = cmd.chatbotParams.users
+          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Vip))
+          .keySet
+          .contains(cmd.e.chatterUserId)
+        val isSub = cmd.chatbotParams.users
+          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Sub))
+          .keySet
+          .contains(cmd.e.chatterUserId)
+        val authorized = greetsSettings match {
+          case None => isBroadcaster
+          case Some(KnownGreetsSettings(KnownGreetsMode.Mods, _, _, _)) =>
+            isBroadcaster || isMod
+          case Some(KnownGreetsSettings(KnownGreetsMode.ModsVips, _, _, _)) =>
+            isBroadcaster || isMod || isVip
+          case Some(
+                KnownGreetsSettings(KnownGreetsMode.ModsVipsSubs, _, _, _)
+              ) =>
+            isBroadcaster || isMod || isVip || isSub
+          case Some(KnownGreetsSettings(KnownGreetsMode.All, _, _, _)) =>
+            true
+        }
+
+        if (!authorized) {
+          ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+            cmd,
+            chatters,
+            Some(s"$${sender}, You do not have permission for this action.")
+          )
+        } else {
+          (action, isBroadcaster, greetsSettings) match {
+            case (Actions.ON, true, None) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets =
+                          Some(KnownGreetsSettings())
+                        )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(s"$${sender}, known greets are now turned on.")
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to turn on known greets for channel {}",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the known greets are turned on... $problemDiscord"
+                    )
+                  )
+              }
+            case (Actions.ON, true, _) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(s"$${sender}, The known greets are already on.")
+              )
+            case (Actions.OFF, true, Some(_)) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets = None)
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(s"$${sender}, known greets are now turned off.")
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to turn off known greets for channel {}",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the known greets are turned off... $problemDiscord"
+                    )
+                  )
+              }
+            case (Actions.OFF, true, _) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(s"$${sender}, The known greets are already off.")
+              )
+            case (Actions.OFF, _, _) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(s"$${sender}, You do not have permission for this action.")
+              )
+            case (Actions.SHOW, true, Some(knownGreetsSettings)) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(
+                  s"$${sender}, The standard known greets are: ${knownGreetsSettings.standardGreets.mkString(", ")}"
+                )
+              )
+            case (Actions.SHOW, false, Some(knownGreetsSettings)) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(
+                  s"$${sender}, Your greets are: ${knownGreetsSettings.specificGreets
+                      .getOrElse(cmd.e.chatterUserId, Nil)
+                      .mkString(", ")}"
+                )
+              )
+            case (Actions.NAME, true, _) =>
+            // Do nothing as the broadcaster doesn't get greeted anyway
+            case (Actions.NAME, false, Some(knownGreetsSettings)) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets =
+                          Some(
+                            knownGreetsSettings.copy(specificNames =
+                              knownGreetsSettings.specificNames + (cmd.e.chatterUserId -> afterAction)
+                            )
+                          )
+                        )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, the greet name was successfully changed to \"$afterAction\"."
+                    )
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to change greet name for {} in channel {}.",
+                    cmd.e.chatterUserName,
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm your greet name was changed... $problemDiscord"
+                    )
+                  )
+              }
+            case (
+                  Actions.ADD | Actions.CREATE,
+                  true,
+                  Some(knownGreetsSettings)
+                ) =>
+              val newGreetsSettings = knownGreetsSettings.copy(standardGreets =
+                knownGreetsSettings.standardGreets :+ afterAction
+              )
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets =
+                          Some(newGreetsSettings)
+                        )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, The greet \"$afterAction\" was successfully added."
+                    )
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to add greet in channel {}.",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the new greet was added... $problemDiscord"
+                    )
+                  )
+              }
+
+            case (
+                  Actions.ADD | Actions.CREATE,
+                  false,
+                  Some(knownGreetsSettings)
+                ) =>
+              val newSpecificGreetsForUser = knownGreetsSettings.specificGreets
+                .getOrElse(cmd.e.chatterUserId, Nil) :+ afterAction
+              val newGreetsSettings = knownGreetsSettings.copy(specificGreets =
+                knownGreetsSettings.specificGreets + (cmd.e.chatterUserId -> newSpecificGreetsForUser)
+              )
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets =
+                          Some(newGreetsSettings)
+                        )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, The greet \"$afterAction\" was successfully added."
+                    )
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to add greet for {} in channel {}.",
+                    cmd.e.chatterUserName,
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the new greet was added... $problemDiscord"
+                    )
+                  )
+              }
+
+            case (
+                  Actions.EDIT | Actions.UPDATE | Actions.CHANGE,
+                  true,
+                  Some(knownGreetsSettings)
+                ) =>
+              val afterTarget = afterAction.indexOf(' ')
+              if (afterTarget < 0) {
+                TwitchCommandsService.ReturnCommandResponse(
+                  cmd,
+                  chatters,
+                  Some(usage)
+                )
+              } else {
+                val target = afterAction.substring(0, afterTarget).trim
+                val newGreet = afterAction.substring(afterTarget).trim
+                val index =
+                  target.asIndex(knownGreetsSettings.standardGreets.length)
+                val newGreetsSettings =
+                  knownGreetsSettings.copy(standardGreets =
+                    knownGreetsSettings.standardGreets.updated(index, newGreet)
+                  )
+                ctx.ask[
+                  ArchieMateMediator.Command,
+                  AutomaticMessagesSettingsRepository.Acknowledged.type
+                ](
+                  mediator,
+                  ref =>
+                    ArchieMateMediator
+                      .SendAutomaticMessagesSettingsRepositoryCommand(
+                        AutomaticMessagesSettingsRepository.ChangeSettings(
+                          ref,
+                          broadcasterId,
+                          automaticMessagesSettings.copy(knownGreets =
+                            Some(newGreetsSettings)
+                          )
+                        )
+                      )
+                ) {
+                  case Success(
+                        AutomaticMessagesSettingsRepository.Acknowledged
+                      ) =>
+                    TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, The greet at index $index was successfully changed to \"$newGreet\"."
+                      )
+                    )
+
+                  case Failure(ex) =>
+                    log.error(
+                      "There was an exception when waiting for response from automatic messages settings repository when asked to edit greet no. {} in channel {}.",
+                      index,
+                      channelName,
+                      ex
+                    )
+                    TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, I cannot confirm the greet at index $index was changed... $problemDiscord"
+                      )
+                    )
+                }
+              }
+
+            case (
+                  Actions.EDIT | Actions.UPDATE | Actions.CHANGE,
+                  false,
+                  Some(knownGreetsSettings)
+                ) =>
+              val afterTarget = afterAction.indexOf(' ')
+              if (afterTarget < 0) {
+                TwitchCommandsService.ReturnCommandResponse(
+                  cmd,
+                  chatters,
+                  Some(usage)
+                )
+              } else {
+                val target = afterAction.substring(0, afterTarget).trim
+                val newGreet = afterAction.substring(afterTarget).trim
+                val currentSpecificGreets = knownGreetsSettings.specificGreets
+                  .getOrElse(cmd.e.chatterUserId, Nil)
+                val index =
+                  target.asIndex(currentSpecificGreets.length)
+                if (currentSpecificGreets.isEmpty) {
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(s"$${sender}, there are no greets to edit.")
+                  )
+                } else {
+                  val newGreetsSettings =
+                    knownGreetsSettings.copy(specificGreets =
+                      knownGreetsSettings.specificGreets + (cmd.e.chatterUserId -> currentSpecificGreets
+                        .updated(index, newGreet))
+                    )
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    AutomaticMessagesSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendAutomaticMessagesSettingsRepositoryCommand(
+                          AutomaticMessagesSettingsRepository.ChangeSettings(
+                            ref,
+                            broadcasterId,
+                            automaticMessagesSettings.copy(knownGreets =
+                              Some(newGreetsSettings)
+                            )
+                          )
+                        )
+                  ) {
+                    case Success(
+                          AutomaticMessagesSettingsRepository.Acknowledged
+                        ) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, The greet at index $index was successfully changed to \"$newGreet\"."
+                        )
+                      )
+
+                    case Failure(ex) =>
+                      log.error(
+                        "There was an exception when waiting for response from automatic messages settings repository when asked to edit greet no. {} for {} in channel {}.",
+                        index,
+                        cmd.e.chatterUserName,
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the greet at index $index was changed... $problemDiscord"
+                        )
+                      )
+                  }
+                }
+              }
+
+            case (
+                  Actions.DELETE | Actions.REMOVE,
+                  true,
+                  Some(knownGreetsSettings)
+                ) =>
+              val target = afterAction.trim
+              val index =
+                target.asIndex(knownGreetsSettings.standardGreets.length)
+              val takeLeft = index
+              val takeRight =
+                knownGreetsSettings.standardGreets.length - index - 1
+              val newGreetsSettings =
+                knownGreetsSettings.copy(standardGreets =
+                  knownGreetsSettings.standardGreets.take(
+                    takeLeft
+                  ) ++ knownGreetsSettings.standardGreets.takeRight(takeRight)
+                )
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        automaticMessagesSettings.copy(knownGreets =
+                          Some(newGreetsSettings)
+                        )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, The greet at index $index was successfully deleted."
+                    )
+                  )
+
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository when asked to delete greet no. {} in channel {}.",
+                    index,
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the greet at index $index was deleted... $problemDiscord"
+                    )
+                  )
+              }
+
+            case (
+                  Actions.DELETE | Actions.REMOVE,
+                  false,
+                  Some(knownGreetsSettings)
+                ) =>
+              val target = afterAction.trim
+              val currentSpecificGreets = knownGreetsSettings.specificGreets
+                .getOrElse(cmd.e.chatterUserId, Nil)
+              val index =
+                target.asIndex(currentSpecificGreets.length)
+              if (currentSpecificGreets.isEmpty) {
+                ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                  cmd,
+                  chatters,
+                  Some(s"$${sender}, there are no greets to delete.")
+                )
+              } else {
+                val takeLeft = index
+                val takeRight = currentSpecificGreets.length - index - 1
+                val newGreetsSettings =
+                  knownGreetsSettings.copy(specificGreets =
+                    knownGreetsSettings.specificGreets + (cmd.e.chatterUserId -> (currentSpecificGreets
+                      .take(takeLeft) ++ currentSpecificGreets.takeRight(
+                      takeRight
+                    )))
+                  )
+                ctx.ask[
+                  ArchieMateMediator.Command,
+                  AutomaticMessagesSettingsRepository.Acknowledged.type
+                ](
+                  mediator,
+                  ref =>
+                    ArchieMateMediator
+                      .SendAutomaticMessagesSettingsRepositoryCommand(
+                        AutomaticMessagesSettingsRepository.ChangeSettings(
+                          ref,
+                          broadcasterId,
+                          automaticMessagesSettings.copy(knownGreets =
+                            Some(newGreetsSettings)
+                          )
+                        )
+                      )
+                ) {
+                  case Success(
+                        AutomaticMessagesSettingsRepository.Acknowledged
+                      ) =>
+                    TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, The greet at index $index was successfully deleted."
+                      )
+                    )
+
+                  case Failure(ex) =>
+                    log.error(
+                      "There was an exception when waiting for response from automatic messages settings repository when asked to delete greet no. {} for {} in channel {}.",
+                      index,
+                      cmd.e.chatterUserName,
+                      channelName,
+                      ex
+                    )
+                    TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, I cannot confirm the greet at index $index was deleted... $problemDiscord"
+                      )
+                    )
+                }
+              }
+
+            case (Actions.RESET, true, Some(knownGreetsSettings)) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        cmd.chatbotParams.channelSettings.automaticMessagesSettings
+                          .copy(knownGreets = Some(KnownGreetsSettings()))
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, The greet settings have been reset to default."
+                    )
+                  )
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository  when asked to reset greets settings in channel {}.",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the greet settings have been reset... $problemDiscord"
+                    )
+                  )
+              }
+
+            case (Actions.RESET, false, Some(knownGreetsSettings)) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                AutomaticMessagesSettingsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendAutomaticMessagesSettingsRepositoryCommand(
+                      AutomaticMessagesSettingsRepository.ChangeSettings(
+                        ref,
+                        broadcasterId,
+                        cmd.chatbotParams.channelSettings.automaticMessagesSettings
+                          .copy(knownGreets =
+                            Some(
+                              knownGreetsSettings.copy(
+                                specificGreets =
+                                  knownGreetsSettings.specificGreets + (cmd.e.chatterUserId -> Nil),
+                                specificNames =
+                                  knownGreetsSettings.specificNames - cmd.e.chatterUserId
+                              )
+                            )
+                          )
+                      )
+                    )
+              ) {
+                case Success(
+                      AutomaticMessagesSettingsRepository.Acknowledged
+                    ) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, Your specific greet settings have been reset to default."
+                    )
+                  )
+                case Failure(ex) =>
+                  log.error(
+                    "There was an exception when waiting for response from automatic messages settings repository  when asked to reset specific greets settings for {} in channel {}.",
+                    cmd.e.chatterUserName,
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm your specific greet settings have been reset... $problemDiscord"
+                    )
+                  )
+              }
+
+            case (Actions.TEST, true, _) =>
+            case (Actions.TEST, false, Some(knownGreetsSettings)) =>
+              val userState = cmd.chatbotParams.users.getOrElse(
+                cmd.e.chatterUserId,
+                TwitchChatbot.UserState(user =
+                  TwitchApi.User(
+                    cmd.e.chatterUserId,
+                    cmd.e.chatterUserLogin,
+                    cmd.e.chatterUserName
+                  )
+                )
+              )
+              val userStateWithoutOnline = userState.copy(flags =
+                userState.flags - TwitchChatbot.UserFlag.Online
+              )
+              val tempChatbotParams = cmd.chatbotParams.copy(users =
+                cmd.chatbotParams.users + (cmd.e.chatterUserId -> userStateWithoutOnline)
+              )
+              ctx.self ! TwitchCommandsService.GreetUsers(
+                tempChatbotParams,
+                Map(
+                  cmd.e.chatterUserId -> userStateWithoutOnline
+                )
+              )
+
+            case (_, false, None) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(s"$${sender}, The known greets are currently off.")
+              )
+
+            case _ =>
+              log.warn(
+                "Unknown state when handling Greets command. action = {}, isBroadcaster = {}, knownGreetsSettingsOption = {}",
+                action,
+                isBroadcaster,
+                cmd.chatbotParams.channelSettings.automaticMessagesSettings.knownGreets
+              )
+          }
+        }
+      }
+    }
+
     val builtInCommands: Map[String, BuiltInCommand] = Map(
       Command.name -> Command,
       Commands.name -> Commands,
@@ -1137,7 +1932,8 @@ class TwitchCommandsService(using
       Subs.name -> Subs,
       Uptime.name -> Uptime,
       Followage.name -> Followage,
-      Afk.name -> Afk
+      Afk.name -> Afk,
+      Greets.name -> Greets
     )
 
     val isBuilInCommandEnabled
@@ -1151,11 +1947,12 @@ class TwitchCommandsService(using
       Subs.name -> (_.subs),
       Uptime.name -> (_.uptime),
       Followage.name -> (_.followage),
-      Afk.name -> (_.afk)
+      Afk.name -> (_.afk),
+      Greets.name -> (_.greets)
     )
   }
 
-  def operational(): Behavior[TwitchCommandsService.Command] =
+  def operational(): Behavior[TwitchCommandsService.Command] = {
     Behaviors.receiveAndLogMessage {
       case cmd @ TwitchCommandsService.RespondToCommand(chatbotParams, e) =>
         e.message.text.trim match {
@@ -1253,5 +2050,100 @@ class TwitchCommandsService(using
           )
         }
         Behaviors.same
+
+      case TwitchCommandsService.GreetUsers(chatbotParams, userStateMap) =>
+        chatbotParams.channelSettings.automaticMessagesSettings.knownGreets match {
+          case Some(knownGreetsSettings) =>
+            val shouldGreetUsersId = userStateMap
+              .filter((_, userState) =>
+                shouldGreet(
+                  userState,
+                  knownGreetsSettings,
+                  chatbotParams.broadcaster.id
+                )
+              )
+              .keySet
+
+            val newShouldGreetUsersId =
+              shouldGreetUsersId.diff(chatbotParams.users.keySet)
+
+            val newlyOnlineShouldGreetUsersId =
+              shouldGreetUsersId.filter(greetUserId =>
+                chatbotParams.users.exists((userId, user) =>
+                  greetUserId == userId && !user.flags.contains(
+                    TwitchChatbot.UserFlag.Online
+                  ) && !user.flags.contains(TwitchChatbot.UserFlag.Ignore)
+                )
+              )
+
+            val allGreetsUserId =
+              newShouldGreetUsersId ++ newlyOnlineShouldGreetUsersId
+
+            allGreetsUserId.foreach { userId =>
+              val (greet, name) = getGreetAndName(
+                chatbotParams.users(userId),
+                knownGreetsSettings
+              )
+              val finalGreet = greet.replaceAll("user".asVariableRegex, name)
+              chatbotParams.ircListener ! IRCListener.SendMessage(finalGreet)
+            }
+
+          case None =>
+        }
+
+        Behaviors.same
     }
+  }
+
+  private def shouldGreet(
+      userState: TwitchChatbot.UserState,
+      settings: KnownGreetsSettings,
+      twitchRoomId: String
+  ): Boolean = settings.mode match {
+    case KnownGreetsMode.All      => !isBroadcaster(userState, twitchRoomId)
+    case KnownGreetsMode.Mods     => isMod(userState)
+    case KnownGreetsMode.ModsVips => isMod(userState) || isVip(userState)
+    case KnownGreetsMode.ModsVipsSubs =>
+      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
+        userState
+      ) || isSub(userState))
+  }
+
+  private def isBroadcaster(
+      userState: TwitchChatbot.UserState,
+      twitchRoomId: String
+  ): Boolean = userState.user.user_id == twitchRoomId
+
+  private def isMod(
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Mod)
+
+  private def isVip(
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Vip)
+
+  private def isSub(
+      userState: TwitchChatbot.UserState
+  ): Boolean =
+    userState.flags.contains(TwitchChatbot.UserFlag.Sub)
+
+  private def getGreetAndName(
+      userState: TwitchChatbot.UserState,
+      settings: KnownGreetsSettings
+  ): (String, String) = {
+    val greet = settings.specificGreets
+      .getOrElse(
+        userState.user.user_id,
+        settings.standardGreets
+      )
+      .randomOrDefault("Hi")
+    val name =
+      settings.specificNames.getOrElse(
+        userState.user.user_id,
+        s"@${userState.user.user_name}"
+      )
+    (greet, name)
+  }
 }

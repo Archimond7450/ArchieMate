@@ -35,7 +35,8 @@ object ChannelSettings {
       subs: Boolean = false,
       uptime: Boolean = false,
       followage: Boolean = false,
-      afk: Boolean = false
+      afk: Boolean = false,
+      greets: Boolean = false
   )
 
   case object BuiltInCommandsSettings {
@@ -208,7 +209,7 @@ object ChannelSettings {
       mode: KnownGreetsMode = KnownGreetsMode.ModsVipsSubs,
       standardGreets: List[String] = List("Hi ${user}"),
       specificNames: Map[String, String] = Map.empty,
-      specificGreets: Map[String, String] = Map.empty
+      specificGreets: Map[String, List[String]] = Map.empty
   )
 
   object KnownGreetsSettings {
