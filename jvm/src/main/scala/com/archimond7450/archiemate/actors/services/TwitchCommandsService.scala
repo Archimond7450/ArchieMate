@@ -2139,12 +2139,12 @@ class TwitchCommandsService(using
       userState: TwitchChatbot.UserState,
       settings: KnownGreetsSettings
   ): (String, String) = {
-    val greet = settings.specificGreets
+    val greet = (settings.specificGreets
       .getOrElse(
         userState.user.user_id,
-        settings.standardGreets
-      )
-      .randomOrDefault("Hi")
+        Nil
+      ) ++ settings.standardGreets)
+      .randomOrDefault(s"Hi $${user}")
     val name =
       settings.specificNames.getOrElse(
         userState.user.user_id,
