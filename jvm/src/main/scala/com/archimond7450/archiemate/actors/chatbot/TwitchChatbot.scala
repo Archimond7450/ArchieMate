@@ -507,6 +507,9 @@ class TwitchChatbot(twitchRoomId: String)(using
         case TwitchChatbot.Subs(Some(subs)) =>
           initializing(params.copy(subs = Some(subs)))
 
+        case TwitchChatbot.Followers(Some(followers)) =>
+          initializing(params.copy(followers = Some(followers)))
+
         case TwitchChatbot.Chatters(Some(chatters)) =>
           initializing(params.copy(chatters = Some(chatters)))
 
@@ -514,8 +517,8 @@ class TwitchChatbot(twitchRoomId: String)(using
           initializing(params.copy(stream = Some(stream)))
 
         case TwitchChatbot.Mods(None) | TwitchChatbot.VIPs(None) |
-            TwitchChatbot.Subs(None) | TwitchChatbot.Chatters(None) |
-            TwitchChatbot.Stream(None) =>
+            TwitchChatbot.Subs(None) | TwitchChatbot.Followers(None) |
+            TwitchChatbot.Chatters(None) | TwitchChatbot.Stream(None) =>
           supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
             params.broadcaster.id
           )
