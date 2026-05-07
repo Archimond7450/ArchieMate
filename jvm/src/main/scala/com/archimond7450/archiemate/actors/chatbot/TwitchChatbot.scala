@@ -3,61 +3,20 @@ package com.archimond7450.archiemate.actors.chatbot
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbot.UserFlag
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
-import com.archimond7450.archiemate.actors.repositories.settings.{
-  AutomaticMessagesSettingsRepository,
-  BasicChatbotSettingsRepository,
-  BuiltInCommandsSettingsRepository,
-  CommandsSettingsRepository,
-  OverlaysSettingsRepository,
-  TimersSettingsRepository,
-  VariablesSettingsRepository
-}
+import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
 import com.archimond7450.archiemate.actors.services.TwitchCommandsService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.extensions.ListExtension.{
-  randomOrDefault,
-  toMapWithKey
-}
-import com.archimond7450.archiemate.extensions.StringExtensions.{
-  asTwitchSubTier,
-  asVariableRegex
-}
-import com.archimond7450.archiemate.http.ChannelSettings.{
-  AutomaticMessagesSettings,
-  BasicChatbotSettings,
-  BuiltInCommandsSettings,
-  CommandsSettings,
-  KnownGreetsMode,
-  KnownGreetsSettings,
-  ManualTimer,
-  OverlaysSettings,
-  TimersSettings,
-  VariablesSettings,
-  Settings as ChannelSettings
-}
+import com.archimond7450.archiemate.extensions.ListExtension.{randomOrDefault, toMapWithKey}
+import com.archimond7450.archiemate.extensions.StringExtensions.{asTwitchSubTier, asVariableRegex}
+import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, KnownGreetsMode, KnownGreetsSettings, ManualTimer, OverlaysSettings, TimersSettings, VariablesSettings, Settings as ChannelSettings}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
-import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
-  GetChatters,
-  GetModerators,
-  GetStream,
-  GetSubs,
-  GetTokenUser,
-  GetVIPs
-}
+import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{GetChannelFollowers, GetChatters, GetModerators, GetStream, GetSubs, GetTokenUser, GetVIPs}
 import com.archimond7450.archiemate.twitch.eventsub
-import com.archimond7450.archiemate.twitch.irc.{
-  IncomingMessageDecoder,
-  OutgoingMessageEncoder
-}
-import org.apache.pekko.actor.typed.scaladsl.{
-  ActorContext,
-  Behaviors,
-  StashBuffer,
-  TimerScheduler
-}
+import com.archimond7450.archiemate.twitch.irc.{IncomingMessageDecoder, OutgoingMessageEncoder}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.util.Timeout
 
@@ -90,6 +49,7 @@ object TwitchChatbot {
   final case class Mods(mods: Option[GetModerators]) extends Command
   final case class VIPs(vips: Option[GetVIPs]) extends Command
   final case class Subs(subs: Option[GetSubs]) extends Command
+  final case class Followers(followers: Option[GetChannelFollowers]) extends Command
   final case class Chatters(chatters: Option[GetChatters]) extends Command
   final case class Stream(stream: Option[Option[TwitchApi.Stream]])
       extends Command // TODO: Change outer Option to Try
@@ -125,6 +85,7 @@ object TwitchChatbot {
       ircListener: ActorRef[IRCListener.Command],
       twitchCommandsService: ActorRef[TwitchCommandsService.Command],
       users: Map[String, UserState],
+      followers: Map[String, TwitchApi.UserFollowage],
       stream: Option[TwitchApi.Stream],
       messagesAfterLastTimer: Int = 0,
       lastTimers: Seq[Either[String, String]] = Seq.empty
@@ -441,6 +402,7 @@ class TwitchChatbot(twitchRoomId: String)(using
     askForMods(tokenId, broadcaster)
     askForVIPs(tokenId, broadcaster)
     askForSubs(tokenId, broadcaster)
+    askForFollowers(tokenId, broadcaster)
     askForChatters(tokenId, broadcaster)
     askForStream(tokenId, broadcaster)
 
@@ -464,6 +426,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       mods: Option[GetModerators] = None,
       vips: Option[GetVIPs] = None,
       subs: Option[GetSubs] = None,
+      followers: Option[GetChannelFollowers] = None,
       chatters: Option[GetChatters] = None,
       stream: Option[Option[TwitchApi.Stream]] = None
   )
@@ -472,7 +435,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       params: InitializingParameters
   ): Behavior[TwitchChatbot.Command] = {
     if (
-      params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty
+      params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.followers.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty
     ) {
       supervisor ! TwitchChatbotsSupervisor.JoinOK(params.broadcaster.id)
 
@@ -499,6 +462,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       val subsAsUser = subs.map((userId, sub) =>
         userId -> TwitchApi.User(sub.user_id, sub.user_login, sub.user_name)
       )
+      val followers = params.followers.get.data.toMapWithKey(_.user_id)
       val chatters = params.chatters.get.data.toMapWithKey(_.user_id)
       val usersState: Map[String, TwitchChatbot.UserState] =
         (mods ++ vips ++ subsAsUser ++ chatters).map { (userId, user) =>
@@ -527,6 +491,7 @@ class TwitchChatbot(twitchRoomId: String)(using
             params.ircListener,
             twitchCommandsService,
             usersState,
+            followers,
             params.stream.get
           )
         )
@@ -691,7 +656,7 @@ class TwitchChatbot(twitchRoomId: String)(using
         val msgWithUser = msg.replaceAll("user".asVariableRegex, e.userName)
         params.ircListener ! IRCListener.SendMessage(msgWithUser)
       }
-      Behaviors.same
+      operational(params.copy(followers = params.followers + (e.userId -> TwitchApi.UserFollowage(e.userId, e.userLogin, e.userName, e.followedAt))))
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelAdBreakBeginEvent) =>
       Behaviors.same
@@ -1487,6 +1452,26 @@ class TwitchChatbot(twitchRoomId: String)(using
           ex
         )
         TwitchChatbot.Subs(None)
+    }
+
+  private def askForFollowers(tokenId: String, broadcaster: GetTokenUser): Unit =
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetChannelFollowers](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          TwitchApiClient.GetChannelFollowers(ref, tokenId, broadcaster.id)
+        )
+    ) {
+      case Success(followers: GetChannelFollowers) =>
+        TwitchChatbot.Followers(Some(followers))
+
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve followers of channel {}",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.Followers(None)
     }
 
   private def askForChatters(tokenId: String, broadcaster: GetTokenUser): Unit =

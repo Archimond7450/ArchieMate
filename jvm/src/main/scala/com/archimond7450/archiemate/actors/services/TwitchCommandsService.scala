@@ -1150,6 +1150,7 @@ class TwitchCommandsService(using
         val HELP = "help"
         val ON = "on"
         val OFF = "off"
+        val MODE = "mode"
         val SHOW = "show"
         val NAME = "name"
         val ADD = "add"
@@ -1166,6 +1167,7 @@ class TwitchCommandsService(using
           HELP,
           ON,
           OFF,
+          MODE,
           SHOW,
           NAME,
           ADD,
@@ -1219,6 +1221,8 @@ class TwitchCommandsService(using
           .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Sub))
           .keySet
           .contains(cmd.e.chatterUserId)
+        val isFollower = cmd.chatbotParams.followers.keySet.contains(cmd.e.chatterUserId)
+
         val authorized = greetsSettings match {
           case None => isBroadcaster
           case Some(KnownGreetsSettings(KnownGreetsMode.Mods, _, _, _)) =>
@@ -1229,6 +1233,8 @@ class TwitchCommandsService(using
                 KnownGreetsSettings(KnownGreetsMode.ModsVipsSubs, _, _, _)
               ) =>
             isBroadcaster || isMod || isVip || isSub
+          case Some(KnownGreetsSettings(KnownGreetsMode.ModsVipsSubsFollows, _, _, _)) =>
+            isBroadcaster || isMod || isVip || isSub || isFollower
           case Some(KnownGreetsSettings(KnownGreetsMode.All, _, _, _)) =>
             true
         }
@@ -1340,6 +1346,33 @@ class TwitchCommandsService(using
                 chatters,
                 Some(s"$${sender}, You do not have permission for this action.")
               )
+            case (Actions.MODE, true, Some(knownGreetsSettings: KnownGreetsSettings)) =>
+              val optionMode = afterAction.trim.toLowerCase match {
+                case "all" => Some(KnownGreetsMode.All)
+                case "mods" | "moderators" => Some(KnownGreetsMode.Mods)
+                case "modsvips" | "moderatorsvips" => Some(KnownGreetsMode.ModsVips)
+                case "modsvipssubs" | "moderatorsvipssubscribers" => Some(KnownGreetsMode.ModsVipsSubs)
+                case "modsvipssubsfollows" | "moderatorsvipssubscribersfollowers" => Some(KnownGreetsMode.ModsVipsSubsFollows)
+                case _ => None
+              }
+              optionMode match {
+                case Some(mode) =>
+                  ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettingsRepository.Acknowledged.type](
+                    mediator, ref => ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(AutomaticMessagesSettingsRepository.ChangeSettings(ref, broadcasterId, automaticMessagesSettings.copy(knownGreets = Some(knownGreetsSettings.copy(mode = mode)))))
+                  ) {
+                    case Success(AutomaticMessagesSettingsRepository.Acknowledged) =>
+                      TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(s"$${sender}, The known greets mode was successfully changed to \"${afterAction.trim}\"."))
+
+                    case Failure(ex) =>
+                      log.error("There was an exception when waiting for response from automatic messages settings repository when asked to change known greets mode to \"{}\" in {} channel.", afterAction.trim, channelName, ex)
+                      TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(s"$${sender}, I cannot confirm the known greets mode was changed... $problemDiscord"))
+                  }
+
+                case None =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd, chatters, Some(s"$${sender}, The known greets mode is invalid.")
+                  )
+              }
             case (Actions.SHOW, true, Some(knownGreetsSettings)) =>
               ctx.self ! TwitchCommandsService.ReturnCommandResponse(
                 cmd,
@@ -2065,7 +2098,8 @@ class TwitchCommandsService(using
                 shouldGreet(
                   userState,
                   knownGreetsSettings,
-                  chatbotParams.broadcaster.id
+                  chatbotParams.broadcaster.id,
+                  chatbotParams.followers
                 )
               )
               .keySet
@@ -2104,7 +2138,8 @@ class TwitchCommandsService(using
   private def shouldGreet(
       userState: TwitchChatbot.UserState,
       settings: KnownGreetsSettings,
-      twitchRoomId: String
+      twitchRoomId: String,
+      followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = settings.mode match {
     case KnownGreetsMode.All      => !isBroadcaster(userState, twitchRoomId)
     case KnownGreetsMode.Mods     => isMod(userState)
@@ -2113,6 +2148,8 @@ class TwitchCommandsService(using
       !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
         userState
       ) || isSub(userState))
+    case KnownGreetsMode.ModsVipsSubsFollows =>
+      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(userState) || isSub(userState) || isFollower(userState, followers))
   }
 
   private def isBroadcaster(
@@ -2132,8 +2169,16 @@ class TwitchCommandsService(using
 
   private def isSub(
       userState: TwitchChatbot.UserState
-  ): Boolean =
+  ): Boolean = {
     userState.flags.contains(TwitchChatbot.UserFlag.Sub)
+  }
+
+  private def isFollower(
+      userState: TwitchChatbot.UserState,
+      followers: Map[String, TwitchApi.UserFollowage]
+  ): Boolean = {
+    followers.exists(_._2.user_id == userState.user.user_id)
+  }
 
   private def getGreetAndName(
       userState: TwitchChatbot.UserState,
