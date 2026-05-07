@@ -222,6 +222,7 @@ object ChannelSettings {
     case Mods
     case ModsVips
     case ModsVipsSubs
+    case ModsVipsSubsFollows
   }
 
   object KnownGreetsMode {
