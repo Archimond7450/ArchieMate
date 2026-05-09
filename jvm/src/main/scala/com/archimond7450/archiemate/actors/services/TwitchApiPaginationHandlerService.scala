@@ -126,14 +126,14 @@ class TwitchApiPaginationHandlerService(using
       active(state.copy(stream = state.stream - cmd))
     case ChattersResponse(cmd, Success(chatters)) =>
       chatters.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if chatters.data.nonEmpty =>
           askForChatters(cmd, cursor = Some(cursor))
           active(
             state.copy(chatters =
               state.chatters + (cmd -> (state.chatters(cmd) :+ chatters))
             )
           )
-        case None =>
+        case _ =>
           val chattersData = state.chatters(cmd) :+ chatters
           val finalData = chattersData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
@@ -143,14 +143,14 @@ class TwitchApiPaginationHandlerService(using
       }
     case ModeratorsResponse(cmd, Success(moderators)) =>
       moderators.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if moderators.data.nonEmpty =>
           askForModerators(cmd, cursor = Some(cursor))
           active(
             state.copy(moderators =
               state.moderators + (cmd -> (state.moderators(cmd) :+ moderators))
             )
           )
-        case None =>
+        case _ =>
           val moderatorsData = state.moderators(cmd) :+ moderators
           val finalData = moderatorsData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
@@ -160,12 +160,12 @@ class TwitchApiPaginationHandlerService(using
       }
     case VIPsResponse(cmd, Success(vips)) =>
       vips.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if vips.data.nonEmpty =>
           askForVIPs(cmd)
           active(
             state.copy(vips = state.vips + (cmd -> (state.vips(cmd) :+ vips)))
           )
-        case None =>
+        case _ =>
           val vipsData = state.vips(cmd) :+ vips
           val finalData = vipsData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
@@ -175,12 +175,12 @@ class TwitchApiPaginationHandlerService(using
       }
     case SubsResponse(cmd, Success(subs)) =>
       subs.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if subs.data.nonEmpty =>
           askForSubs(cmd)
           active(
             state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))
           )
-        case None =>
+        case _ =>
           val subsData = state.subs(cmd) :+ subs
           val finalData = subsData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
@@ -190,14 +190,14 @@ class TwitchApiPaginationHandlerService(using
       }
     case ChannelFollowersResponse(cmd, Success(followers)) =>
       followers.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if followers.data.nonEmpty =>
           askForChannelFollowers(cmd)
           active(
             state.copy(followers =
               state.followers + (cmd -> (state.followers(cmd) :+ followers))
             )
           )
-        case None =>
+        case _ =>
           val followersData = state.followers(cmd) :+ followers
           val finalData = followersData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
@@ -207,14 +207,14 @@ class TwitchApiPaginationHandlerService(using
       }
     case StreamResponse(cmd, Success(stream)) =>
       stream.pagination.cursor match {
-        case Some(cursor) =>
+        case Some(cursor) if stream.data.nonEmpty =>
           askForStream(cmd)
           active(
             state.copy(stream =
               state.stream + (cmd -> (state.stream(cmd) :+ stream))
             )
           )
-        case None =>
+        case _ =>
           val streamData = state.stream(cmd) :+ stream
           val finalData = streamData.flatMap(_.data).toSet
           cmd.clientCmd.replyTo ! StatusReply.success(
