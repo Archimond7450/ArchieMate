@@ -126,7 +126,7 @@ class TwitchApiPaginationHandlerService(using
       active(state.copy(stream = state.stream - cmd))
     case ChattersResponse(cmd, Success(chatters)) =>
       chatters.pagination.cursor match {
-        case Some(cursor) if chatters.data.nonEmpty && chatters.data != state.chatters(cmd).tail =>
+        case Some(cursor) if chatters.data.nonEmpty && (state.chatters(cmd).isEmpty || chatters.data != state.chatters(cmd).tail) =>
           askForChatters(cmd, cursor = Some(cursor))
           active(
             state.copy(chatters =
@@ -143,7 +143,7 @@ class TwitchApiPaginationHandlerService(using
       }
     case ModeratorsResponse(cmd, Success(moderators)) =>
       moderators.pagination.cursor match {
-        case Some(cursor) if moderators.data.nonEmpty && moderators.data != state.moderators(cmd).tail =>
+        case Some(cursor) if moderators.data.nonEmpty && (state.moderators(cmd).isEmpty || moderators.data != state.moderators(cmd).tail) =>
           askForModerators(cmd, cursor = Some(cursor))
           active(
             state.copy(moderators =
@@ -160,7 +160,7 @@ class TwitchApiPaginationHandlerService(using
       }
     case VIPsResponse(cmd, Success(vips)) =>
       vips.pagination.cursor match {
-        case Some(cursor) if vips.data.nonEmpty && vips.data != state.vips(cmd).tail =>
+        case Some(cursor) if vips.data.nonEmpty && (state.vips(cmd).isEmpty || vips.data != state.vips(cmd).tail) =>
           askForVIPs(cmd)
           active(
             state.copy(vips = state.vips + (cmd -> (state.vips(cmd) :+ vips)))
@@ -175,7 +175,7 @@ class TwitchApiPaginationHandlerService(using
       }
     case SubsResponse(cmd, Success(subs)) =>
       subs.pagination.cursor match {
-        case Some(cursor) if subs.data.nonEmpty && subs.data != state.subs(cmd).tail =>
+        case Some(cursor) if subs.data.nonEmpty && (state.subs(cmd).isEmpty || subs.data != state.subs(cmd).tail) =>
           askForSubs(cmd)
           active(
             state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))
@@ -190,7 +190,7 @@ class TwitchApiPaginationHandlerService(using
       }
     case ChannelFollowersResponse(cmd, Success(followers)) =>
       followers.pagination.cursor match {
-        case Some(cursor) if followers.data.nonEmpty && followers.data != state.followers(cmd).tail =>
+        case Some(cursor) if followers.data.nonEmpty && (state.followers(cmd).isEmpty || followers.data != state.followers(cmd).tail) =>
           askForChannelFollowers(cmd)
           active(
             state.copy(followers =
@@ -207,7 +207,7 @@ class TwitchApiPaginationHandlerService(using
       }
     case StreamResponse(cmd, Success(stream)) =>
       stream.pagination.cursor match {
-        case Some(cursor) if stream.data.nonEmpty && stream.data != state.stream(cmd).tail =>
+        case Some(cursor) if stream.data.nonEmpty && (state.stream(cmd).isEmpty || stream.data != state.stream(cmd).tail) =>
           askForStream(cmd)
           active(
             state.copy(stream =
