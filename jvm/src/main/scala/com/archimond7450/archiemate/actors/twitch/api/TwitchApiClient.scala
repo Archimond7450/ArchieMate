@@ -759,9 +759,9 @@ class TwitchApiClient(using
     )
   }
 
-  private def addCursor(uri: Uri, cursor: Option[String]): Uri = cursor match {
-    case None         => uri
-    case Some(cursor) => uri.withQuery(Query("after" -> cursor))
+  private def addCursor(uri: Uri, query: Query, cursor: Option[String]): Uri = cursor match {
+    case None         => uri.withQuery(query)
+    case Some(cursor) => uri.withQuery(Query(query.toMap + ("after" -> cursor)))
   }
 
   private def processGetChatters(cmd: GetChatters): Unit = {
@@ -770,12 +770,11 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/chat/chatters").withQuery(
-          Query(
-            "broadcaster_id" -> cmd.roomId,
-            "moderator_id" -> cmd.moderatorId,
-            "first" -> "1000"
-          )
+        Uri("https://api.twitch.tv/helix/chat/chatters"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "moderator_id" -> cmd.moderatorId,
+          "first" -> "1000"
         ),
         cmd.cursor
       ),
@@ -789,11 +788,10 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/moderation/moderators").withQuery(
-          Query(
-            "broadcaster_id" -> cmd.roomId,
-            "first" -> "100"
-          )
+        Uri("https://api.twitch.tv/helix/moderation/moderators"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "first" -> "100"
         ),
         cmd.cursor
       ),
@@ -807,11 +805,10 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/channels/vips").withQuery(
-          Query(
-            "broadcaster_id" -> cmd.roomId,
-            "first" -> "100"
-          )
+        Uri("https://api.twitch.tv/helix/channels/vips"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "first" -> "100"
         ),
         cmd.cursor
       ),
@@ -825,11 +822,10 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/subscriptions").withQuery(
-          Query(
-            "broadcaster_id" -> cmd.roomId,
-            "first" -> "100"
-          )
+        Uri("https://api.twitch.tv/helix/subscriptions"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "first" -> "100"
         ),
         cmd.cursor
       ),
@@ -859,11 +855,10 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/channels/followers").withQuery(
-          Query(
-            "broadcaster_id" -> cmd.roomId,
-            "first" -> "100"
-          )
+        Uri("https://api.twitch.tv/helix/channels/followers"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "first" -> "100"
         ),
         cmd.cursor
       ),
@@ -920,10 +915,9 @@ class TwitchApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = addCursor(
-        Uri("https://api.twitch.tv/helix/streams").withQuery(
-          Query(
-            "user_id" -> cmd.roomId
-          )
+        Uri("https://api.twitch.tv/helix/streams"),
+        Query(
+          "user_id" -> cmd.roomId
         ),
         cmd.cursor
       ),
