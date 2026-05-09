@@ -18,7 +18,7 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
   .enablePlugins(BuildInfoPlugin)
   .settings(
     name := "ArchieMate",
-    version := "0.2.0.4",
+    version := "0.2.1.1",
     libraryDependencies ++= Seq(
       // Circe
       "io.circe" %%% "circe-core" % "0.14.10",
