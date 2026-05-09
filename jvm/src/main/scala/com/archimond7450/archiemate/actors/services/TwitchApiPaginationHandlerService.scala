@@ -161,7 +161,7 @@ class TwitchApiPaginationHandlerService(using
     case VIPsResponse(cmd, Success(vips)) =>
       vips.pagination.cursor match {
         case Some(cursor) =>
-          askForVIPs(cmd)
+          askForVIPs(cmd, cursor = Some(cursor))
           active(
             state.copy(vips = state.vips + (cmd -> (state.vips(cmd) :+ vips)))
           )
@@ -176,7 +176,7 @@ class TwitchApiPaginationHandlerService(using
     case SubsResponse(cmd, Success(subs)) =>
       subs.pagination.cursor match {
         case Some(cursor) if subs.data.length + state.subs(cmd).map(_.data.length).sum <= subs.total =>
-          askForSubs(cmd)
+          askForSubs(cmd, cursor = Some(cursor))
           active(
             state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))
           )
@@ -191,7 +191,7 @@ class TwitchApiPaginationHandlerService(using
     case ChannelFollowersResponse(cmd, Success(followers)) =>
       followers.pagination.cursor match {
         case Some(cursor) =>
-          askForChannelFollowers(cmd)
+          askForChannelFollowers(cmd, cursor = Some(cursor))
           active(
             state.copy(followers =
               state.followers + (cmd -> (state.followers(cmd) :+ followers))
@@ -208,7 +208,7 @@ class TwitchApiPaginationHandlerService(using
     case StreamResponse(cmd, Success(stream)) =>
       stream.pagination.cursor match {
         case Some(cursor) =>
-          askForStream(cmd)
+          askForStream(cmd, cursor = Some(cursor))
           active(
             state.copy(stream =
               state.stream + (cmd -> (state.stream(cmd) :+ stream))
