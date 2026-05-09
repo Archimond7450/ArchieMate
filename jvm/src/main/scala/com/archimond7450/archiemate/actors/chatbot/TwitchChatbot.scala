@@ -1,22 +1,68 @@
 package com.archimond7450.archiemate.actors.chatbot
 
+import com.archimond7450.archiemate.actors
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbot.UserFlag
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
-import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
-import com.archimond7450.archiemate.actors.services.TwitchCommandsService
+import com.archimond7450.archiemate.actors.repositories.settings.{
+  AutomaticMessagesSettingsRepository,
+  BasicChatbotSettingsRepository,
+  BuiltInCommandsSettingsRepository,
+  CommandsSettingsRepository,
+  OverlaysSettingsRepository,
+  TimersSettingsRepository,
+  VariablesSettingsRepository
+}
+import com.archimond7450.archiemate.actors.services.{
+  TwitchApiPaginationHandlerService,
+  TwitchCommandsService
+}
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.extensions.ListExtension.{randomOrDefault, toMapWithKey}
-import com.archimond7450.archiemate.extensions.StringExtensions.{asTwitchSubTier, asVariableRegex}
-import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, KnownGreetsMode, KnownGreetsSettings, ManualTimer, OverlaysSettings, TimersSettings, VariablesSettings, Settings as ChannelSettings}
+import com.archimond7450.archiemate.extensions.ListExtension.{
+  randomOrDefault,
+  toMapWithKey
+}
+import com.archimond7450.archiemate.extensions.StringExtensions.{
+  asTwitchSubTier,
+  asVariableRegex
+}
+import com.archimond7450.archiemate.http.ChannelSettings.{
+  AutomaticMessagesSettings,
+  BasicChatbotSettings,
+  BuiltInCommandsSettings,
+  CommandsSettings,
+  KnownGreetsMode,
+  KnownGreetsSettings,
+  ManualTimer,
+  OverlaysSettings,
+  TimersSettings,
+  VariablesSettings,
+  Settings as ChannelSettings
+}
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
-import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{GetChannelFollowers, GetChatters, GetModerators, GetStream, GetSubs, GetTokenUser, GetVIPs}
+import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
+  GetChannelFollowers,
+  GetChatters,
+  GetModerators,
+  GetStream,
+  GetSubs,
+  GetTokenUser,
+  GetVIPs
+}
 import com.archimond7450.archiemate.twitch.eventsub
-import com.archimond7450.archiemate.twitch.irc.{IncomingMessageDecoder, OutgoingMessageEncoder}
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
+import com.archimond7450.archiemate.twitch.irc.{
+  IncomingMessageDecoder,
+  OutgoingMessageEncoder
+}
+import org.apache.pekko.actor.typed.scaladsl.{
+  ActorContext,
+  Behaviors,
+  StashBuffer,
+  TimerScheduler
+}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.util.Timeout
 
@@ -49,7 +95,8 @@ object TwitchChatbot {
   final case class Mods(mods: Option[GetModerators]) extends Command
   final case class VIPs(vips: Option[GetVIPs]) extends Command
   final case class Subs(subs: Option[GetSubs]) extends Command
-  final case class Followers(followers: Option[GetChannelFollowers]) extends Command
+  final case class Followers(followers: Option[GetChannelFollowers])
+      extends Command
   final case class Chatters(chatters: Option[GetChatters]) extends Command
   final case class Stream(stream: Option[Option[TwitchApi.Stream]])
       extends Command // TODO: Change outer Option to Try
@@ -659,7 +706,12 @@ class TwitchChatbot(twitchRoomId: String)(using
         val msgWithUser = msg.replaceAll("user".asVariableRegex, e.userName)
         params.ircListener ! IRCListener.SendMessage(msgWithUser)
       }
-      operational(params.copy(followers = params.followers + (e.userId -> TwitchApi.UserFollowage(e.userId, e.userLogin, e.userName, e.followedAt))))
+      operational(
+        params.copy(followers =
+          params.followers + (e.userId -> TwitchApi
+            .UserFollowage(e.userId, e.userLogin, e.userName, e.followedAt))
+        )
+      )
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelAdBreakBeginEvent) =>
       Behaviors.same
@@ -1401,8 +1453,10 @@ class TwitchChatbot(twitchRoomId: String)(using
     .askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetModerators](
       mediator,
       ref =>
-        ArchieMateMediator.SendTwitchApiClientCommand(
-          TwitchApiClient.GetModerators(ref, tokenId, broadcaster.id)
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetModerators(
+            TwitchApiClient.GetModerators(ref, tokenId, broadcaster.id)
+          )
         )
     ) {
       case Success(mods: GetModerators) =>
@@ -1421,8 +1475,10 @@ class TwitchChatbot(twitchRoomId: String)(using
     ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetVIPs](
       mediator,
       ref =>
-        ArchieMateMediator.SendTwitchApiClientCommand(
-          TwitchApiClient.GetVIPs(ref, tokenId, broadcaster.id)
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetVIPs(
+            TwitchApiClient.GetVIPs(ref, tokenId, broadcaster.id)
+          )
         )
     ) {
       case Success(vips: GetVIPs) =>
@@ -1441,8 +1497,10 @@ class TwitchChatbot(twitchRoomId: String)(using
     ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetSubs](
       mediator,
       ref =>
-        ArchieMateMediator.SendTwitchApiClientCommand(
-          TwitchApiClient.GetSubs(ref, tokenId, broadcaster.id)
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetSubs(
+            TwitchApiClient.GetSubs(ref, tokenId, broadcaster.id)
+          )
         )
     ) {
       case Success(subs: GetSubs) =>
@@ -1457,12 +1515,20 @@ class TwitchChatbot(twitchRoomId: String)(using
         TwitchChatbot.Subs(None)
     }
 
-  private def askForFollowers(tokenId: String, broadcaster: GetTokenUser): Unit =
-    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetChannelFollowers](
+  private def askForFollowers(
+      tokenId: String,
+      broadcaster: GetTokenUser
+  ): Unit =
+    ctx.askWithStatus[
+      ArchieMateMediator.Command,
+      TwitchApiResponse.GetChannelFollowers
+    ](
       mediator,
       ref =>
-        ArchieMateMediator.SendTwitchApiClientCommand(
-          TwitchApiClient.GetChannelFollowers(ref, tokenId, broadcaster.id)
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetChannelFollowers(
+            TwitchApiClient.GetChannelFollowers(ref, tokenId, broadcaster.id)
+          )
         )
     ) {
       case Success(followers: GetChannelFollowers) =>
@@ -1479,12 +1545,17 @@ class TwitchChatbot(twitchRoomId: String)(using
 
   private def askForChatters(tokenId: String, broadcaster: GetTokenUser): Unit =
     ctx
-      .askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetChatters](
+      .askWithStatus[
+        ArchieMateMediator.Command,
+        TwitchApiResponse.GetChatters
+      ](
         mediator,
         ref =>
-          ArchieMateMediator.SendTwitchApiClientCommand(
-            TwitchApiClient
-              .GetChatters(ref, tokenId, broadcaster.id, broadcaster.id)
+          ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+            TwitchApiPaginationHandlerService.GetChatters(
+              TwitchApiClient
+                .GetChatters(ref, tokenId, broadcaster.id, broadcaster.id)
+            )
           )
       ) {
         case Success(chatters: GetChatters) =>
@@ -1503,8 +1574,10 @@ class TwitchChatbot(twitchRoomId: String)(using
     ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
       mediator,
       ref =>
-        ArchieMateMediator.SendTwitchApiClientCommand(
-          TwitchApiClient.GetStream(ref, tokenId, broadcaster.id)
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetStream(
+            TwitchApiClient.GetStream(ref, tokenId, broadcaster.id)
+          )
         )
     ) {
       case Success(GetStream(List(stream), _)) =>

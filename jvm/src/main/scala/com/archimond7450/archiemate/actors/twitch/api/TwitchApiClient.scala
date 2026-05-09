@@ -6,7 +6,10 @@ import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheS
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
-import com.archimond7450.archiemate.twitch.api.{TwitchApiRequest, TwitchApiResponse}
+import com.archimond7450.archiemate.twitch.api.{
+  TwitchApiRequest,
+  TwitchApiResponse
+}
 import com.archimond7450.archiemate.twitch.eventsub.{Condition, Transport}
 import io.circe.Decoder
 import io.circe.syntax.EncoderOps
@@ -15,7 +18,17 @@ import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, HttpHeader, HttpMethod, HttpMethods, RequestEntity, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  FormData,
+  HttpEntity,
+  HttpHeader,
+  HttpMethod,
+  HttpMethods,
+  RequestEntity,
+  StatusCodes,
+  Uri
+}
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 
@@ -81,21 +94,27 @@ object TwitchApiClient {
   ) extends PublicCommand
 
   final case class ChangeChannelGame(
-      replyTo: ActorRef[StatusReply[TwitchApiResponse.ModifyChannelInformation.type]],
+      replyTo: ActorRef[
+        StatusReply[TwitchApiResponse.ModifyChannelInformation.type]
+      ],
       tokenId: String,
       roomId: String,
       gameId: String
   ) extends PublicCommand
 
   final case class ChangeChannelToUnknownGame(
-      replyTo: ActorRef[StatusReply[TwitchApiResponse.ModifyChannelInformation.type]],
+      replyTo: ActorRef[
+        StatusReply[TwitchApiResponse.ModifyChannelInformation.type]
+      ],
       tokenId: String,
       roomId: String,
       gameName: String
   ) extends PublicCommand
 
   final case class ChangeChannelTitle(
-      replyTo: ActorRef[StatusReply[TwitchApiResponse.ModifyChannelInformation.type]],
+      replyTo: ActorRef[
+        StatusReply[TwitchApiResponse.ModifyChannelInformation.type]
+      ],
       tokenId: String,
       roomId: String,
       title: String
@@ -111,25 +130,29 @@ object TwitchApiClient {
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetChatters]],
       tokenId: String,
       roomId: String,
-      moderatorId: String
+      moderatorId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class GetModerators(
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetModerators]],
       tokenId: String,
-      roomId: String
+      roomId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class GetVIPs(
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetVIPs]],
       tokenId: String,
-      roomId: String
+      roomId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class GetSubs(
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetSubs]],
       tokenId: String,
-      roomId: String
+      roomId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class SendShoutout(
@@ -143,7 +166,8 @@ object TwitchApiClient {
   final case class GetChannelFollowers(
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetChannelFollowers]],
       tokenId: String,
-      roomId: String
+      roomId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class CheckUserFollowage(
@@ -154,7 +178,9 @@ object TwitchApiClient {
   ) extends PublicCommand
 
   final case class CreateEventSubWebsocketSubscription(
-      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateEventSubWebsocketSubscriptionResponse]],
+      replyTo: ActorRef[StatusReply[
+        TwitchApiResponse.CreateEventSubWebsocketSubscriptionResponse
+      ]],
       tokenId: String,
       websocketSessionId: String,
       subscriptionType: String,
@@ -165,7 +191,8 @@ object TwitchApiClient {
   final case class GetStream(
       replyTo: ActorRef[StatusReply[TwitchApiResponse.GetStream]],
       tokenId: String,
-      roomId: String
+      roomId: String,
+      cursor: Option[String] = None
   ) extends PublicCommand
 
   final case class GetEmoteSets(
@@ -174,13 +201,18 @@ object TwitchApiClient {
       emoteSets: List[String]
   ) extends PublicCommand
 
-  def apply()(using mediator: ActorRef[ArchieMateMediator.Command]): Behavior[Command] = Behaviors.setup { ctx =>
+  def apply()(using
+      mediator: ActorRef[ArchieMateMediator.Command]
+  ): Behavior[Command] = Behaviors.setup { ctx =>
     given ActorContext[Command] = ctx
     new TwitchApiClient().operational()
   }
 }
 
-class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator: ActorRef[ArchieMateMediator.Command]) {
+class TwitchApiClient(using
+    ctx: ActorContext[TwitchApiClient.Command],
+    mediator: ActorRef[ArchieMateMediator.Command]
+) {
   import TwitchApiClient.*
 
   given ExecutionContextExecutor = ctx.executionContext
@@ -293,8 +325,21 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
   }
 
   private def retrieveToken(request: Request, tokenId: String): Unit = {
-    ctx.log.debug("retrieveToken(request: {}, tokenId: \"{}\")", request, tokenId)
-    ctx.ask[ArchieMateMediator.Command, TwitchUserSessionsRepository.ReturnedTokenFromId](mediator, ref => ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(TwitchUserSessionsRepository.GetTokenFromId(ref, tokenId))) {
+    ctx.log.debug(
+      "retrieveToken(request: {}, tokenId: \"{}\")",
+      request,
+      tokenId
+    )
+    ctx.ask[
+      ArchieMateMediator.Command,
+      TwitchUserSessionsRepository.ReturnedTokenFromId
+    ](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(
+          TwitchUserSessionsRepository.GetTokenFromId(ref, tokenId)
+        )
+    ) {
       case Success(TwitchUserSessionsRepository.ReturnedTokenFromId(token)) =>
         request.copy(token = token)
 
@@ -322,44 +367,58 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.askWithStatus[ArchieMateMediator.Command, HttpClient.Response](
       mediator,
       ref =>
-        ArchieMateMediator.SendHttpClientRequest(HttpClient.Request(
-          ref,
-          method = request.method,
-          uri = request.uri,
-          headers = headers,
-          entity = request.entity
-        ))
+        ArchieMateMediator.SendHttpClientRequest(
+          HttpClient.Request(
+            ref,
+            method = request.method,
+            uri = request.uri,
+            headers = headers,
+            entity = request.entity
+          )
+        )
     ) {
-      case Success(response: HttpClient.Response) if response.response.status.isSuccess && request.refreshing =>
+      case Success(response: HttpClient.Response)
+          if response.response.status.isSuccess && request.refreshing =>
         TokenRefreshed(request, response)
 
-      case Success(response: HttpClient.Response) if response.response.status == StatusCodes.Unauthorized && request.shouldRefresh =>
+      case Success(response: HttpClient.Response)
+          if response.response.status == StatusCodes.Unauthorized && request.shouldRefresh =>
         RefreshToken(request)
 
-      case Success(response: HttpClient.Response) if response.response.status.isSuccess =>
+      case Success(response: HttpClient.Response)
+          if response.response.status.isSuccess =>
         WrappedSuccessfulResponse(request.originalCommand, response)
 
       case Success(response: HttpClient.Response) =>
-        WrappedFailedResponse(request.originalCommand, RuntimeException("Received error response from Twitch"))
+        WrappedFailedResponse(
+          request.originalCommand,
+          RuntimeException("Received error response from Twitch")
+        )
 
       case Failure(ex) =>
         WrappedFailedResponse(request.originalCommand, ex)
     }
   }
 
-  private def processWrappedSuccessfulResponse(resp: WrappedSuccessfulResponse): Unit = {
+  private def processWrappedSuccessfulResponse(
+      resp: WrappedSuccessfulResponse
+  ): Unit = {
     ctx.log.debug("processWrappedSuccessfulResponse(resp: {})", resp)
     val json = resp.response.entityString
     resp.originalCommand match {
       case cmd: GetToken =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetToken](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetToken](json)
+        )
 
       case cmd: GetTokenUserFromTokenId =>
         val tryUsers = decodeResponse[TwitchApiResponse.GetUsers](json)
         val tryResponse = tryUsers.map(users => users.data.last)
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
         tryResponse.foreach { tokenUser =>
-          mediator ! ArchieMateMediator.SendTwitchTokenUserCacheServiceCommand(TwitchTokenUserCacheService.CacheTokenUser(tokenUser))
+          mediator ! ArchieMateMediator.SendTwitchTokenUserCacheServiceCommand(
+            TwitchTokenUserCacheService.CacheTokenUser(tokenUser)
+          )
         }
 
       case cmd: GetTokenUserFromAccessToken =>
@@ -369,60 +428,92 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
 
       case cmd: GetGameByName =>
         val tryGames = decodeResponse[TwitchApiResponse.GetGames](json)
-        val tryResponse = tryGames.map(games => TwitchApiResponse.GameResponse(games.data.lastOption))
+        val tryResponse = tryGames.map(games =>
+          TwitchApiResponse.GameResponse(games.data.lastOption)
+        )
 
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
 
       case cmd: ChangeChannelGame =>
-        cmd.replyTo ! StatusReply.success(TwitchApiResponse.ModifyChannelInformation)
+        cmd.replyTo ! StatusReply.success(
+          TwitchApiResponse.ModifyChannelInformation
+        )
 
       case cmd: ChangeChannelToUnknownGame =>
-        cmd.replyTo ! StatusReply.success(TwitchApiResponse.ModifyChannelInformation)
+        cmd.replyTo ! StatusReply.success(
+          TwitchApiResponse.ModifyChannelInformation
+        )
 
       case cmd: ChangeChannelTitle =>
-        cmd.replyTo ! StatusReply.success(TwitchApiResponse.ModifyChannelInformation)
+        cmd.replyTo ! StatusReply.success(
+          TwitchApiResponse.ModifyChannelInformation
+        )
 
       case cmd: GetChannelInformation =>
-        val tryInformation = decodeResponse[TwitchApiResponse.GetChannelInformation](json)
+        val tryInformation =
+          decodeResponse[TwitchApiResponse.GetChannelInformation](json)
         val tryResponse = tryInformation.map(_.data.last)
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
 
       case cmd: GetChatters =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetChatters](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetChatters](json)
+        )
 
       case cmd: GetModerators =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetModerators](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetModerators](json)
+        )
 
       case cmd: GetVIPs =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetVIPs](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetVIPs](json)
+        )
 
       case cmd: GetSubs =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetSubs](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetSubs](json)
+        )
 
       case cmd: SendShoutout =>
         cmd.replyTo ! StatusReply.success(TwitchApiResponse.SendShoutout)
 
       case cmd: GetChannelFollowers =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetChannelFollowers](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetChannelFollowers](json)
+        )
 
       case cmd: CheckUserFollowage =>
-        val tryFollowers = decodeResponse[TwitchApiResponse.GetChannelFollowers](json)
-        val tryResponse = tryFollowers.map(followers => TwitchApiResponse.CheckUserFollowage(followers.data.lastOption))
+        val tryFollowers =
+          decodeResponse[TwitchApiResponse.GetChannelFollowers](json)
+        val tryResponse = tryFollowers.map(followers =>
+          TwitchApiResponse.CheckUserFollowage(followers.data.lastOption)
+        )
 
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
 
       case cmd: CreateEventSubWebsocketSubscription =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.CreateEventSubWebsocketSubscriptionResponse](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[
+            TwitchApiResponse.CreateEventSubWebsocketSubscriptionResponse
+          ](json)
+        )
 
       case cmd: GetStream =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetStream](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetStream](json)
+        )
 
       case cmd: GetEmoteSets =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[TwitchApiResponse.GetEmoteSets](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetEmoteSets](json)
+        )
     }
   }
 
-  private def processWrappedFailedResponse(resp: WrappedFailedResponse): Unit = {
+  private def processWrappedFailedResponse(
+      resp: WrappedFailedResponse
+  ): Unit = {
     ctx.log.debug("processWrappedFailedResponse(resp: {})", resp)
     resp.originalCommand match {
       case cmd: GetToken =>
@@ -483,12 +574,16 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
 
   private def processRefreshToken(cmd: RefreshToken): Unit = {
     ctx.log.debug("processRefreshToken(cmd: {})", cmd)
-    val formDataFuture = Marshal(FormData(Map(
-      "client_id" -> settings.twitchAppClientId,
-      "client_secret" -> settings.twitchAppClientSecret,
-      "grant_type" -> "refresh_token",
-      "refresh_token" -> cmd.originalRequest.token.get.refresh_token
-    ))).to[RequestEntity]
+    val formDataFuture = Marshal(
+      FormData(
+        Map(
+          "client_id" -> settings.twitchAppClientId,
+          "client_secret" -> settings.twitchAppClientSecret,
+          "grant_type" -> "refresh_token",
+          "refresh_token" -> cmd.originalRequest.token.get.refresh_token
+        )
+      )
+    ).to[RequestEntity]
 
     ctx.pipeToSelf(formDataFuture) {
       case Success(formData) =>
@@ -509,23 +604,35 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.log.debug("processTokenRefreshed(cmd: {})", cmd)
     decodeToTry[TwitchApiResponse.GetToken](cmd.response.entityString) match {
       case Success(token) =>
-        mediator ! ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(TwitchUserSessionsRepository.RefreshToken(cmd.originalRequest.tokenId.get, token))
+        mediator ! ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(
+          TwitchUserSessionsRepository.RefreshToken(
+            cmd.originalRequest.tokenId.get,
+            token
+          )
+        )
         ctx.self ! cmd.originalRequest.originalCommand
 
       case Failure(ex) =>
-        ctx.self ! WrappedFailedResponse(cmd.originalRequest.originalCommand, ex)
+        ctx.self ! WrappedFailedResponse(
+          cmd.originalRequest.originalCommand,
+          ex
+        )
     }
   }
 
   private def processGetToken(cmd: GetToken): Unit = {
     ctx.log.debug("processGetToken(cmd: {})", cmd)
-    val formDataFuture = Marshal(FormData(Map(
-      "client_id" -> settings.twitchAppClientId,
-      "client_secret" -> settings.twitchAppClientSecret,
-      "code" -> cmd.code,
-      "grant_type" -> "authorization_code",
-      "redirect_uri" -> settings.twitchAppRedirectUri
-    ))).to[RequestEntity]
+    val formDataFuture = Marshal(
+      FormData(
+        Map(
+          "client_id" -> settings.twitchAppClientId,
+          "client_secret" -> settings.twitchAppClientSecret,
+          "code" -> cmd.code,
+          "grant_type" -> "authorization_code",
+          "redirect_uri" -> settings.twitchAppRedirectUri
+        )
+      )
+    ).to[RequestEntity]
 
     ctx.pipeToSelf(formDataFuture) {
       case Success(formData) =>
@@ -542,7 +649,9 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     }
   }
 
-  private def processGetTokenUserFromTokenId(cmd: GetTokenUserFromTokenId): Unit = {
+  private def processGetTokenUserFromTokenId(
+      cmd: GetTokenUserFromTokenId
+  ): Unit = {
     ctx.log.debug("processGetTokenUserFromTokenId(cmd: {})", cmd)
     ctx.self ! Request(
       originalCommand = cmd,
@@ -552,13 +661,16 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     )
   }
 
-  private def processGetTokenUserFromAccessToken(cmd: GetTokenUserFromAccessToken): Unit = {
+  private def processGetTokenUserFromAccessToken(
+      cmd: GetTokenUserFromAccessToken
+  ): Unit = {
     ctx.log.debug("processGetTokenUserFromAccessToken(cmd: {})", cmd)
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = "https://api.twitch.tv/helix/users",
-      token = Some(TwitchApiResponse.GetToken(cmd.accessToken, 0, "", None, "")),
+      token =
+        Some(TwitchApiResponse.GetToken(cmd.accessToken, 0, "", None, "")),
       shouldRefresh = false
     )
   }
@@ -568,19 +680,29 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/games").withQuery(Query("name" -> cmd.gameName)),
+      uri = Uri("https://api.twitch.tv/helix/games").withQuery(
+        Query("name" -> cmd.gameName)
+      ),
       tokenId = Some(cmd.tokenId)
     )
   }
 
-  private def processChangeChannelToUnknownGame(cmd: ChangeChannelToUnknownGame): Unit = {
+  private def processChangeChannelToUnknownGame(
+      cmd: ChangeChannelToUnknownGame
+  ): Unit = {
     ctx.log.debug("processChangeChannelToUnknownGame(cmd: {})", cmd)
-    ctx.askWithStatus[Command, TwitchApiResponse.GameResponse](ctx.self, ref => GetGameByName(ref, cmd.tokenId, cmd.gameName)) {
+    ctx.askWithStatus[Command, TwitchApiResponse.GameResponse](
+      ctx.self,
+      ref => GetGameByName(ref, cmd.tokenId, cmd.gameName)
+    ) {
       case Success(TwitchApiResponse.GameResponse(Some(game))) =>
         ChangeChannelGame(cmd.replyTo, cmd.tokenId, cmd.roomId, game.id)
 
       case Success(TwitchApiResponse.GameResponse(None)) =>
-        WrappedFailedResponse(cmd, TwitchApiResponse.GameNotFoundException(cmd.gameName))
+        WrappedFailedResponse(
+          cmd,
+          TwitchApiResponse.GameNotFoundException(cmd.gameName)
+        )
 
       case Failure(ex) =>
         WrappedFailedResponse(cmd, ex)
@@ -592,12 +714,17 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.PATCH,
-      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(Query("broadcaster_id" -> cmd.roomId)),
+      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(
+        Query("broadcaster_id" -> cmd.roomId)
+      ),
       entity = HttpEntity(
         ContentTypes.`application/json`,
-        TwitchApiRequest.ModifyChannelInformationRequestData(game_id = Some(cmd.gameId)).asJson.noSpaces
+        TwitchApiRequest
+          .ModifyChannelInformationRequestData(game_id = Some(cmd.gameId))
+          .asJson
+          .noSpaces
       ),
-      tokenId = Some(cmd.tokenId),
+      tokenId = Some(cmd.tokenId)
     )
   }
 
@@ -606,10 +733,15 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.PATCH,
-      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(Query("broadcaster_id" -> cmd.roomId)),
+      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(
+        Query("broadcaster_id" -> cmd.roomId)
+      ),
       entity = HttpEntity(
         ContentTypes.`application/json`,
-        TwitchApiRequest.ModifyChannelInformationRequestData(title = Some(cmd.title)).asJson.noSpaces
+        TwitchApiRequest
+          .ModifyChannelInformationRequestData(title = Some(cmd.title))
+          .asJson
+          .noSpaces
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -620,9 +752,16 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(Query("broadcaster_id" -> cmd.roomId)),
+      uri = Uri("https://api.twitch.tv/helix/channels").withQuery(
+        Query("broadcaster_id" -> cmd.roomId)
+      ),
       tokenId = Some(cmd.tokenId)
     )
+  }
+
+  private def addCursor(uri: Uri, cursor: Option[String]): Uri = cursor match {
+    case None         => uri
+    case Some(cursor) => uri.withQuery(Query("after" -> cursor))
   }
 
   private def processGetChatters(cmd: GetChatters): Unit = {
@@ -630,12 +769,15 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/chat/chatters").withQuery(
-        Query(
-          "broadcaster_id" -> cmd.roomId,
-          "moderator_id" -> cmd.moderatorId,
-          "first" -> "1000"
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/chat/chatters").withQuery(
+          Query(
+            "broadcaster_id" -> cmd.roomId,
+            "moderator_id" -> cmd.moderatorId,
+            "first" -> "1000"
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -646,11 +788,14 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/moderation/moderators").withQuery(
-        Query(
-          "broadcaster_id" -> cmd.roomId,
-          "first" -> "100"
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/moderation/moderators").withQuery(
+          Query(
+            "broadcaster_id" -> cmd.roomId,
+            "first" -> "100"
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -661,11 +806,14 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/channels/vips").withQuery(
-        Query(
-          "broadcaster_id" -> cmd.roomId,
-          "first" -> "100"
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/channels/vips").withQuery(
+          Query(
+            "broadcaster_id" -> cmd.roomId,
+            "first" -> "100"
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -676,11 +824,14 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/subscriptions").withQuery(
-        Query(
-          "broadcaster_id" -> cmd.roomId,
-          "first" -> "100"
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/subscriptions").withQuery(
+          Query(
+            "broadcaster_id" -> cmd.roomId,
+            "first" -> "100"
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -707,11 +858,14 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/channels/followers").withQuery(
-        Query(
-          "broadcaster_id" -> cmd.roomId,
-          "first" -> "100",
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/channels/followers").withQuery(
+          Query(
+            "broadcaster_id" -> cmd.roomId,
+            "first" -> "100"
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -733,7 +887,9 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     )
   }
 
-  private def processCreateEventSubWebsocketSubscription(cmd: CreateEventSubWebsocketSubscription): Unit = {
+  private def processCreateEventSubWebsocketSubscription(
+      cmd: CreateEventSubWebsocketSubscription
+  ): Unit = {
     ctx.log.debug("processCreateEventSubWebsocketSubcription(cmd: {})", cmd)
     ctx.self ! Request(
       originalCommand = cmd,
@@ -741,7 +897,18 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
       uri = Uri("https://api.twitch.tv/helix/eventsub/subscriptions"),
       entity = HttpEntity(
         ContentTypes.`application/json`,
-        TwitchApiRequest.CreateEventSubSubscriptionPayload(cmd.subscriptionType, cmd.subscriptionVersion, cmd.condition, Transport(method = "websocket", session = Some(cmd.websocketSessionId))).asJson.noSpaces
+        TwitchApiRequest
+          .CreateEventSubSubscriptionPayload(
+            cmd.subscriptionType,
+            cmd.subscriptionVersion,
+            cmd.condition,
+            Transport(
+              method = "websocket",
+              session = Some(cmd.websocketSessionId)
+            )
+          )
+          .asJson
+          .noSpaces
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -752,10 +919,13 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri("https://api.twitch.tv/helix/streams").withQuery(
-        Query(
-          "user_id" -> cmd.roomId
-        )
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/streams").withQuery(
+          Query(
+            "user_id" -> cmd.roomId
+          )
+        ),
+        cmd.cursor
       ),
       tokenId = Some(cmd.tokenId)
     )
@@ -771,19 +941,22 @@ class TwitchApiClient(using ctx: ActorContext[TwitchApiClient.Command], mediator
       method = HttpMethods.GET,
       uri = Uri("https://api.twitch.tv/helix/chat/emotes/set").withQuery(
         Query(
-          queries:_*
+          queries: _*
         )
       ),
       tokenId = Some(cmd.tokenId)
     )
   }
 
-  private def decodeResponse[T <: TwitchApiResponse](str: String)(using Decoder[T]): Try[T] = {
+  private def decodeResponse[T <: TwitchApiResponse](
+      str: String
+  )(using Decoder[T]): Try[T] = {
     decodeToTry[T](str)
   }
 
-  private def tryResponseToStatusReply[T <: TwitchApiResponse]: PartialFunction[Try[T], StatusReply[T]] = {
+  private def tryResponseToStatusReply[T <: TwitchApiResponse]
+      : PartialFunction[Try[T], StatusReply[T]] = {
     case Success(response) => StatusReply.success(response)
-    case Failure(ex) => StatusReply.error(ex)
+    case Failure(ex)       => StatusReply.error(ex)
   }
 }
