@@ -2120,12 +2120,20 @@ class TwitchCommandsService(using
               newShouldGreetUsersId ++ newlyOnlineShouldGreetUsersId
 
             allGreetsUserId.foreach { userId =>
-              val (greet, name) = getGreetAndName(
-                chatbotParams.users(userId),
-                knownGreetsSettings
-              )
-              val finalGreet = greet.replaceAll("user".asVariableRegex, name)
-              chatbotParams.ircListener ! IRCListener.SendMessage(finalGreet)
+              val optionFollower = chatbotParams.followers.get(userId)
+              val optionFollowerUser = optionFollower.map(follower => TwitchApi.User(follower.user_id, follower.user_login, follower.user_name))
+              val optionFollowerUserState = optionFollowerUser.map(TwitchChatbot.UserState(_))
+              val optionUserState = chatbotParams.users.get(userId).orElse(optionFollowerUserState)
+              optionUserState match {
+                case Some(userState) =>
+                  val (greet, name) = getGreetAndName(
+                    userState,
+                    knownGreetsSettings
+                  )
+                  val finalGreet = greet.replaceAll("user".asVariableRegex, name)
+                  chatbotParams.ircListener ! IRCListener.SendMessage(finalGreet)
+                case None =>
+              }
             }
 
           case None =>
@@ -2177,7 +2185,7 @@ class TwitchCommandsService(using
       userState: TwitchChatbot.UserState,
       followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = {
-    followers.exists(_._2.user_id == userState.user.user_id)
+    followers.keySet.contains(userState.user.user_id)
   }
 
   private def getGreetAndName(
