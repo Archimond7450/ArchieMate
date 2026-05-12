@@ -6,29 +6,16 @@ import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheS
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
-import com.archimond7450.archiemate.twitch.api.{
-  TwitchApiRequest,
-  TwitchApiResponse
-}
+import com.archimond7450.archiemate.twitch.api.{TwitchApiRequest, TwitchApiResponse}
 import com.archimond7450.archiemate.twitch.eventsub.{Condition, Transport}
 import io.circe.Decoder
 import io.circe.syntax.EncoderOps
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  FormData,
-  HttpEntity,
-  HttpHeader,
-  HttpMethod,
-  HttpMethods,
-  RequestEntity,
-  StatusCodes,
-  Uri
-}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, HttpHeader, HttpMethod, HttpMethods, RequestEntity, StatusCodes, Uri}
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 
@@ -203,10 +190,13 @@ object TwitchApiClient {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    new TwitchApiClient().operational()
-  }
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+
+      new TwitchApiClient().operational()
+    }
+  }.onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 class TwitchApiClient(using

@@ -1,37 +1,17 @@
 package com.archimond7450.archiemate.actors
 
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.sessions.{
-  TwitchUserSessionsRepository,
-  YouTubeChannelSessionsRepository
-}
-import com.archimond7450.archiemate.actors.repositories.settings.{
-  AutomaticMessagesSettingsRepository,
-  BasicChatbotSettingsRepository,
-  BuiltInCommandsSettingsRepository,
-  CommandsSettingsRepository,
-  OverlaysSettingsRepository,
-  TimersSettingsRepository,
-  VariablesSettingsRepository
-}
-import com.archimond7450.archiemate.actors.services.{
-  JWTService,
-  TwitchApiPaginationHandlerService,
-  TwitchLoginValidatorService
-}
+import com.archimond7450.archiemate.actors.repositories.sessions.{TwitchUserSessionsRepository, YouTubeChannelSessionsRepository}
+import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
+import com.archimond7450.archiemate.actors.services.{JWTService, TwitchApiPaginationHandlerService, TwitchLoginValidatorService}
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
-import com.archimond7450.archiemate.actors.services.controllerhelpers.{
-  CommandsControllerHelperService,
-  OAuthControllerHelperService,
-  SettingsControllerHelperService,
-  UserControllerHelperService
-}
+import com.archimond7450.archiemate.actors.services.controllerhelpers.{CommandsControllerHelperService, OAuthControllerHelperService, SettingsControllerHelperService, UserControllerHelperService}
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
-import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.util.Timeout
@@ -105,10 +85,12 @@ object ArchieMateMediator {
       randomProvider: RandomProvider,
       timeProvider: TimeProvider,
       settings: Settings
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    new ArchieMateMediator().operational()
-  }
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+      new ArchieMateMediator().operational()
+    }
+  }.onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 final class ArchieMateMediator(using

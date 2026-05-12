@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors
 
 import org.apache.pekko.actor.ClassicActorSystemProvider
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.http.scaladsl.HttpExt
 import org.apache.pekko.http.scaladsl.model.{HttpEntity, HttpHeader, HttpMethod, HttpRequest, HttpResponse, RequestEntity, Uri}
@@ -15,13 +15,15 @@ import scala.util.{Failure, Success, Try}
 object HttpClient {
   val actorName = "HttpClient"
 
-  final case class Request(replyTo: ActorRef[StatusReply[Response]],
-                           method: HttpMethod, uri: Uri,
-                           headers: Seq[HttpHeader] = Seq.empty,
-                           entity: RequestEntity = HttpEntity.Empty)
+  final case class Request(
+      replyTo: ActorRef[StatusReply[Response]],
+      method: HttpMethod,
+      uri: Uri,
+      headers: Seq[HttpHeader] = Seq.empty,
+      entity: RequestEntity = HttpEntity.Empty
+  )
 
-  final case class Response(response: HttpResponse,
-                            entityString: String)
+  final case class Response(response: HttpResponse, entityString: String)
 
   trait HttpClientAdapter {
     def singleRequest(request: HttpRequest): Future[HttpResponse]
@@ -32,26 +34,49 @@ object HttpClient {
       http.singleRequest(request)
   }
 
-  def apply(http: HttpClientAdapter): Behavior[Request] = Behaviors.receive { (ctx, msg) =>
-    val log = ctx.log
-    given ClassicActorSystemProvider = ctx.system
-    given ExecutionContextExecutor = ctx.executionContext
+  def apply(http: HttpClientAdapter): Behavior[Request] =
+    Behaviors.supervise[Request] {
+      Behaviors.receive { (ctx, msg) =>
+        val log = ctx.log
 
-    msg match {
-      case Request(replyTo, method, uri, headers, entity) =>
-        val request = HttpRequest(method = method, uri = uri, headers = headers, entity = entity)
-        val responseFuture = http.singleRequest(request).flatMap { response =>
-          Unmarshal(response.entity).to[String].map(entity => Response(response, entity))
+        given ClassicActorSystemProvider = ctx.system
+
+        given ExecutionContextExecutor = ctx.executionContext
+
+        msg match {
+          case Request(replyTo, method, uri, headers, entity) =>
+            val request = HttpRequest(
+              method = method,
+              uri = uri,
+              headers = headers,
+              entity = entity
+            )
+            val responseFuture =
+              http.singleRequest(request).flatMap { response =>
+                Unmarshal(response.entity)
+                  .to[String]
+                  .map(entity => Response(response, entity))
+              }
+            responseFuture.onComplete(logAndReply(log, request, replyTo))
         }
-        responseFuture.onComplete(logAndReply(log, request, replyTo))
-    }
 
-    Behaviors.same
-  }
+        Behaviors.same
+      }
+    }.onFailure[Throwable](SupervisorStrategy.resume)
 
-  private def logAndReply(log: Logger, request: HttpRequest, replyTo: ActorRef[StatusReply[Response]]): PartialFunction[Try[Response], Unit] = {
+  private def logAndReply(
+      log: Logger,
+      request: HttpRequest,
+      replyTo: ActorRef[StatusReply[Response]]
+  ): PartialFunction[Try[Response], Unit] = {
     case Success(resp @ Response(response, entityString)) =>
-      log.debug("{} ({}) -> {} ({})", request, request.entity, response, entityString)
+      log.debug(
+        "{} ({}) -> {} ({})",
+        request,
+        request.entity,
+        response,
+        entityString
+      )
       replyTo ! StatusReply.success(resp)
     case Failure(ex) =>
       log.error("{} ({}) -> FAIL", request, request.entity, ex)

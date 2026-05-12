@@ -14,7 +14,7 @@ import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.GetTokenUser
 import com.archimond7450.archiemate.twitch.irc.{IncomingMessageDecoder, OutgoingMessageEncoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.util.Timeout
 
 import scala.util.{Failure, Success}
@@ -43,10 +43,13 @@ object TwitchChatbotsSupervisor {
               randomProvider: RandomProvider,
               timeProvider: TimeProvider,
               settings: Settings
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    (new TwitchChatbotsSupervisor).operational()
-  }
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+
+      (new TwitchChatbotsSupervisor).operational()
+    }
+  }.onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 class TwitchChatbotsSupervisor(using

@@ -4,7 +4,7 @@ import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 
 object TwitchTokenUserCacheService {
   val actorName = "TwitchTokenUserCacheService"
@@ -14,10 +14,13 @@ object TwitchTokenUserCacheService {
   final case class GetTokenUserFromUserId(replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]], userId: String) extends Command
   final case class GetTokenUserFromUserName(replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]], userName: String) extends Command
 
-  def apply(): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    ready()
-  }
+  def apply(): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+
+      ready()
+    }
+  }.onFailure[Throwable](SupervisorStrategy.resume)
 
   private def ready(tokenUsers: Map[String, TwitchApiResponse.GetTokenUser] = Map.empty)(using ActorContext[Command]): Behavior[Command] = Behaviors.receiveAndLogMessage {
     case CacheTokenUser(tokenUser) =>

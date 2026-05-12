@@ -13,7 +13,7 @@ import com.archimond7450.archiemate.SerializerIDs
 import io.circe.{Decoder, Encoder}
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
@@ -263,13 +263,16 @@ object CommandsSettingsRepository {
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command],
       randomProvider: RandomProvider
-  ): Behavior[Command] =
-    EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
-      persistenceId = PersistenceId.ofUniqueId(actorName),
-      emptyState = State(),
-      commandHandler = commandHandler,
-      eventHandler = eventHandler
-    )
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
+        persistenceId = PersistenceId.ofUniqueId(actorName),
+        emptyState = State(),
+        commandHandler = commandHandler,
+        eventHandler = eventHandler
+      )
+    }
+    .onFailure[Throwable](SupervisorStrategy.restart)
 
   private def notifyChatbotsSupervisor(using
       mediator: ActorRef[ArchieMateMediator.Command]

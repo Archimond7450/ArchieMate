@@ -4,7 +4,7 @@ import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
@@ -56,10 +56,15 @@ object TwitchApiPaginationHandlerService {
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command],
       timeout: Timeout
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    new TwitchApiPaginationHandlerService().active()
-  }
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
+
+        new TwitchApiPaginationHandlerService().active()
+      }
+    }
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 class TwitchApiPaginationHandlerService(using
@@ -175,7 +180,11 @@ class TwitchApiPaginationHandlerService(using
       }
     case SubsResponse(cmd, Success(subs)) =>
       subs.pagination.cursor match {
-        case Some(cursor) if subs.data.length + state.subs(cmd).map(_.data.length).sum <= subs.total =>
+        case Some(cursor)
+            if subs.data.length + state
+              .subs(cmd)
+              .map(_.data.length)
+              .sum <= subs.total =>
           askForSubs(cmd, cursor = Some(cursor))
           active(
             state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))

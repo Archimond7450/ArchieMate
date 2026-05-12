@@ -7,13 +7,8 @@ import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.eventsub.*
 import io.circe.jawn.decode
-import org.apache.pekko.actor.typed.scaladsl.{
-  ActorContext,
-  Behaviors,
-  StashBuffer,
-  TimerScheduler
-}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import org.apache.pekko.util.ByteString
@@ -38,16 +33,21 @@ object EventSubListener {
       twitchChatbot: ActorRef[TwitchChatbot.Command],
       mediator: ActorRef[ArchieMateMediator.Command],
       settings: Settings
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    Behaviors.withTimers { scheduler =>
-      given TimerScheduler[Command] = scheduler
-      Behaviors.withStash(64) { buffer =>
-        given StashBuffer[Command] = buffer
-        new EventSubListener(tokenId, broadcaster).initial
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+
+      Behaviors.withTimers { scheduler =>
+        given TimerScheduler[Command] = scheduler
+
+        Behaviors.withStash(64) { buffer =>
+          given StashBuffer[Command] = buffer
+
+          new EventSubListener(tokenId, broadcaster).initial
+        }
       }
     }
-  }
+  }.onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 private class EventSubListener(

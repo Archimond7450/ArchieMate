@@ -12,13 +12,9 @@ import io.circe.jawn.decode
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
-import org.apache.pekko.persistence.typed.scaladsl.{
-  Effect,
-  EventSourcedBehavior,
-  ReplyEffect
-}
+import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 import org.apache.pekko.serialization.Serializer
 
 import java.io.NotSerializableException
@@ -87,34 +83,36 @@ object TwitchUserSessionsRepository {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    EventSourcedBehavior
-      .withEnforcedReplies[Command, Event, State](
-        persistenceId = PersistenceId.ofUniqueId(actorName),
-        emptyState = State(),
-        commandHandler = commandHandler,
-        eventHandler = eventHandler
-      )
-      .receiveSignal { case (state, RecoveryCompleted) =>
-        state.users.foreach { (userId, userState) =>
-          val tokenId = userState.tokens
-            .find(_._2.scope.nonEmpty)
-            .getOrElse(userState.tokens.last)
-            ._1
-          mediator ! ArchieMateMediator.SendTwitchApiClientCommand(
-            TwitchApiClient.GetTokenUserFromTokenId(
-              ctx.system.ignoreRef,
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      EventSourcedBehavior
+        .withEnforcedReplies[Command, Event, State](
+          persistenceId = PersistenceId.ofUniqueId(actorName),
+          emptyState = State(),
+          commandHandler = commandHandler,
+          eventHandler = eventHandler
+        )
+        .receiveSignal { case (state, RecoveryCompleted) =>
+          state.users.foreach { (userId, userState) =>
+            val tokenId = userState.tokens
+              .find(_._2.scope.nonEmpty)
+              .getOrElse(userState.tokens.last)
+              ._1
+            mediator ! ArchieMateMediator.SendTwitchApiClientCommand(
+              TwitchApiClient.GetTokenUserFromTokenId(
+                ctx.system.ignoreRef,
+                tokenId
+              )
+            )
+            ctx.log.debug(
+              "Sent GetTokenUserFromTokenId to twitchApiClient for userId {} and tokenId {}",
+              userId,
               tokenId
             )
-          )
-          ctx.log.debug(
-            "Sent GetTokenUserFromTokenId to twitchApiClient for userId {} and tokenId {}",
-            userId,
-            tokenId
-          )
+          }
         }
-      }
-  }
+    }
+  }.onFailure[Throwable](SupervisorStrategy.restart)
 
   private val commandHandler: (State, Command) => ReplyEffect[Event, State] = {
     (state, command) =>

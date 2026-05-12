@@ -3,28 +3,16 @@ package com.archimond7450.archiemate.actors
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.ws.{
-  BinaryMessage,
-  Message,
-  PeerClosedConnectionException,
-  TextMessage,
-  WebSocketRequest,
-  WebSocketUpgradeResponse
-}
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message, PeerClosedConnectionException, TextMessage, WebSocketRequest, WebSocketUpgradeResponse}
 import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
 import org.apache.pekko.stream.OverflowStrategy
-import org.apache.pekko.stream.scaladsl.{
-  Flow,
-  Keep,
-  Sink,
-  Source,
-  SourceQueueWithComplete
-}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import org.apache.pekko.util.ByteString
 
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -56,69 +44,73 @@ object WebSocketClient {
       binaryMessageTransform: BinaryMessage.Strict => T,
       doneNotification: () => T,
       failNotification: Throwable => T
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    given ActorSystem[Nothing] = ctx.system
-    given ExecutionContext = ctx.executionContext
+  ): Behavior[Command] = Behaviors.supervise[Command] {
+    Behaviors.setup { ctx =>
+      given ActorContext[Command] = ctx
+      given ActorSystem[Nothing] = ctx.system
+      given ExecutionContext = ctx.executionContext
 
-    val settings = Settings(ctx.system)
+      val settings = Settings(ctx.system)
 
-    val self = ctx.self
+      val self = ctx.self
 
-    val outgoing = Source
-      .queue[Message](bufferSize = 64, OverflowStrategy.dropHead)
-      .mapMaterializedValue { queue =>
-        self ! InternalConnected(queue)
-        queue
+      val outgoing = Source
+        .queue[Message](bufferSize = 64, OverflowStrategy.dropHead)
+        .mapMaterializedValue { queue =>
+          self ! InternalConnected(queue)
+          queue
+        }
+
+      val incoming: Sink[Message, Future[Done]] = Sink.foreach {
+        case tm: TextMessage.Strict   => self ! IncomingText(tm)
+        case bm: BinaryMessage.Strict => self ! IncomingBinary(bm)
+        case tm: TextMessage.Streamed =>
+          ctx.pipeToSelf(tm.toStrict(settings.askTimeout.duration)) {
+            case Success(text) => IncomingText(text)
+            case Failure(ex)   => StreamToTextFailed(ex)
+          }
+        case bm: BinaryMessage.Streamed =>
+          bm.toStrict(settings.askTimeout.duration).onComplete {
+            case Success(bin) => self ! IncomingBinary(bin)
+            case Failure(ex)  => StreamToBinaryFailed(ex)
+          }
       }
 
-    val incoming: Sink[Message, Future[Done]] = Sink.foreach {
-      case tm: TextMessage.Strict   => self ! IncomingText(tm)
-      case bm: BinaryMessage.Strict => self ! IncomingBinary(bm)
-      case tm: TextMessage.Streamed =>
-        ctx.pipeToSelf(tm.toStrict(settings.askTimeout.duration)) {
-          case Success(text) => IncomingText(text)
-          case Failure(ex)   => StreamToTextFailed(ex)
-        }
-      case bm: BinaryMessage.Streamed =>
-        bm.toStrict(settings.askTimeout.duration).onComplete {
-          case Success(bin) => self ! IncomingBinary(bin)
-          case Failure(ex)  => StreamToBinaryFailed(ex)
-        }
+      val flow: Flow[Message, Message, Future[Done]] =
+        Flow.fromSinkAndSourceMat(incoming, outgoing)(Keep.left)
+
+      val (
+        upgradeResponse: Future[WebSocketUpgradeResponse],
+        closed: Future[Done]
+      ) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+
+      ctx.pipeToSelf(upgradeResponse) {
+        case Success(resp: WebSocketUpgradeResponse)
+            if resp.response.status == StatusCodes.SwitchingProtocols =>
+          InternalUpgradeSucceeded
+        case Success(resp) =>
+          InternalFailed(
+            new RuntimeException(s"WebSocket upgrade failed: $resp")
+          )
+        case Failure(ex) =>
+          InternalFailed(ex)
+      }
+
+      ctx.pipeToSelf(closed) {
+        case Success(_)  => InternalDone
+        case Failure(ex) => InternalFailed(ex)
+      }
+
+      waitingForQueue(
+        parent,
+        connectedNotification,
+        textMessageTransform,
+        binaryMessageTransform,
+        doneNotification,
+        failNotification
+      )
     }
-
-    val flow: Flow[Message, Message, Future[Done]] =
-      Flow.fromSinkAndSourceMat(incoming, outgoing)(Keep.left)
-
-    val (
-      upgradeResponse: Future[WebSocketUpgradeResponse],
-      closed: Future[Done]
-    ) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
-
-    ctx.pipeToSelf(upgradeResponse) {
-      case Success(resp: WebSocketUpgradeResponse)
-          if resp.response.status == StatusCodes.SwitchingProtocols =>
-        InternalUpgradeSucceeded
-      case Success(resp) =>
-        InternalFailed(new RuntimeException(s"WebSocket upgrade failed: $resp"))
-      case Failure(ex) =>
-        InternalFailed(ex)
-    }
-
-    ctx.pipeToSelf(closed) {
-      case Success(_)  => InternalDone
-      case Failure(ex) => InternalFailed(ex)
-    }
-
-    waitingForQueue(
-      parent,
-      connectedNotification,
-      textMessageTransform,
-      binaryMessageTransform,
-      doneNotification,
-      failNotification
-    )
-  }
+  }.onFailure[Throwable](SupervisorStrategy.restartWithBackoff(1.second, 1.minute, 0.2))
 
   private def waitingForQueue[T](
       parent: ActorRef[T],

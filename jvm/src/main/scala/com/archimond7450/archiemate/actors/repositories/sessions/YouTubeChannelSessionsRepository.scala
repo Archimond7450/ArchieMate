@@ -9,7 +9,7 @@ import com.archimond7450.archiemate.youtube.api.YouTubeApiResponse.GetToken
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
@@ -77,34 +77,38 @@ object YouTubeChannelSessionsRepository {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    EventSourcedBehavior
-      .withEnforcedReplies[Command, Event, State](
-        persistenceId = PersistenceId.ofUniqueId(actorName),
-        emptyState = State(),
-        commandHandler = commandHandler,
-        eventHandler = eventHandler
-      )
-      .receiveSignal { case (state, RecoveryCompleted) =>
-        state.users.foreach { (userId, userState) =>
-          val tokenId = userState.tokens
-            .find(_._2.scope.nonEmpty)
-            .getOrElse(userState.tokens.last)
-            ._1
-          mediator ! ArchieMateMediator.SendYouTubeApiClientCommand(
-            YouTubeApiClient.GetChannelFromTokenId(
-              ctx.system.ignoreRef,
-              tokenId
-            )
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        EventSourcedBehavior
+          .withEnforcedReplies[Command, Event, State](
+            persistenceId = PersistenceId.ofUniqueId(actorName),
+            emptyState = State(),
+            commandHandler = commandHandler,
+            eventHandler = eventHandler
           )
-          ctx.log.debug(
-            "Sent GetChannelFromTokenId to youTubeApiClient for userId {} and tokenId {}",
-            userId,
-            tokenId
-          )
-        }
+          .receiveSignal { case (state, RecoveryCompleted) =>
+            state.users.foreach { (userId, userState) =>
+              val tokenId = userState.tokens
+                .find(_._2.scope.nonEmpty)
+                .getOrElse(userState.tokens.last)
+                ._1
+              mediator ! ArchieMateMediator.SendYouTubeApiClientCommand(
+                YouTubeApiClient.GetChannelFromTokenId(
+                  ctx.system.ignoreRef,
+                  tokenId
+                )
+              )
+              ctx.log.debug(
+                "Sent GetChannelFromTokenId to youTubeApiClient for userId {} and tokenId {}",
+                userId,
+                tokenId
+              )
+            }
+          }
       }
-  }
+    }
+    .onFailure[Throwable](SupervisorStrategy.restart)
 
   private val commandHandler: (State, Command) => ReplyEffect[Event, State] = {
     (state, command) =>

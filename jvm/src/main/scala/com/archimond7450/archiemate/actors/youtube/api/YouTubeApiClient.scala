@@ -8,7 +8,7 @@ import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
 import com.archimond7450.archiemate.youtube.api.YouTubeApiResponse
 import io.circe.Decoder
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
@@ -62,27 +62,45 @@ object YouTubeApiClient {
   ) extends PublicCommand
 
   final case class GetChannelFromTokenId(
-      replyTo: ActorRef[StatusReply[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]]],
+      replyTo: ActorRef[
+        StatusReply[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]]
+      ],
       tokenId: String
   ) extends PublicCommand
 
   final case class GetChannelFromAccessToken(
-      replyTo: ActorRef[StatusReply[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]]],
+      replyTo: ActorRef[
+        StatusReply[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]]
+      ],
       accessToken: String
   ) extends PublicCommand
 
   final case class GetLiveBroadcast(
-      replyTo: ActorRef[StatusReply[YouTubeApiResponse.Response[YouTubeApiResponse.LiveBroadcast]]],
+      replyTo: ActorRef[StatusReply[
+        YouTubeApiResponse.Response[YouTubeApiResponse.LiveBroadcast]
+      ]],
       tokenId: String
   ) extends PublicCommand
 
-  def apply()(using mediator: ActorRef[ArchieMateMediator.Command], settings: Settings): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    new YouTubeApiClient().operational()
-  }
+  def apply()(using
+      mediator: ActorRef[ArchieMateMediator.Command],
+      settings: Settings
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
+
+        new YouTubeApiClient().operational()
+      }
+    }
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
-class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], mediator: ActorRef[ArchieMateMediator.Command], settings: Settings) {
+class YouTubeApiClient()(using
+    ctx: ActorContext[YouTubeApiClient.Command],
+    mediator: ActorRef[ArchieMateMediator.Command],
+    settings: Settings
+) {
   import YouTubeApiClient.*
 
   given ExecutionContextExecutor = ctx.executionContext
@@ -141,9 +159,24 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
   }
 
   private def retrieveToken(request: Request, tokenId: String): Unit = {
-    ctx.log.debug("retrieveToken(request: {}, tokenId: \"{}\")", request, tokenId)
-    ctx.ask[ArchieMateMediator.Command, YouTubeChannelSessionsRepository.ReturnedTokenFromId](mediator, ref => ArchieMateMediator.SendYouTubeChannelSessionsRepositoryCommand(YouTubeChannelSessionsRepository.GetTokenFromId(ref, tokenId))) {
-      case Success(YouTubeChannelSessionsRepository.ReturnedTokenFromId(id, token)) =>
+    ctx.log.debug(
+      "retrieveToken(request: {}, tokenId: \"{}\")",
+      request,
+      tokenId
+    )
+    ctx.ask[
+      ArchieMateMediator.Command,
+      YouTubeChannelSessionsRepository.ReturnedTokenFromId
+    ](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendYouTubeChannelSessionsRepositoryCommand(
+          YouTubeChannelSessionsRepository.GetTokenFromId(ref, tokenId)
+        )
+    ) {
+      case Success(
+            YouTubeChannelSessionsRepository.ReturnedTokenFromId(id, token)
+          ) =>
         request.copy(token = token)
 
       case Failure(ex) =>
@@ -169,50 +202,76 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
     ctx.askWithStatus[ArchieMateMediator.Command, HttpClient.Response](
       mediator,
       ref =>
-        ArchieMateMediator.SendHttpClientRequest(HttpClient.Request(
-          ref,
-          method = request.method,
-          uri = request.uri,
-          headers = request.headers,
-          entity = request.entity
-        ))
+        ArchieMateMediator.SendHttpClientRequest(
+          HttpClient.Request(
+            ref,
+            method = request.method,
+            uri = request.uri,
+            headers = request.headers,
+            entity = request.entity
+          )
+        )
     ) {
-      case Success(response: HttpClient.Response) if response.response.status.isSuccess && request.refreshing =>
+      case Success(response: HttpClient.Response)
+          if response.response.status.isSuccess && request.refreshing =>
         TokenRefreshed(request, response)
 
-      case Success(response: HttpClient.Response) if response.response.status == StatusCodes.Unauthorized && request.shouldRefresh =>
+      case Success(response: HttpClient.Response)
+          if response.response.status == StatusCodes.Unauthorized && request.shouldRefresh =>
         RefreshToken(request)
 
-      case Success(response: HttpClient.Response) if response.response.status.isSuccess =>
+      case Success(response: HttpClient.Response)
+          if response.response.status.isSuccess =>
         WrappedSuccessfulResponse(request.originalCommand, response)
 
       case Success(response: HttpClient.Response) =>
-        WrappedFailedResponse(request.originalCommand, RuntimeException("Received error response from YouTube"))
+        WrappedFailedResponse(
+          request.originalCommand,
+          RuntimeException("Received error response from YouTube")
+        )
 
       case Failure(ex) =>
         WrappedFailedResponse(request.originalCommand, ex)
     }
   }
 
-  private def processWrappedSuccessfulResponse(resp: WrappedSuccessfulResponse): Unit = {
+  private def processWrappedSuccessfulResponse(
+      resp: WrappedSuccessfulResponse
+  ): Unit = {
     ctx.log.debug("processWrappedSuccessfulResponse(resp: {})", resp)
     val json = resp.response.entityString
     resp.originalCommand match {
       case cmd: GetToken =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[YouTubeApiResponse.GetToken](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[YouTubeApiResponse.GetToken](json)
+        )
 
       case cmd: GetChannelFromTokenId =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[
+            YouTubeApiResponse.Response[YouTubeApiResponse.Channel]
+          ](json)
+        )
 
       case cmd: GetChannelFromAccessToken =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[YouTubeApiResponse.Response[YouTubeApiResponse.Channel]](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[
+            YouTubeApiResponse.Response[YouTubeApiResponse.Channel]
+          ](json)
+        )
 
       case cmd: GetLiveBroadcast =>
-        cmd.replyTo ! tryResponseToStatusReply(decodeResponse[YouTubeApiResponse.Response[YouTubeApiResponse.LiveBroadcast]](json))
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[
+            YouTubeApiResponse.Response[YouTubeApiResponse.LiveBroadcast]
+          ](json)
+        )
     }
   }
 
-  private def processWrappedFailedResponse(resp: WrappedFailedResponse): Unit = {
+  private def processWrappedFailedResponse(
+      resp: WrappedFailedResponse
+  ): Unit = {
     ctx.log.debug("processWrappedFailedResponse(resp: {})", resp)
     resp.originalCommand match {
       case cmd: GetToken =>
@@ -231,12 +290,16 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
 
   private def processRefreshToken(cmd: RefreshToken): Unit = {
     ctx.log.debug("processRefreshToken(cmd: {})", cmd)
-    val formDataFuture = Marshal(FormData(Map(
-      "client_id" -> settings.youTubeAppClientId,
-      "client_secret" -> settings.youTubeAppClientSecret,
-      "grant_type" -> "refresh_token",
-      "refresh_token" -> cmd.originalRequest.token.get.refresh_token
-    ))).to[RequestEntity]
+    val formDataFuture = Marshal(
+      FormData(
+        Map(
+          "client_id" -> settings.youTubeAppClientId,
+          "client_secret" -> settings.youTubeAppClientSecret,
+          "grant_type" -> "refresh_token",
+          "refresh_token" -> cmd.originalRequest.token.get.refresh_token
+        )
+      )
+    ).to[RequestEntity]
 
     ctx.pipeToSelf(formDataFuture) {
       case Success(formData) =>
@@ -257,24 +320,37 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
     ctx.log.debug("processTokenRefreshed(cmd: {})", cmd)
     decodeToTry[YouTubeApiResponse.GetToken](cmd.response.entityString) match {
       case Success(token) =>
-        mediator ! ArchieMateMediator.SendYouTubeChannelSessionsRepositoryCommand(YouTubeChannelSessionsRepository.RefreshToken(cmd.originalRequest.tokenId.get, token))
+        mediator ! ArchieMateMediator
+          .SendYouTubeChannelSessionsRepositoryCommand(
+            YouTubeChannelSessionsRepository.RefreshToken(
+              cmd.originalRequest.tokenId.get,
+              token
+            )
+          )
         ctx.self ! cmd.originalRequest.originalCommand
 
       case Failure(ex) =>
-        ctx.self ! WrappedFailedResponse(cmd.originalRequest.originalCommand, ex)
+        ctx.self ! WrappedFailedResponse(
+          cmd.originalRequest.originalCommand,
+          ex
+        )
     }
   }
 
   private def processGetToken(cmd: GetToken): Unit = {
     ctx.log.debug("processGetToken(cmd: {})", cmd)
 
-    val formDataFuture = Marshal(FormData(Map(
-      "client_id" -> settings.youTubeAppClientId,
-      "client_secret" -> settings.youTubeAppClientSecret,
-      "code" -> cmd.code,
-      "grant_type" -> "authorization_code",
-      "redirect_uri" -> settings.youTubeAppRedirectUri
-    ))).to[RequestEntity]
+    val formDataFuture = Marshal(
+      FormData(
+        Map(
+          "client_id" -> settings.youTubeAppClientId,
+          "client_secret" -> settings.youTubeAppClientSecret,
+          "code" -> cmd.code,
+          "grant_type" -> "authorization_code",
+          "redirect_uri" -> settings.youTubeAppRedirectUri
+        )
+      )
+    ).to[RequestEntity]
 
     ctx.pipeToSelf(formDataFuture) {
       case Success(formData) =>
@@ -296,24 +372,32 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri(s"$v3baseUrl/channels").withQuery(Query(
-        "part" -> "brandingSettings,contentDetails,contentOwnerDetails,id,localizations,snippet,statistics,status,topicDetails",
-        "mine" -> "true"
-      )),
+      uri = Uri(s"$v3baseUrl/channels").withQuery(
+        Query(
+          "part" -> "brandingSettings,contentDetails,contentOwnerDetails,id,localizations,snippet,statistics,status,topicDetails",
+          "mine" -> "true"
+        )
+      ),
       tokenId = Some(cmd.tokenId)
     )
   }
 
-  private def processGetChannelFromAccessToken(cmd: GetChannelFromAccessToken): Unit = {
+  private def processGetChannelFromAccessToken(
+      cmd: GetChannelFromAccessToken
+  ): Unit = {
     ctx.log.debug("processGetChannelFromAccessToken(cmd: {})", cmd)
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri(s"$v3baseUrl/channels").withQuery(Query(
-        "part" -> "brandingSettings,contentDetails,contentOwnerDetails,id,localizations,snippet,statistics,status,topicDetails",
-        "mine" -> "true"
-      )),
-      token = Some(YouTubeApiResponse.GetToken(cmd.accessToken, 0, "", None, Nil, "")),
+      uri = Uri(s"$v3baseUrl/channels").withQuery(
+        Query(
+          "part" -> "brandingSettings,contentDetails,contentOwnerDetails,id,localizations,snippet,statistics,status,topicDetails",
+          "mine" -> "true"
+        )
+      ),
+      token = Some(
+        YouTubeApiResponse.GetToken(cmd.accessToken, 0, "", None, Nil, "")
+      ),
       shouldRefresh = false
     )
   }
@@ -323,20 +407,25 @@ class YouTubeApiClient()(using ctx: ActorContext[YouTubeApiClient.Command], medi
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = Uri(s"$v3baseUrl/liveBroadcasts").withQuery(Query(
-        "part" -> "id,snippet,contentDetails,monetizationDetails,status",
-        "mine" -> "true"
-      )),
+      uri = Uri(s"$v3baseUrl/liveBroadcasts").withQuery(
+        Query(
+          "part" -> "id,snippet,contentDetails,monetizationDetails,status",
+          "mine" -> "true"
+        )
+      ),
       tokenId = Some(cmd.tokenId)
     )
   }
 
-  private def decodeResponse[T <: YouTubeApiResponse](str: String)(using Decoder[T]): Try[T] = {
+  private def decodeResponse[T <: YouTubeApiResponse](
+      str: String
+  )(using Decoder[T]): Try[T] = {
     decodeToTry[T](str)
   }
 
-  private def tryResponseToStatusReply[T <: YouTubeApiResponse]: PartialFunction[Try[T], StatusReply[T]] = {
+  private def tryResponseToStatusReply[T <: YouTubeApiResponse]
+      : PartialFunction[Try[T], StatusReply[T]] = {
     case Success(response) => StatusReply.success(response)
-    case Failure(ex) => StatusReply.error(ex)
+    case Failure(ex)       => StatusReply.error(ex)
   }
 }

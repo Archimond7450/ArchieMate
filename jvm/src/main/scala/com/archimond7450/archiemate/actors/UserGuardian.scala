@@ -27,7 +27,12 @@ import com.archimond7450.archiemate.actors.services.{
 }
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
-import org.apache.pekko.actor.typed.{ActorRef, Behavior, Scheduler}
+import org.apache.pekko.actor.typed.{
+  ActorRef,
+  Behavior,
+  Scheduler,
+  SupervisorStrategy
+}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import com.archimond7450.archiemate.extensions.*
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
@@ -59,20 +64,27 @@ object UserGuardian {
   private final case class HttpFailed(ex: Throwable) extends Command
   private case object Stop extends Command
 
-  def apply(): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    Try(Settings(ctx.system)) match {
-      case Success(settings) =>
-        ctx.log.info("Settings retrieved successfully!")
-        ctx.self ! StartHttp
-        given Settings = settings
-        withSettings
+  def apply(): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
 
-      case Failure(ex) =>
-        ctx.log.error("Settings could not be retrieved!", ex)
-        Behaviors.stopped
+        Try(Settings(ctx.system)) match {
+          case Success(settings) =>
+            ctx.log.info("Settings retrieved successfully!")
+            ctx.self ! StartHttp
+
+            given Settings = settings
+
+            withSettings
+
+          case Failure(ex) =>
+            ctx.log.error("Settings could not be retrieved!", ex)
+            Behaviors.stopped
+        }
+      }
     }
-  }
+    .onFailure[Throwable](SupervisorStrategy.restart)
 
   private def withSettings(using
       ctx: ActorContext[Command],

@@ -63,7 +63,7 @@ import org.apache.pekko.actor.typed.scaladsl.{
   StashBuffer,
   TimerScheduler
 }
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.util.Timeout
 
 import scala.concurrent.duration.DurationInt
@@ -146,18 +146,20 @@ object TwitchChatbot {
       randomProvider: RandomProvider,
       timeProvider: TimeProvider,
       settings: Settings
-  ): Behavior[Command] = {
-    Behaviors.withStash(100) { buffer =>
-      given StashBuffer[Command] = buffer
-      Behaviors.setup { ctx =>
-        given ActorContext[Command] = ctx
-        Behaviors.withTimers { timers =>
-          given TimerScheduler[Command] = timers
-          (new TwitchChatbot(twitchRoomId)).initial
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.withStash(100) { buffer =>
+        given StashBuffer[Command] = buffer
+        Behaviors.setup { ctx =>
+          given ActorContext[Command] = ctx
+          Behaviors.withTimers { timers =>
+            given TimerScheduler[Command] = timers
+            new TwitchChatbot(twitchRoomId).initial
+          }
         }
       }
     }
-  }
+    .onFailure(SupervisorStrategy.resume)
 }
 
 class TwitchChatbot(twitchRoomId: String)(using
