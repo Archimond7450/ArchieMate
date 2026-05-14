@@ -1324,7 +1324,7 @@ class TwitchChatbot(twitchRoomId: String)(using
                     id = choice.id,
                     title = choice.title,
                     votes = 0,
-                    channelPointVotes = 0,
+                    channelPointsVotes = 0,
                     bitsVotes = 0
                   )
                 ),
@@ -1350,7 +1350,7 @@ class TwitchChatbot(twitchRoomId: String)(using
                 id = choice.id,
                 title = choice.title,
                 votes = choice.votes,
-                channelPointVotes = choice.channelPointsVotes,
+                channelPointsVotes = choice.channelPointsVotes,
                 bitsVotes = choice.bitsVotes
               )
             )

@@ -142,7 +142,7 @@ object TwitchApi {
       id: String,
       title: String,
       votes: Int,
-      channelPointVotes: Int,
+      channelPointsVotes: Int,
       bitsVotes: Int
   )
   object PollChoice {
