@@ -33,7 +33,7 @@ import com.archimond7450.archiemate.twitch.eventsub.{
   ChatMessage
 }
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.{ActorRef, Behavior}
+import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.util.Timeout
 import org.slf4j.Logger
 
@@ -71,10 +71,14 @@ object TwitchCommandsService {
       chatbot: ActorRef[TwitchChatbot.Command],
       randomProvider: RandomProvider,
       timeProvider: TimeProvider
-  ): Behavior[Command] = Behaviors.setup { ctx =>
-    given ActorContext[Command] = ctx
-    (new TwitchCommandsService).operational()
-  }
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
+        (new TwitchCommandsService).operational()
+      }
+    }
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 class TwitchCommandsService(using
@@ -2501,6 +2505,13 @@ class TwitchCommandsService(using
                       )
                   }
               }
+
+            case _ =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(usage)
+              )
           }
         }
       }
