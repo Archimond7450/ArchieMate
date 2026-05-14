@@ -1,17 +1,43 @@
 package com.archimond7450.archiemate.actors
 
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
-import com.archimond7450.archiemate.actors.repositories.sessions.{TwitchUserSessionsRepository, YouTubeChannelSessionsRepository}
-import com.archimond7450.archiemate.actors.repositories.settings.{AutomaticMessagesSettingsRepository, BasicChatbotSettingsRepository, BuiltInCommandsSettingsRepository, CommandsSettingsRepository, OverlaysSettingsRepository, TimersSettingsRepository, VariablesSettingsRepository}
-import com.archimond7450.archiemate.actors.services.{JWTService, TwitchApiPaginationHandlerService, TwitchLoginValidatorService}
+import com.archimond7450.archiemate.actors.repositories.sessions.{
+  TwitchUserSessionsRepository,
+  YouTubeChannelSessionsRepository
+}
+import com.archimond7450.archiemate.actors.repositories.settings.{
+  AutomaticMessagesSettingsRepository,
+  BasicChatbotSettingsRepository,
+  BuiltInCommandsSettingsRepository,
+  CommandsSettingsRepository,
+  OverlaysSettingsRepository,
+  PollsRepository,
+  TimersSettingsRepository,
+  VariablesSettingsRepository
+}
+import com.archimond7450.archiemate.actors.services.{
+  JWTService,
+  TwitchApiPaginationHandlerService,
+  TwitchLoginValidatorService
+}
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
-import com.archimond7450.archiemate.actors.services.controllerhelpers.{CommandsControllerHelperService, OAuthControllerHelperService, SettingsControllerHelperService, UserControllerHelperService}
+import com.archimond7450.archiemate.actors.services.controllerhelpers.{
+  CommandsControllerHelperService,
+  OAuthControllerHelperService,
+  SettingsControllerHelperService,
+  UserControllerHelperService
+}
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
-import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, SupervisorStrategy}
+import org.apache.pekko.actor.typed.{
+  ActorRef,
+  ActorSystem,
+  Behavior,
+  SupervisorStrategy
+}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.util.Timeout
@@ -53,6 +79,9 @@ object ArchieMateMediator {
   final case class SendVariablesSettingsRepositoryCommand(
       cmd: VariablesSettingsRepository.Command
   ) extends Command
+  final case class SendPollsRepositoryCommand(
+      cmd: PollsRepository.Command
+  ) extends Command
   final case class SendTwitchTokenUserCacheServiceCommand(
       cmd: TwitchTokenUserCacheService.Command
   ) extends Command
@@ -85,12 +114,14 @@ object ArchieMateMediator {
       randomProvider: RandomProvider,
       timeProvider: TimeProvider,
       settings: Settings
-  ): Behavior[Command] = Behaviors.supervise[Command] {
-    Behaviors.setup { ctx =>
-      given ActorContext[Command] = ctx
-      new ArchieMateMediator().operational()
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
+        new ArchieMateMediator().operational()
+      }
     }
-  }.onFailure[Throwable](SupervisorStrategy.resume)
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 final class ArchieMateMediator(using
@@ -129,6 +160,7 @@ final class ArchieMateMediator(using
       variablesSettingsRepository: ActorRef[
         VariablesSettingsRepository.Command
       ],
+      pollsRepository: ActorRef[PollsRepository.Command],
       twitchTokenUserCacheService: ActorRef[
         TwitchTokenUserCacheService.Command
       ],
@@ -197,6 +229,7 @@ final class ArchieMateMediator(using
         VariablesSettingsRepository(),
         VariablesSettingsRepository.actorName
       ),
+      pollsRepository = ctx.spawn(PollsRepository(), PollsRepository.actorName),
       twitchTokenUserCacheService = ctx.spawn(
         TwitchTokenUserCacheService(),
         TwitchTokenUserCacheService.actorName
@@ -277,6 +310,10 @@ final class ArchieMateMediator(using
 
     case SendVariablesSettingsRepositoryCommand(cmd) =>
       state.variablesSettingsRepository ! cmd
+      Behaviors.same
+
+    case SendPollsRepositoryCommand(cmd) =>
+      state.pollsRepository ! cmd
       Behaviors.same
 
     case SendTwitchTokenUserCacheServiceCommand(cmd) =>

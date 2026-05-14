@@ -27,6 +27,7 @@ object TwitchApiPaginationHandlerService {
   ) extends Command
   final case class GetStream(clientCmd: TwitchApiClient.GetStream)
       extends Command
+  final case class GetPolls(clientCmd: TwitchApiClient.GetPolls) extends Command
 
   private final case class ChattersResponse(
       cmd: GetChatters,
@@ -51,6 +52,10 @@ object TwitchApiPaginationHandlerService {
   private final case class StreamResponse(
       cmd: GetStream,
       tryStream: Try[TwitchApiResponse.GetStream]
+  ) extends Command
+  private final case class PollsResponse(
+      cmd: GetPolls,
+      tryPolls: Try[TwitchApiResponse.GetPolls]
   ) extends Command
 
   def apply()(using
@@ -83,7 +88,8 @@ class TwitchApiPaginationHandlerService(using
       followers: Map[GetChannelFollowers, List[
         TwitchApiResponse.GetChannelFollowers
       ]] = Map.empty,
-      stream: Map[GetStream, List[TwitchApiResponse.GetStream]] = Map.empty
+      stream: Map[GetStream, List[TwitchApiResponse.GetStream]] = Map.empty,
+      polls: Map[GetPolls, List[TwitchApiResponse.GetPolls]] = Map.empty
   )
 
   private def active(
@@ -111,6 +117,9 @@ class TwitchApiPaginationHandlerService(using
     case cmd @ GetStream(clientCmd) =>
       askForStream(cmd)
       active(state.copy(stream = state.stream + (cmd -> Nil)))
+    case cmd @ GetPolls(clientCmd) =>
+      askForPolls(cmd)
+      active(state.copy(polls = state.polls + (cmd -> Nil)))
     case ChattersResponse(cmd, Failure(ex)) =>
       cmd.clientCmd.replyTo ! StatusReply.error(ex)
       active(state.copy(chatters = state.chatters - cmd))
@@ -129,6 +138,9 @@ class TwitchApiPaginationHandlerService(using
     case StreamResponse(cmd, Failure(ex)) =>
       cmd.clientCmd.replyTo ! StatusReply.error(ex)
       active(state.copy(stream = state.stream - cmd))
+    case PollsResponse(cmd, Failure(ex)) =>
+      cmd.clientCmd.replyTo ! StatusReply.error(ex)
+      active(state.copy(polls = state.polls - cmd))
     case ChattersResponse(cmd, Success(chatters)) =>
       chatters.pagination.cursor match {
         case Some(cursor) =>
@@ -231,6 +243,23 @@ class TwitchApiPaginationHandlerService(using
           )
           active(state.copy(stream = state.stream - cmd))
       }
+    case PollsResponse(cmd, Success(polls)) =>
+      polls.pagination.cursor match {
+        case Some(cursor) =>
+          askForPolls(cmd, cursor = Some(cursor))
+          active(
+            state.copy(polls =
+              state.polls + (cmd -> (state.polls(cmd) :+ polls))
+            )
+          )
+        case _ =>
+          val pollsData = state.polls(cmd) :+ polls
+          val finalData = pollsData.flatMap(_.data).toSet
+          cmd.clientCmd.replyTo ! StatusReply.success(
+            polls.copy(data = finalData.toList)
+          )
+          active(state.copy(polls = state.polls - cmd))
+      }
   }
 
   private def askForChatters(
@@ -313,5 +342,18 @@ class TwitchApiPaginationHandlerService(using
             cmd.clientCmd.copy(replyTo = ref, cursor = cursor)
           )
       )(StreamResponse(cmd, _))
+  }
+
+  private def askForPolls(
+      cmd: GetPolls,
+      cursor: Option[String] = None
+  ): Unit = {
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetPolls](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          cmd.clientCmd.copy(replyTo = ref, cursor = cursor)
+        )
+    )(PollsResponse(cmd, _))
   }
 }

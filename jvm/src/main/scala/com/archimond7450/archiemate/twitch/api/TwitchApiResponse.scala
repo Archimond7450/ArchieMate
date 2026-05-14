@@ -213,4 +213,20 @@ object TwitchApiResponse {
     given Decoder[GetEmoteSets] = ConfiguredDecoder.derived
     given Encoder[GetEmoteSets] = ConfiguredEncoder.derived
   }
+
+  final case class GetPolls(
+      data: List[TwitchApi.Poll],
+      pagination: TwitchApi.Pagination
+  ) extends TwitchApiResponse
+  object GetPolls {
+    given Decoder[GetPolls] = ConfiguredDecoder.derived
+    given Encoder[GetPolls] = ConfiguredEncoder.derived
+  }
+
+  final case class CreateOrEndPoll(data: List[TwitchApi.Poll])
+      extends TwitchApiResponse
+  object CreateOrEndPoll {
+    given Decoder[CreateOrEndPoll] = ConfiguredDecoder.derived
+    given Encoder[CreateOrEndPoll] = ConfiguredEncoder.derived
+  }
 }

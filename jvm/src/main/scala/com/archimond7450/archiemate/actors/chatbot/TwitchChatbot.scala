@@ -10,6 +10,7 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
   BuiltInCommandsSettingsRepository,
   CommandsSettingsRepository,
   OverlaysSettingsRepository,
+  PollsRepository,
   TimersSettingsRepository,
   VariablesSettingsRepository
 }
@@ -41,6 +42,7 @@ import com.archimond7450.archiemate.http.ChannelSettings.{
   VariablesSettings,
   Settings as ChannelSettings
 }
+import com.archimond7450.archiemate.http.Polls.ChannelPolls
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
@@ -66,6 +68,7 @@ import org.apache.pekko.actor.typed.scaladsl.{
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.util.Timeout
 
+import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
@@ -90,6 +93,7 @@ object TwitchChatbot {
   final case class NewAutomaticMessagesSettings(
       settings: AutomaticMessagesSettings
   ) extends Command
+  final case class NewPolls(polls: ChannelPolls) extends Command
   final case class Broadcaster(broadcaster: GetTokenUser) extends Command
   private final case class FailedToGetSettings(ex: Throwable) extends Command
   final case class Mods(mods: Option[GetModerators]) extends Command
@@ -100,6 +104,8 @@ object TwitchChatbot {
   final case class Chatters(chatters: Option[GetChatters]) extends Command
   final case class Stream(stream: Option[Option[TwitchApi.Stream]])
       extends Command // TODO: Change outer Option to Try
+  final case class PollHistory(polls: Option[List[TwitchApi.Poll]])
+      extends Command
   final case class EventSubEvent(event: eventsub.Event) extends Command
   final case class Afk(chatterUserId: String) extends Command
   private case object ChattersTimer extends Command
@@ -127,6 +133,8 @@ object TwitchChatbot {
   final case class OperationalParameters(
       tokenId: String,
       channelSettings: ChannelSettings,
+      polls: ChannelPolls,
+      currentPoll: Option[TwitchApi.Poll],
       broadcaster: GetTokenUser,
       eventSubListener: ActorRef[EventSubListener.Command],
       ircListener: ActorRef[IRCListener.Command],
@@ -189,6 +197,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       timersSettingsOption: Option[TimersSettings] = None,
       overlaysSettingsOption: Option[OverlaysSettings] = None,
       automaticMessagesSettingsOption: Option[AutomaticMessagesSettings] = None,
+      polls: Option[ChannelPolls] = None,
       broadcasterOption: Option[GetTokenUser] = None
   )
 
@@ -314,6 +323,19 @@ class TwitchChatbot(twitchRoomId: String)(using
           case Failure(ex) => TwitchChatbot.FailedToGetSettings(ex)
         }
 
+        ctx.ask[ArchieMateMediator.Command, ChannelPolls](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendPollsRepositoryCommand(
+              PollsRepository.GetPolls(ref, params.twitchRoomId)
+            )
+        ) {
+          case Success(polls) =>
+            TwitchChatbot.NewPolls(polls)
+          case Failure(ex) =>
+            TwitchChatbot.FailedToGetSettings(ex)
+        }
+
         ctx.askWithStatus[
           ArchieMateMediator.Command,
           TwitchApiResponse.GetTokenUser
@@ -362,6 +384,7 @@ class TwitchChatbot(twitchRoomId: String)(using
     params.timersSettingsOption,
     params.overlaysSettingsOption,
     params.automaticMessagesSettingsOption,
+    params.polls,
     params.broadcasterOption
   ) match {
     case (
@@ -373,6 +396,7 @@ class TwitchChatbot(twitchRoomId: String)(using
           Some(timersSettings),
           Some(overlaysSettings),
           Some(automaticMessagesSettings),
+          Some(polls),
           Some(broadcaster)
         ) =>
       withSettings(
@@ -386,6 +410,7 @@ class TwitchChatbot(twitchRoomId: String)(using
           overlaysSettings,
           automaticMessagesSettings
         ),
+        polls,
         broadcaster
       )
 
@@ -414,6 +439,9 @@ class TwitchChatbot(twitchRoomId: String)(using
             params.copy(automaticMessagesSettingsOption = Some(settings))
           )
 
+        case TwitchChatbot.NewPolls(polls) =>
+          initial2(params.copy(polls = Some(polls)))
+
         case TwitchChatbot.Broadcaster(broadcaster) =>
           initial2(params.copy(broadcasterOption = Some(broadcaster)))
 
@@ -433,6 +461,7 @@ class TwitchChatbot(twitchRoomId: String)(using
   def withSettings(
       tokenId: String,
       channelSettings: ChannelSettings,
+      polls: ChannelPolls,
       broadcaster: GetTokenUser
   ): Behavior[TwitchChatbot.Command] = {
     val eventSubListener = ctx.spawn(
@@ -454,11 +483,13 @@ class TwitchChatbot(twitchRoomId: String)(using
     askForFollowers(tokenId, broadcaster)
     askForChatters(tokenId, broadcaster)
     askForStream(tokenId, broadcaster)
+    askForPollsHistory(tokenId, broadcaster)
 
     initializing(
       InitializingParameters(
         tokenId,
         channelSettings,
+        polls,
         broadcaster,
         eventSubListener,
         ircListener
@@ -469,6 +500,7 @@ class TwitchChatbot(twitchRoomId: String)(using
   final case class InitializingParameters(
       tokenId: String,
       channelSettings: ChannelSettings,
+      polls: ChannelPolls,
       broadcaster: GetTokenUser,
       eventSubListener: ActorRef[EventSubListener.Command],
       ircListener: ActorRef[IRCListener.Command],
@@ -477,7 +509,8 @@ class TwitchChatbot(twitchRoomId: String)(using
       subs: Option[GetSubs] = None,
       followers: Option[GetChannelFollowers] = None,
       chatters: Option[GetChatters] = None,
-      stream: Option[Option[TwitchApi.Stream]] = None
+      stream: Option[Option[TwitchApi.Stream]] = None,
+      pollHistory: Option[List[TwitchApi.Poll]] = None
   )
 
   private def initializing(
@@ -513,7 +546,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       )
       val followers = params.followers.get.data.toMapWithKey(_.user_id)
       val chatters = params.chatters.get.data.toMapWithKey(_.user_id)
-      val usersState: Map[String, TwitchChatbot.UserState] =
+      val usersState: Map[String, TwitchChatbot.UserState] = {
         (mods ++ vips ++ subsAsUser ++ chatters).map { (userId, user) =>
           val flags = Seq(
             mods.get(userId).map(_ => TwitchChatbot.UserFlag.Mod),
@@ -530,11 +563,14 @@ class TwitchChatbot(twitchRoomId: String)(using
           val subInfo = subs.get(userId)
           userId -> TwitchChatbot.UserState(user, flags, subInfo)
         }
+      }
       buffer.unstashAll(
         operational(
           TwitchChatbot.OperationalParameters(
             params.tokenId,
             params.channelSettings,
+            params.polls,
+            params.pollHistory.get.find(_.status == "ACTIVE"),
             params.broadcaster,
             params.eventSubListener,
             params.ircListener,
@@ -565,9 +601,13 @@ class TwitchChatbot(twitchRoomId: String)(using
         case TwitchChatbot.Stream(Some(stream)) =>
           initializing(params.copy(stream = Some(stream)))
 
+        case TwitchChatbot.PollHistory(Some(polls)) =>
+          initializing(params.copy(pollHistory = Some(polls)))
+
         case TwitchChatbot.Mods(None) | TwitchChatbot.VIPs(None) |
             TwitchChatbot.Subs(None) | TwitchChatbot.Followers(None) |
-            TwitchChatbot.Chatters(None) | TwitchChatbot.Stream(None) =>
+            TwitchChatbot.Chatters(None) | TwitchChatbot.Stream(None) |
+            TwitchChatbot.PollHistory(None) =>
           supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
             params.broadcaster.id
           )
@@ -1268,14 +1308,70 @@ class TwitchChatbot(twitchRoomId: String)(using
         ) =>
       Behaviors.same
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPollBeginEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPollBeginEvent) =>
+      operational(params =
+        params.copy(currentPoll =
+          Some(
+            TwitchApi.Poll(
+              id = e.id,
+              broadcasterId = e.broadcasterUserId,
+              broadcasterName = e.broadcasterUserName,
+              broadcasterLogin = e.broadcasterUserLogin,
+              title = e.title,
+              choices = e.choices
+                .map(choice =>
+                  TwitchApi.PollChoice(
+                    id = choice.id,
+                    title = choice.title,
+                    votes = 0,
+                    channelPointVotes = 0,
+                    bitsVotes = 0
+                  )
+                ),
+              bitsVotingEnabled = e.bitsVoting.isEnabled,
+              bitsPerVote = e.bitsVoting.amountPerVote,
+              channelPointsVotingEnabled = e.channelPointsVoting.isEnabled,
+              channelPointsPerVote = e.channelPointsVoting.amountPerVote,
+              status = "ACTIVE",
+              duration =
+                ChronoUnit.SECONDS.between(e.endsAt, e.startedAt).toInt,
+              startedAt = e.startedAt
+            )
+          )
+        )
+      )
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPollProgressEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPollProgressEvent) =>
+      operational(params = params.copy(currentPoll = params.currentPoll.map {
+        poll =>
+          poll.copy(
+            choices = e.choices.map(choice =>
+              TwitchApi.PollChoice(
+                id = choice.id,
+                title = choice.title,
+                votes = choice.votes,
+                channelPointVotes = choice.channelPointsVotes,
+                bitsVotes = choice.bitsVotes
+              )
+            )
+          )
+      }))
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPollEndEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPollEndEvent) =>
+      given Ordering[eventsub.StartedPollChoice] = Ordering.fromLessThan((x, y) =>
+        x.votes + x.bitsVotes + x.channelPointsVotes < y.votes + y.bitsVotes + y.channelPointsVotes
+      )
+      val sortedChoices = e.choices.sorted
+      val maxChoice = e.choices.max
+      val maxVote =
+        maxChoice.votes + maxChoice.bitsVotes + maxChoice.channelPointsVotes
+      val winningChoices = e.choices.filter(choice =>
+        choice.votes + choice.bitsVotes + choice.channelPointsVotes == maxVote
+      )
+      params.ircListener ! IRCListener.SendMessage(
+        s"Poll ended with the following winner(s) - $maxVote vote(s): ${winningChoices.map(_.title).mkString(", ")}"
+      )
+      operational(params = params.copy(currentPoll = None))
 
     case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionBeginEvent) =>
       Behaviors.same
@@ -1572,7 +1668,7 @@ class TwitchChatbot(twitchRoomId: String)(using
           TwitchChatbot.Chatters(None)
       }
 
-  private def askForStream(tokenId: String, broadcaster: GetTokenUser): Unit =
+  private def askForStream(tokenId: String, broadcaster: GetTokenUser): Unit = {
     ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetStream](
       mediator,
       ref =>
@@ -1604,4 +1700,31 @@ class TwitchChatbot(twitchRoomId: String)(using
         )
         TwitchChatbot.Stream(Some(None))
     }
+  }
+
+  private def askForPollsHistory(
+      tokenId: String,
+      broadcaster: GetTokenUser
+  ): Unit = {
+    ctx.askWithStatus[ArchieMateMediator.Command, TwitchApiResponse.GetPolls](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetPolls(
+            TwitchApiClient.GetPolls(ref, tokenId, broadcaster.id)
+          )
+        )
+    ) {
+      case Success(TwitchApiResponse.GetPolls(polls, _)) =>
+        TwitchChatbot.PollHistory(Some(polls))
+
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve channel {} poll history",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.PollHistory(None)
+    }
+  }
 }

@@ -1,12 +1,16 @@
 package com.archimond7450.archiemate.actors.twitch.api
 
+import com.archimond7450.archiemate.CirceConfiguration.twitchConfiguration
 import com.archimond7450.archiemate.actors.{ArchieMateMediator, HttpClient}
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
-import com.archimond7450.archiemate.twitch.api.{TwitchApiRequest, TwitchApiResponse}
+import com.archimond7450.archiemate.twitch.api.{
+  TwitchApiRequest,
+  TwitchApiResponse
+}
 import com.archimond7450.archiemate.twitch.eventsub.{Condition, Transport}
 import io.circe.Decoder
 import io.circe.syntax.EncoderOps
@@ -15,7 +19,17 @@ import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
 import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, HttpHeader, HttpMethod, HttpMethods, RequestEntity, StatusCodes, Uri}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  FormData,
+  HttpEntity,
+  HttpHeader,
+  HttpMethod,
+  HttpMethods,
+  RequestEntity,
+  StatusCodes,
+  Uri
+}
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 
@@ -188,15 +202,43 @@ object TwitchApiClient {
       emoteSets: List[String]
   ) extends PublicCommand
 
+  final case class GetPolls(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.GetPolls]],
+      tokenId: String,
+      roomId: String,
+      cursor: Option[String] = None
+  ) extends PublicCommand
+
+  final case class CreatePoll(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPoll]],
+      tokenId: String,
+      roomId: String,
+      title: String,
+      choices: Set[String],
+      durationSeconds: Int,
+      channelPointsVotingEnabled: Boolean = false,
+      channelPointsPerVote: Int = 1
+  ) extends PublicCommand
+
+  final case class EndPoll(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPoll]],
+      tokenId: String,
+      roomId: String,
+      pollId: String,
+      withoutTrace: Boolean = false
+  ) extends PublicCommand
+
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.supervise[Command] {
-    Behaviors.setup { ctx =>
-      given ActorContext[Command] = ctx
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
 
-      new TwitchApiClient().operational()
+        new TwitchApiClient().operational()
+      }
     }
-  }.onFailure[Throwable](SupervisorStrategy.resume)
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 class TwitchApiClient(using
@@ -300,6 +342,18 @@ class TwitchApiClient(using
 
     case cmd: GetEmoteSets =>
       processGetEmoteSets(cmd)
+      Behaviors.same
+
+    case cmd: GetPolls =>
+      processGetPolls(cmd)
+      Behaviors.same
+
+    case cmd: CreatePoll =>
+      processCreatePoll(cmd)
+      Behaviors.same
+
+    case cmd: EndPoll =>
+      processEndPoll(cmd)
       Behaviors.same
   }
 
@@ -498,6 +552,21 @@ class TwitchApiClient(using
         cmd.replyTo ! tryResponseToStatusReply(
           decodeResponse[TwitchApiResponse.GetEmoteSets](json)
         )
+
+      case cmd: GetPolls =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetPolls](json)
+        )
+
+      case cmd: CreatePoll =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.CreateOrEndPoll](json)
+        )
+
+      case cmd: EndPoll =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.CreateOrEndPoll](json)
+        )
     }
   }
 
@@ -558,6 +627,15 @@ class TwitchApiClient(using
         cmd.replyTo ! StatusReply.error(resp.cause)
 
       case cmd: GetEmoteSets =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetPolls =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: CreatePoll =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: EndPoll =>
         cmd.replyTo ! StatusReply.error(resp.cause)
     }
   }
@@ -749,10 +827,12 @@ class TwitchApiClient(using
     )
   }
 
-  private def addCursor(uri: Uri, query: Query, cursor: Option[String]): Uri = cursor match {
-    case None         => uri.withQuery(query)
-    case Some(cursor) => uri.withQuery(Query(query.toMap + ("after" -> cursor)))
-  }
+  private def addCursor(uri: Uri, query: Query, cursor: Option[String]): Uri =
+    cursor match {
+      case None => uri.withQuery(query)
+      case Some(cursor) =>
+        uri.withQuery(Query(query.toMap + ("after" -> cursor)))
+    }
 
   private def processGetChatters(cmd: GetChatters): Unit = {
     ctx.log.debug("processGetChatters(cmd: {})", cmd)
@@ -927,6 +1007,74 @@ class TwitchApiClient(using
         Query(
           queries: _*
         )
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processGetPolls(cmd: GetPolls): Unit = {
+    ctx.log.debug("processGetPolls(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = addCursor(
+        Uri("https://api.twitch.tv/helix/polls"),
+        Query(
+          "broadcaster_id" -> cmd.roomId,
+          "first" -> "20"
+        ),
+        cmd.cursor
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processCreatePoll(cmd: CreatePoll): Unit = {
+    ctx.log.debug("processCreatePoll(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.POST,
+      uri = Uri("https://api.twitch.tv/helix/polls"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        TwitchApiRequest
+          .CreatePollRequestData(
+            broadcasterId = cmd.roomId,
+            title = cmd.title,
+            choices = cmd.choices.map(TwitchApiRequest.PollChoice.apply).toList,
+            channelPointsVotingEnabled =
+              if (cmd.channelPointsVotingEnabled) Some(true) else None,
+            channelPointsPerVote =
+              if (cmd.channelPointsVotingEnabled) Some(cmd.channelPointsPerVote)
+              else None,
+            duration = cmd.durationSeconds
+          )
+          .asJson
+          .noSpaces
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processEndPoll(cmd: EndPoll): Unit = {
+    ctx.log.debug("processEndPoll(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.PATCH,
+      uri = Uri("https://api.twitch.tv/helix/polls"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        TwitchApiRequest
+          .EndPollRequestData(
+            broadcasterId = cmd.roomId,
+            id = cmd.pollId,
+            status = if (cmd.withoutTrace) "ARCHIVED" else "TERMINATED"
+          )
+          .asJson
+          .noSpaces
       ),
       tokenId = Some(cmd.tokenId)
     )

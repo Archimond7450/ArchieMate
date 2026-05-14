@@ -9,6 +9,7 @@ import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLog
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.http.ChannelSettings
 import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, OverlaysSettings, TimersSettings, VariablesSettings}
+import com.archimond7450.archiemate.http.Polls.ChannelPolls
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.GetTokenUser
@@ -37,6 +38,7 @@ object TwitchChatbotsSupervisor {
   final case class TimersSettingsChanged(settings: TimersSettings) extends SettingsEvent
   final case class OverlaysSettingsChanged(settings: OverlaysSettings) extends SettingsEvent
   final case class AutomaticMessagesSettingsChanged(settings: AutomaticMessagesSettings) extends SettingsEvent
+  final case class PollsChanged(polls: ChannelPolls) extends SettingsEvent
 
   def apply()(using
               mediator: ActorRef[ArchieMateMediator.Command],
@@ -98,6 +100,7 @@ class TwitchChatbotsSupervisor(using
             case TimersSettingsChanged(settings) => chatbot ! TwitchChatbot.NewTimersSettings(settings)
             case OverlaysSettingsChanged(settings) => chatbot ! TwitchChatbot.NewOverlaysSettings(settings)
             case AutomaticMessagesSettingsChanged(settings) => chatbot ! TwitchChatbot.NewAutomaticMessagesSettings(settings)
+            case PollsChanged(polls) => chatbot ! TwitchChatbot.NewPolls(polls)
           }
 
         case None =>

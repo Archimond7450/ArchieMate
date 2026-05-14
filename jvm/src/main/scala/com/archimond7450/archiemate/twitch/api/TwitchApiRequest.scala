@@ -8,22 +8,66 @@ import io.circe.syntax.EncoderOps
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 
 object TwitchApiRequest {
-  final case class ModifyChannelInformationRequestData(game_id: Option[String] = None, title: Option[String] = None, tags: Option[Set[String]] = None)
+  final case class ModifyChannelInformationRequestData(
+      game_id: Option[String] = None,
+      title: Option[String] = None,
+      tags: Option[Set[String]] = None
+  )
   object ModifyChannelInformationRequestData {
-    given Decoder[ModifyChannelInformationRequestData] = ConfiguredDecoder.derived
-    given Encoder[ModifyChannelInformationRequestData] = dropNulls(ConfiguredEncoder.derived)
+    given Decoder[ModifyChannelInformationRequestData] =
+      ConfiguredDecoder.derived
+    given Encoder[ModifyChannelInformationRequestData] = dropNulls(
+      ConfiguredEncoder.derived
+    )
   }
 
-  final case class CreateEventSubSubscriptionPayload(`type`: String, version: String, condition: Condition, transport: Transport)
+  final case class CreateEventSubSubscriptionPayload(
+      `type`: String,
+      version: String,
+      condition: Condition,
+      transport: Transport
+  )
   object CreateEventSubSubscriptionPayload {
     given Decoder[CreateEventSubSubscriptionPayload] = ConfiguredDecoder.derived
-    given Encoder[CreateEventSubSubscriptionPayload] = (p: CreateEventSubSubscriptionPayload) => {
-      Json.fromJsonObject(JsonObject(
-        "type" -> Json.fromString(p.`type`),
-        "version" -> Json.fromString(p.version),
-        "condition" -> p.condition.asJson,
-        "transport" -> p.transport.asJson
-      ))
-    }
+    given Encoder[CreateEventSubSubscriptionPayload] =
+      (p: CreateEventSubSubscriptionPayload) => {
+        Json.fromJsonObject(
+          JsonObject(
+            "type" -> Json.fromString(p.`type`),
+            "version" -> Json.fromString(p.version),
+            "condition" -> p.condition.asJson,
+            "transport" -> p.transport.asJson
+          )
+        )
+      }
+  }
+
+  final case class CreatePollRequestData(
+      broadcasterId: String,
+      title: String,
+      choices: List[PollChoice],
+      channelPointsVotingEnabled: Option[Boolean] = None,
+      channelPointsPerVote: Option[Int] = None,
+      duration: Int
+  )
+  object CreatePollRequestData {
+    given Decoder[CreatePollRequestData] = ConfiguredDecoder.derived
+    given Encoder[CreatePollRequestData] = dropNulls(ConfiguredEncoder.derived)
+  }
+
+  final case class PollChoice(title: String)
+  object PollChoice {
+    given Decoder[PollChoice] = ConfiguredDecoder.derived
+    given Encoder[PollChoice] = ConfiguredEncoder.derived
+  }
+
+  final case class EndPollRequestData(
+      broadcasterId: String,
+      id: String,
+      status: String
+  )
+  object EndPollRequestData {
+    given Decoder[EndPollRequestData] = ConfiguredDecoder.derived
+    given Encoder[EndPollRequestData] = ConfiguredEncoder.derived
   }
 }

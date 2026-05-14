@@ -5,6 +5,7 @@ import com.archimond7450.archiemate.actors.chatbot.{IRCListener, TwitchChatbot}
 import com.archimond7450.archiemate.actors.repositories.settings.{
   AutomaticMessagesSettingsRepository,
   CommandsSettingsRepository,
+  PollsRepository,
   VariablesSettingsRepository
 }
 import com.archimond7450.archiemate.actors.services.TwitchCommandsService.actorName
@@ -18,7 +19,7 @@ import com.archimond7450.archiemate.extensions.StringExtensions.{
   asIndex,
   asVariableRegex
 }
-import com.archimond7450.archiemate.http.ChannelSettings
+import com.archimond7450.archiemate.http.{ChannelSettings, Polls}
 import com.archimond7450.archiemate.http.ChannelSettings.{
   BuiltInCommandsSettings,
   ChannelCommand,
@@ -38,6 +39,7 @@ import org.slf4j.Logger
 
 import java.time.{OffsetDateTime, ZoneId}
 import java.time.format.DateTimeFormatter
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
@@ -1203,9 +1205,15 @@ class TwitchCommandsService(using
         val (action, afterAction) = {
           if (actionEnd == -1 && strParameters.isEmpty) (Actions.HELP, "")
           else if (actionEnd == -1) (strParameters, "")
-          else (strParameters.substring(0, actionEnd).toLowerCase(), strParameters.substring(actionEnd).trim)
+          else
+            (
+              strParameters.substring(0, actionEnd).toLowerCase(),
+              strParameters.substring(actionEnd).trim
+            )
         }
-        ctx.log.debug(s"!greets strParameters = $strParameters |action = $action, afterAction = $afterAction")
+        ctx.log.debug(
+          s"!greets strParameters = $strParameters | action = $action, afterAction = $afterAction"
+        )
         val automaticMessagesSettings =
           cmd.chatbotParams.channelSettings.automaticMessagesSettings
         val greetsSettings = automaticMessagesSettings.knownGreets
@@ -1221,7 +1229,8 @@ class TwitchCommandsService(using
           .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Sub))
           .keySet
           .contains(cmd.e.chatterUserId)
-        val isFollower = cmd.chatbotParams.followers.keySet.contains(cmd.e.chatterUserId)
+        val isFollower =
+          cmd.chatbotParams.followers.keySet.contains(cmd.e.chatterUserId)
 
         val authorized = greetsSettings match {
           case None => isBroadcaster
@@ -1233,7 +1242,14 @@ class TwitchCommandsService(using
                 KnownGreetsSettings(KnownGreetsMode.ModsVipsSubs, _, _, _)
               ) =>
             isBroadcaster || isMod || isVip || isSub
-          case Some(KnownGreetsSettings(KnownGreetsMode.ModsVipsSubsFollows, _, _, _)) =>
+          case Some(
+                KnownGreetsSettings(
+                  KnownGreetsMode.ModsVipsSubsFollows,
+                  _,
+                  _,
+                  _
+                )
+              ) =>
             isBroadcaster || isMod || isVip || isSub || isFollower
           case Some(KnownGreetsSettings(KnownGreetsMode.All, _, _, _)) =>
             true
@@ -1247,7 +1263,12 @@ class TwitchCommandsService(using
           )
         } else {
           (action, isBroadcaster, greetsSettings) match {
-            case (Actions.HELP, _, _) => ctx.self ! TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(usage))
+            case (Actions.HELP, _, _) =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(usage)
+              )
             case (Actions.ON, true, None) =>
               ctx.ask[
                 ArchieMateMediator.Command,
@@ -1346,31 +1367,74 @@ class TwitchCommandsService(using
                 chatters,
                 Some(s"$${sender}, You do not have permission for this action.")
               )
-            case (Actions.MODE, true, Some(knownGreetsSettings: KnownGreetsSettings)) =>
+            case (
+                  Actions.MODE,
+                  true,
+                  Some(knownGreetsSettings: KnownGreetsSettings)
+                ) =>
               val optionMode = afterAction.trim.toLowerCase match {
-                case "all" => Some(KnownGreetsMode.All)
+                case "all"                 => Some(KnownGreetsMode.All)
                 case "mods" | "moderators" => Some(KnownGreetsMode.Mods)
-                case "modsvips" | "moderatorsvips" => Some(KnownGreetsMode.ModsVips)
-                case "modsvipssubs" | "moderatorsvipssubscribers" => Some(KnownGreetsMode.ModsVipsSubs)
-                case "modsvipssubsfollows" | "moderatorsvipssubscribersfollowers" => Some(KnownGreetsMode.ModsVipsSubsFollows)
+                case "modsvips" | "moderatorsvips" =>
+                  Some(KnownGreetsMode.ModsVips)
+                case "modsvipssubs" | "moderatorsvipssubscribers" =>
+                  Some(KnownGreetsMode.ModsVipsSubs)
+                case "modsvipssubsfollows" |
+                    "moderatorsvipssubscribersfollowers" =>
+                  Some(KnownGreetsMode.ModsVipsSubsFollows)
                 case _ => None
               }
               optionMode match {
                 case Some(mode) =>
-                  ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettingsRepository.Acknowledged.type](
-                    mediator, ref => ArchieMateMediator.SendAutomaticMessagesSettingsRepositoryCommand(AutomaticMessagesSettingsRepository.ChangeSettings(ref, broadcasterId, automaticMessagesSettings.copy(knownGreets = Some(knownGreetsSettings.copy(mode = mode)))))
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    AutomaticMessagesSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendAutomaticMessagesSettingsRepositoryCommand(
+                          AutomaticMessagesSettingsRepository.ChangeSettings(
+                            ref,
+                            broadcasterId,
+                            automaticMessagesSettings.copy(knownGreets =
+                              Some(knownGreetsSettings.copy(mode = mode))
+                            )
+                          )
+                        )
                   ) {
-                    case Success(AutomaticMessagesSettingsRepository.Acknowledged) =>
-                      TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(s"$${sender}, The known greets mode was successfully changed to \"${afterAction.trim}\"."))
+                    case Success(
+                          AutomaticMessagesSettingsRepository.Acknowledged
+                        ) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, The known greets mode was successfully changed to \"${afterAction.trim}\"."
+                        )
+                      )
 
                     case Failure(ex) =>
-                      log.error("There was an exception when waiting for response from automatic messages settings repository when asked to change known greets mode to \"{}\" in {} channel.", afterAction.trim, channelName, ex)
-                      TwitchCommandsService.ReturnCommandResponse(cmd, chatters, Some(s"$${sender}, I cannot confirm the known greets mode was changed... $problemDiscord"))
+                      log.error(
+                        "There was an exception when waiting for response from automatic messages settings repository when asked to change known greets mode to \"{}\" in {} channel.",
+                        afterAction.trim,
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the known greets mode was changed... $problemDiscord"
+                        )
+                      )
                   }
 
                 case None =>
                   ctx.self ! TwitchCommandsService.ReturnCommandResponse(
-                    cmd, chatters, Some(s"$${sender}, The known greets mode is invalid.")
+                    cmd,
+                    chatters,
+                    Some(s"$${sender}, The known greets mode is invalid.")
                   )
               }
             case (Actions.SHOW, true, Some(knownGreetsSettings)) =>
@@ -1961,6 +2025,487 @@ class TwitchCommandsService(using
       }
     }
 
+    object Poll extends BuiltInCommand {
+      override val name: String = "poll"
+
+      object Actions {
+        val HELP = "help"
+        val ADD = "add"
+        val CREATE = "create"
+        val ALIAS = "alias"
+        val EDIT = "edit"
+        val UPDATE = "update"
+        val CHANGE = "change"
+        val DELETE = "delete"
+        val REMOVE = "remove"
+        val START = "start"
+        val END = "end"
+        val TERMINATE = "terminate"
+        val ARCHIVE = "archive"
+
+        val ALL_ENDS: List[String] =
+          List(Actions.END, Actions.TERMINATE, Actions.ARCHIVE)
+
+        val ALL_POLL_ACTIONS: List[String] = List(
+          HELP,
+          ADD,
+          CREATE,
+          ALIAS,
+          EDIT,
+          UPDATE,
+          CHANGE,
+          DELETE,
+          REMOVE,
+          START,
+          END,
+          TERMINATE,
+          ARCHIVE
+        )
+      }
+
+      private val usage =
+        s"$${sender} Usage: !poll (${Actions.ALL_POLL_ACTIONS.mkString("|")}) (alias) (timeInSeconds|nextAlias|\"Question\") (\"Answer 1\")..."
+      private val syntax =
+        s"$${sender}, invalid syntax. Use the \" character to surround the question and the answers."
+
+      private val afterActionAddEditRegex: Regex =
+        "(\\S+)\\s+(\\\"[^\\\"]*\\\")\\s+(((\\\"[^\\\"]*\\\")\\s*)+)".r
+
+      override val getCommandResponse: (
+          TwitchCommandsService.RespondToCommand,
+          List[String],
+          String,
+          ActorRef[TwitchChatbot.Command]
+      ) => Unit = (cmd, chatters, strParameters, _) => {
+        val broadcasterId = cmd.chatbotParams.broadcaster.id
+        val isModerator = cmd.chatbotParams.users.keySet
+          .contains(cmd.e.chatterUserId) && cmd.chatbotParams
+          .users(cmd.e.chatterUserId)
+          .flags
+          .contains(TwitchChatbot.UserFlag.Mod)
+
+        if (cmd.e.chatterUserId != broadcasterId && !isModerator) {
+          ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+            cmd,
+            chatters,
+            Some(s"$${sender}, You do not have permission to use this command.")
+          )
+        } else {
+          val actionEnd = strParameters.indexOf(' ')
+          val (action, afterAction) = {
+            if (actionEnd == -1 && strParameters.isEmpty) (Actions.HELP, "")
+            else if (actionEnd == -1) (strParameters, "")
+            else
+              (
+                strParameters.substring(0, actionEnd).toLowerCase(),
+                strParameters.substring(actionEnd).trim
+              )
+          }
+          ctx.log.debug(
+            s"!poll strParameters = $strParameters | action = $action, afterAction = $afterAction"
+          )
+          val channelName = cmd.chatbotParams.broadcaster.login
+          action match {
+            case Actions.HELP =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(usage)
+              )
+
+            case Actions.ADD | Actions.CREATE =>
+              afterAction match {
+                case afterActionAddEditRegex(
+                      alias,
+                      questionQuote,
+                      answersQuotes,
+                      _,
+                      _
+                    ) =>
+                  val question =
+                    questionQuote.substring(1, questionQuote.length - 1)
+                  val answers =
+                    answersQuotes.split('\"').filter(_.trim.nonEmpty)
+                  val newPoll = Polls.Poll(
+                    scala.Predef.Set(alias),
+                    question,
+                    answers.toSet
+                  )
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    PollsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendPollsRepositoryCommand(
+                        PollsRepository.AddPoll(
+                          ref,
+                          broadcasterId,
+                          newPoll
+                        )
+                      )
+                  ) {
+                    case Success(PollsRepository.Acknowledged) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the poll '$alias' was successfully added."
+                        )
+                      )
+                    case Failure(ex) =>
+                      ctx.log.error(
+                        "There was an exception when waiting for response from polls repository when asked to add a poll {} to channel {}",
+                        newPoll,
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the poll '$alias' was added... $problemDiscord"
+                        )
+                      )
+                  }
+
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(syntax)
+                  )
+              }
+            case Actions.ALIAS =>
+              afterAction.trim.split(' ') match {
+                case Array(currentAlias, anotherAlias) =>
+                  cmd.chatbotParams.polls.polls
+                    .find(_._2.aliases.contains(currentAlias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the poll with alias '$currentAlias' was not found."
+                        )
+                      )
+
+                    case Some(oldPoll) =>
+                      ctx.ask[
+                        ArchieMateMediator.Command,
+                        PollsRepository.Acknowledged.type
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendPollsRepositoryCommand(
+                            PollsRepository.EditPoll(
+                              ref,
+                              broadcasterId,
+                              oldPoll._1,
+                              oldPoll._2.copy(aliases =
+                                oldPoll._2.aliases + anotherAlias
+                              )
+                            )
+                          )
+                      ) {
+                        case Success(PollsRepository.Acknowledged) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the poll with alias '$currentAlias' had another alias '$anotherAlias' added to it."
+                            )
+                          )
+
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for polls repository to update poll {} to also contain alias {} in channel {}.",
+                            oldPoll,
+                            anotherAlias,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the poll with alias '$currentAlias' had another alias '$anotherAlias' added to it... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, the syntax was not correct. Alias expects current alias and a new alias - both should be one word."
+                    )
+                  )
+              }
+            case Actions.EDIT | Actions.CHANGE | Actions.UPDATE =>
+              afterAction match {
+                case afterActionAddEditRegex(
+                      alias,
+                      questionQuote,
+                      answersQuotes,
+                      _,
+                      _
+                    ) =>
+                  val question =
+                    questionQuote.substring(1, questionQuote.length - 1)
+                  val answers =
+                    answersQuotes.split('\"').filter(_.trim.nonEmpty)
+                  val editedPoll = Polls.Poll(
+                    scala.Predef.Set(alias),
+                    question,
+                    answers.toSet
+                  )
+                  cmd.chatbotParams.polls.polls
+                    .find(_._2.aliases.contains(alias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the poll with alias '$alias' was not found.'"
+                        )
+                      )
+                    case Some(oldPoll) =>
+                      ctx.ask[
+                        ArchieMateMediator.Command,
+                        PollsRepository.Acknowledged.type
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendPollsRepositoryCommand(
+                            PollsRepository.EditPoll(
+                              ref,
+                              broadcasterId,
+                              oldPoll._1,
+                              editedPoll
+                            )
+                          )
+                      ) {
+                        case Success(PollsRepository.Acknowledged) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the poll '$alias' was successfully edited."
+                            )
+                          )
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for response from polls repository when asked to edit a poll {} to {} in channel {}",
+                            oldPoll,
+                            editedPoll,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the poll '$alias' was edited... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(syntax)
+                  )
+              }
+            case Actions.DELETE | Actions.REMOVE =>
+              val alias = afterAction.trim
+              if (alias.isEmpty) {
+                ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                  cmd,
+                  chatters,
+                  Some(
+                    s"$${sender}, You did not specify the alias for the poll to be deleted."
+                  )
+                )
+              } else {
+                cmd.chatbotParams.polls.polls
+                  .find(_._2.aliases.contains(alias)) match {
+                  case None =>
+                    ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, the poll with alias '$alias' was not found.'"
+                      )
+                    )
+                  case Some(oldPoll) =>
+                    ctx.ask[
+                      ArchieMateMediator.Command,
+                      PollsRepository.Acknowledged.type
+                    ](
+                      mediator,
+                      ref =>
+                        ArchieMateMediator.SendPollsRepositoryCommand(
+                          PollsRepository
+                            .DeletePoll(ref, broadcasterId, oldPoll._1)
+                        )
+                    ) {
+                      case Success(PollsRepository.Acknowledged) =>
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender}, the poll '$alias' was successfully deleted."
+                          )
+                        )
+
+                      case Failure(ex) =>
+                        ctx.log.error(
+                          "There was an exception when waiting for polls repository to delete command {} in channel {}.",
+                          oldPoll,
+                          channelName,
+                          ex
+                        )
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender, I cannot confirm the poll '$alias' was deleted... $problemDiscord"
+                          )
+                        )
+                    }
+                }
+              }
+            case Actions.START =>
+              val afterAlias = afterAction.indexOf(' ')
+              val alias = afterAction.substring(0, afterAlias).trim
+              afterAction.substring(afterAlias).trim.toIntOption match {
+                case None =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, invalid syntax: expected number of seconds after alias."
+                    )
+                  )
+
+                case Some(durationSeconds) =>
+                  cmd.chatbotParams.polls.polls
+                    .find(_._2.aliases.contains(alias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, there are no polls with alias '$alias'."
+                        )
+                      )
+
+                    case Some((pollId, poll)) =>
+                      ctx.askWithStatus[
+                        ArchieMateMediator.Command,
+                        TwitchApiResponse.CreateOrEndPoll
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendTwitchApiClientCommand(
+                            TwitchApiClient.CreatePoll(
+                              ref,
+                              cmd.chatbotParams.tokenId,
+                              broadcasterId,
+                              poll.question,
+                              poll.choices,
+                              durationSeconds
+                            )
+                          )
+                      ) {
+                        case Success(_) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the poll '$alias' was successfully started."
+                            )
+                          )
+
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for twitch api client to start poll {} in channel {}.",
+                            poll,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the poll '$alias' was started... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+              }
+            case endAction if Actions.ALL_ENDS.contains(endAction) =>
+              cmd.chatbotParams.currentPoll match {
+                case None =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(s"$${sender}, there is no poll to end.")
+                  )
+
+                case Some(poll) =>
+                  val withoutTrace = endAction == Actions.ARCHIVE
+                  ctx.askWithStatus[
+                    ArchieMateMediator.Command,
+                    TwitchApiResponse.CreateOrEndPoll
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendTwitchApiClientCommand(
+                        TwitchApiClient.EndPoll(
+                          ref,
+                          cmd.chatbotParams.tokenId,
+                          broadcasterId,
+                          poll.id,
+                          withoutTrace
+                        )
+                      )
+                  ) {
+                    case Success(_) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the current poll was successfully ended."
+                        )
+                      )
+
+                    case Failure(ex) =>
+                      ctx.log.error(
+                        "There was an exception when waiting for twitch api client to end poll {} in channel {}.",
+                        poll,
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the current poll was ended... $problemDiscord"
+                        )
+                      )
+                  }
+              }
+          }
+        }
+      }
+    }
+
     val builtInCommands: Map[String, BuiltInCommand] = Map(
       Command.name -> Command,
       Commands.name -> Commands,
@@ -2121,17 +2666,28 @@ class TwitchCommandsService(using
 
             allGreetsUserId.foreach { userId =>
               val optionFollower = chatbotParams.followers.get(userId)
-              val optionFollowerUser = optionFollower.map(follower => TwitchApi.User(follower.user_id, follower.user_login, follower.user_name))
-              val optionFollowerUserState = optionFollowerUser.map(TwitchChatbot.UserState(_))
-              val optionUserState = chatbotParams.users.get(userId).orElse(optionFollowerUserState)
+              val optionFollowerUser = optionFollower.map(follower =>
+                TwitchApi.User(
+                  follower.user_id,
+                  follower.user_login,
+                  follower.user_name
+                )
+              )
+              val optionFollowerUserState =
+                optionFollowerUser.map(TwitchChatbot.UserState(_))
+              val optionUserState =
+                chatbotParams.users.get(userId).orElse(optionFollowerUserState)
               optionUserState match {
                 case Some(userState) =>
                   val (greet, name) = getGreetAndName(
                     userState,
                     knownGreetsSettings
                   )
-                  val finalGreet = greet.replaceAll("user".asVariableRegex, name)
-                  chatbotParams.ircListener ! IRCListener.SendMessage(finalGreet)
+                  val finalGreet =
+                    greet.replaceAll("user".asVariableRegex, name)
+                  chatbotParams.ircListener ! IRCListener.SendMessage(
+                    finalGreet
+                  )
                 case None =>
               }
             }
@@ -2157,7 +2713,9 @@ class TwitchCommandsService(using
         userState
       ) || isSub(userState))
     case KnownGreetsMode.ModsVipsSubsFollows =>
-      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(userState) || isSub(userState) || isFollower(userState, followers))
+      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
+        userState
+      ) || isSub(userState) || isFollower(userState, followers))
   }
 
   private def isBroadcaster(

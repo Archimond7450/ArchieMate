@@ -11,4 +11,6 @@ object SerializerIDs {
   val overlaysSettingsRepositoryId: Int = 204
   val timersSettingsRepositoryId: Int = 205
   val variablesSettingsRepositoryId: Int = 206
+
+  val pollsRepositoryId: Int = 300
 }
