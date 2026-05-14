@@ -127,35 +127,32 @@ object PollsRepository {
       )
     }
 
-  private def commandHandler(using
-      mediator: ActorRef[ArchieMateMediator.Command]
-  ): (State, Command) => ReplyEffect[Event, State] = (state, command) =>
-    command match {
-      case GetPolls(replyTo, twitchRoomId) =>
-        Effect.none.thenReply(replyTo)(
-          _.twitchRoomIdToPolls.getOrElse(twitchRoomId, ChannelPolls())
-        )
+  private val commandHandler: (State, Command) => ReplyEffect[Event, State] =
+    (state, command) =>
+      command match {
+        case GetPolls(replyTo, twitchRoomId) =>
+          Effect.none.thenReply(replyTo)(
+            _.twitchRoomIdToPolls.getOrElse(twitchRoomId, ChannelPolls())
+          )
 
-      case AddPoll(replyTo, twitchRoomId, poll) =>
-        Effect
-          .persist(PollAdded(twitchRoomId, poll))
-          .thenRun(newStateSender(twitchRoomId))
-          .thenReply(replyTo)(_ => Acknowledged)
+        case AddPoll(replyTo, twitchRoomId, poll) =>
+          Effect
+            .persist(PollAdded(twitchRoomId, poll))
+            .thenReply(replyTo)(_ => Acknowledged)
 
-      case EditPoll(replyTo, twitchRoomId, pollId, poll) =>
-        Effect
-          .persist(PollEdited(twitchRoomId, pollId, poll))
-          .thenRun(newStateSender(twitchRoomId))
-          .thenReply(replyTo)(_ => Acknowledged)
+        case EditPoll(replyTo, twitchRoomId, pollId, poll) =>
+          Effect
+            .persist(PollEdited(twitchRoomId, pollId, poll))
+            .thenReply(replyTo)(_ => Acknowledged)
 
-      case DeletePoll(replyTo, twitchRoomId, pollId) =>
-        Effect
-          .persist(PollDeleted(twitchRoomId, pollId))
-          .thenRun(newStateSender(twitchRoomId))
-          .thenReply(replyTo)(_ => Acknowledged)
-    }
+        case DeletePoll(replyTo, twitchRoomId, pollId) =>
+          Effect
+            .persist(PollDeleted(twitchRoomId, pollId))
+            .thenReply(replyTo)(_ => Acknowledged)
+      }
 
   private def eventHandler(using
+      mediator: ActorRef[ArchieMateMediator.Command],
       randomProvider: RandomProvider
   ): (State, Event) => State = (state, event) =>
     val (twitchRoomId, newPolls) = event match {
@@ -180,7 +177,9 @@ object PollsRepository {
           getTwitchRoomPolls(state, twitchRoomId).withDeletedPoll(pollId)
         )
     }
-    State(state.twitchRoomIdToPolls + (twitchRoomId -> newPolls))
+    val newState = State(state.twitchRoomIdToPolls + (twitchRoomId -> newPolls))
+    newStateSender(twitchRoomId)(newState)
+    newState
 
   private def getTwitchRoomPolls(
       state: State,
