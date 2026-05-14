@@ -1328,8 +1328,8 @@ class TwitchChatbot(twitchRoomId: String)(using
                     bitsVotes = None
                   )
                 ),
-              bitsVotingEnabled = e.bitsVoting.isEnabled,
-              bitsPerVote = e.bitsVoting.amountPerVote,
+              bitsVotingEnabled = Some(e.bitsVoting.isEnabled),
+              bitsPerVote = Some(e.bitsVoting.amountPerVote),
               channelPointsVotingEnabled = e.channelPointsVoting.isEnabled,
               channelPointsPerVote = e.channelPointsVoting.amountPerVote,
               status = "ACTIVE",
