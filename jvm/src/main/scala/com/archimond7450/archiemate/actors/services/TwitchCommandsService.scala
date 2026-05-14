@@ -2532,7 +2532,8 @@ class TwitchCommandsService(using
       Uptime.name -> (_.uptime),
       Followage.name -> (_.followage),
       Afk.name -> (_.afk),
-      Greets.name -> (_.greets)
+      Greets.name -> (_.greets),
+      Poll.name -> (_.poll)
     )
   }
 
