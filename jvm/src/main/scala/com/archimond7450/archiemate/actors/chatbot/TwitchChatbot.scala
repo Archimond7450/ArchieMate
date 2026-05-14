@@ -1325,7 +1325,7 @@ class TwitchChatbot(twitchRoomId: String)(using
                     title = choice.title,
                     votes = 0,
                     channelPointsVotes = 0,
-                    bitsVotes = 0
+                    bitsVotes = None
                   )
                 ),
               bitsVotingEnabled = e.bitsVoting.isEnabled,
@@ -1351,7 +1351,7 @@ class TwitchChatbot(twitchRoomId: String)(using
                 title = choice.title,
                 votes = choice.votes,
                 channelPointsVotes = choice.channelPointsVotes,
-                bitsVotes = choice.bitsVotes
+                bitsVotes = Some(choice.bitsVotes)
               )
             )
           )

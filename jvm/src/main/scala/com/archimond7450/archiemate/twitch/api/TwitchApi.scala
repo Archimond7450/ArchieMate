@@ -143,7 +143,7 @@ object TwitchApi {
       title: String,
       votes: Int,
       channelPointsVotes: Int,
-      bitsVotes: Int
+      bitsVotes: Option[Int]
   )
   object PollChoice {
     given Decoder[PollChoice] = ConfiguredDecoder.derived
