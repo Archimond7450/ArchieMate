@@ -2517,7 +2517,8 @@ class TwitchCommandsService(using
       Uptime.name -> Uptime,
       Followage.name -> Followage,
       Afk.name -> Afk,
-      Greets.name -> Greets
+      Greets.name -> Greets,
+      Poll.name -> Poll
     )
 
     val isBuilInCommandEnabled
