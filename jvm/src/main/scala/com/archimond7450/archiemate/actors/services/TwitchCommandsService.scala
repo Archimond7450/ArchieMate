@@ -2042,6 +2042,7 @@ class TwitchCommandsService(using
         val CHANGE = "change"
         val DELETE = "delete"
         val REMOVE = "remove"
+        val QUICK = "quick"
         val START = "start"
         val END = "end"
         val TERMINATE = "terminate"
@@ -2060,6 +2061,7 @@ class TwitchCommandsService(using
           CHANGE,
           DELETE,
           REMOVE,
+          QUICK,
           START,
           END,
           TERMINATE,
@@ -2074,6 +2076,8 @@ class TwitchCommandsService(using
 
       private val afterActionAddEditRegex: Regex =
         "(\\S+)\\s+(\\\"[^\\\"]*\\\")\\s+(((\\\"[^\\\"]*\\\")\\s*)+)".r
+      private val quickActionRegex: Regex =
+        "(\\S+)\\s+(\\\"[^\\\"]*\\\")\\s+(((\\\"[^\\\"]*\\\")\\s*)+)(\\d+)".r
 
       override val getCommandResponse: (
           TwitchCommandsService.RespondToCommand,
@@ -2383,6 +2387,68 @@ class TwitchCommandsService(using
                         )
                     }
                 }
+              }
+            case Actions.QUICK =>
+              strParameters match {
+                case quickActionRegex(
+                      alias,
+                      questionQuote,
+                      answersQuotes,
+                      _,
+                      _,
+                      durationStr
+                    ) =>
+                  val question =
+                    questionQuote.substring(1, questionQuote.length - 1)
+                  val answers =
+                    answersQuotes.split('\"').filter(_.trim.nonEmpty)
+                  ctx.askWithStatus[
+                    ArchieMateMediator.Command,
+                    TwitchApiResponse.CreateOrEndPoll
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendTwitchApiClientCommand(
+                        TwitchApiClient.CreatePoll(
+                          ref,
+                          cmd.chatbotParams.tokenId,
+                          broadcasterId,
+                          question,
+                          answers.toSet,
+                          durationStr.toInt
+                        )
+                      )
+                  ) {
+                    case Success(_) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the quick poll was successfully started."
+                        )
+                      )
+
+                    case Failure(ex) =>
+                      ctx.log.error(
+                        "There was an exception when waiting for twitch api client to start quick poll in channel {}.",
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the quick poll was started... $problemDiscord"
+                        )
+                      )
+                  }
+
+                case _ =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(usage)
+                  )
               }
             case Actions.START =>
               val afterAlias = afterAction.indexOf(' ')
