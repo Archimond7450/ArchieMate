@@ -912,6 +912,11 @@ class TwitchChatbot(twitchRoomId: String)(using
         )
       )
 
+    case TwitchChatbot.NewPolls(polls) =>
+      operational(
+        params.copy(polls = polls)
+      )
+
     case TwitchChatbot.Broadcaster(broadcaster) =>
       operational(params.copy(broadcaster = broadcaster))
 
