@@ -6,7 +6,10 @@ import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessi
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
+import com.archimond7450.archiemate.helpers.JsonHelper.{
+  decodeOrThrow,
+  decodeToTry
+}
 import com.archimond7450.archiemate.twitch.api.{
   TwitchApiRequest,
   TwitchApiResponse
@@ -228,6 +231,53 @@ object TwitchApiClient {
       withoutTrace: Boolean = false
   ) extends PublicCommand
 
+  final case class GetPredictions(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.GetPredictions]],
+      tokenId: String,
+      roomId: String,
+      cursor: Option[String] = None
+  ) extends PublicCommand
+
+  final case class CreatePrediction(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPrediction]],
+      tokenId: String,
+      roomId: String,
+      title: String,
+      outcomes: Set[String],
+      predictionWindow: Int
+  ) extends PublicCommand
+
+  final case class ResolvePrediction(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPrediction]],
+      tokenId: String,
+      roomId: String,
+      predictionId: String,
+      winningOutcomeId: String
+  ) extends Command
+
+  final case class CancelPrediction(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPrediction]],
+      tokenId: String,
+      roomId: String,
+      predictionId: String
+  ) extends Command
+
+  final case class LockPrediction(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPrediction]],
+      tokenId: String,
+      roomId: String,
+      predictionId: String
+  ) extends Command
+
+  private final case class EndPrediction(
+      replyTo: ActorRef[StatusReply[TwitchApiResponse.CreateOrEndPrediction]],
+      tokenId: String,
+      roomId: String,
+      predictionId: String,
+      status: String,
+      winningOutcomeId: Option[String] = None
+  ) extends PublicCommand
+
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
   ): Behavior[Command] = Behaviors
@@ -354,6 +404,30 @@ class TwitchApiClient(using
 
     case cmd: EndPoll =>
       processEndPoll(cmd)
+      Behaviors.same
+
+    case cmd: GetPredictions =>
+      processGetPredictions(cmd)
+      Behaviors.same
+
+    case cmd: CreatePrediction =>
+      processCreatePrediction(cmd)
+      Behaviors.same
+
+    case cmd: ResolvePrediction =>
+      processResolvePrediction(cmd)
+      Behaviors.same
+
+    case cmd: CancelPrediction =>
+      processCancelPrediction(cmd)
+      Behaviors.same
+
+    case cmd: LockPrediction =>
+      processLockPrediction(cmd)
+      Behaviors.same
+
+    case cmd: EndPrediction =>
+      processEndPrediction(cmd)
       Behaviors.same
   }
 
@@ -567,6 +641,21 @@ class TwitchApiClient(using
         cmd.replyTo ! tryResponseToStatusReply(
           decodeResponse[TwitchApiResponse.CreateOrEndPoll](json)
         )
+
+      case cmd: GetPredictions =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.GetPredictions](json)
+        )
+
+      case cmd: CreatePrediction =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.CreateOrEndPrediction](json)
+        )
+
+      case cmd: EndPrediction =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[TwitchApiResponse.CreateOrEndPrediction](json)
+        )
     }
   }
 
@@ -636,6 +725,15 @@ class TwitchApiClient(using
         cmd.replyTo ! StatusReply.error(resp.cause)
 
       case cmd: EndPoll =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetPredictions =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: CreatePrediction =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: EndPrediction =>
         cmd.replyTo ! StatusReply.error(resp.cause)
     }
   }
@@ -1072,6 +1170,104 @@ class TwitchApiClient(using
             broadcasterId = cmd.roomId,
             id = cmd.pollId,
             status = if (cmd.withoutTrace) "ARCHIVED" else "TERMINATED"
+          )
+          .asJson
+          .noSpaces
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processGetPredictions(cmd: GetPredictions): Unit = {
+    ctx.log.debug("processGetPredictions(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = addCursor(
+        uri = Uri("https://api.twitch.tv/helix/predictions"),
+        query = Query(Map("broadcaster_id" -> cmd.roomId, "first" -> "25")),
+        cursor = cmd.cursor
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processCreatePrediction(cmd: CreatePrediction): Unit = {
+    ctx.log.debug("processCreatePrediction(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.POST,
+      uri = Uri("https://api.twitch.tv/helix/predictions"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        TwitchApiRequest
+          .CreatePredictionRequestData(
+            broadcasterId = cmd.roomId,
+            title = cmd.title,
+            outcomes =
+              cmd.outcomes.map(TwitchApiRequest.PredictionOutcome.apply).toList,
+            predictionWindow = cmd.predictionWindow
+          )
+          .asJson
+          .noSpaces
+      )
+    )
+  }
+
+  private def processResolvePrediction(cmd: ResolvePrediction): Unit = {
+    ctx.log.debug("processResolvePrediction(cmd: {})", cmd)
+
+    ctx.self ! EndPrediction(
+      replyTo = cmd.replyTo,
+      tokenId = cmd.tokenId,
+      roomId = cmd.roomId,
+      predictionId = cmd.predictionId,
+      status = "RESOLVED",
+      winningOutcomeId = Some(cmd.winningOutcomeId)
+    )
+  }
+
+  private def processCancelPrediction(cmd: CancelPrediction): Unit = {
+    ctx.log.debug("processCancelPrediction(cmd: {})", cmd)
+
+    ctx.self ! EndPrediction(
+      replyTo = cmd.replyTo,
+      tokenId = cmd.tokenId,
+      roomId = cmd.roomId,
+      predictionId = cmd.predictionId,
+      status = "CANCELED"
+    )
+  }
+
+  private def processLockPrediction(cmd: LockPrediction): Unit = {
+    ctx.log.debug("processLockPrediction(cmd: {})", cmd)
+
+    ctx.self ! EndPrediction(
+      replyTo = cmd.replyTo,
+      tokenId = cmd.tokenId,
+      roomId = cmd.roomId,
+      predictionId = cmd.predictionId,
+      status = "LOCKED"
+    )
+  }
+
+  private def processEndPrediction(cmd: EndPrediction): Unit = {
+    ctx.log.debug("processEndPrediction(cmd: {})", cmd)
+
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.PATCH,
+      uri = Uri("https://api.twitch.tv/helix/predictions"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        TwitchApiRequest
+          .EndPredictionRequestData(
+            broadcasterId = cmd.roomId,
+            id = cmd.predictionId,
+            status = cmd.status,
+            winningOutcomeId = cmd.winningOutcomeId
           )
           .asJson
           .noSpaces

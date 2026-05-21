@@ -12,6 +12,7 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
   CommandsSettingsRepository,
   OverlaysSettingsRepository,
   PollsRepository,
+  PredictionsRepository,
   TimersSettingsRepository,
   VariablesSettingsRepository
 }
@@ -81,6 +82,9 @@ object ArchieMateMediator {
   ) extends Command
   final case class SendPollsRepositoryCommand(
       cmd: PollsRepository.Command
+  ) extends Command
+  final case class SendPredictionsRepositoryCommand(
+      cmd: PredictionsRepository.Command
   ) extends Command
   final case class SendTwitchTokenUserCacheServiceCommand(
       cmd: TwitchTokenUserCacheService.Command
@@ -161,6 +165,7 @@ final class ArchieMateMediator(using
         VariablesSettingsRepository.Command
       ],
       pollsRepository: ActorRef[PollsRepository.Command],
+      predictionsRepository: ActorRef[PredictionsRepository.Command],
       twitchTokenUserCacheService: ActorRef[
         TwitchTokenUserCacheService.Command
       ],
@@ -230,6 +235,8 @@ final class ArchieMateMediator(using
         VariablesSettingsRepository.actorName
       ),
       pollsRepository = ctx.spawn(PollsRepository(), PollsRepository.actorName),
+      predictionsRepository =
+        ctx.spawn(PredictionsRepository(), PredictionsRepository.actorName),
       twitchTokenUserCacheService = ctx.spawn(
         TwitchTokenUserCacheService(),
         TwitchTokenUserCacheService.actorName
@@ -314,6 +321,10 @@ final class ArchieMateMediator(using
 
     case SendPollsRepositoryCommand(cmd) =>
       state.pollsRepository ! cmd
+      Behaviors.same
+
+    case SendPredictionsRepositoryCommand(cmd) =>
+      state.predictionsRepository ! cmd
       Behaviors.same
 
     case SendTwitchTokenUserCacheServiceCommand(cmd) =>

@@ -11,6 +11,7 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
   CommandsSettingsRepository,
   OverlaysSettingsRepository,
   PollsRepository,
+  PredictionsRepository,
   TimersSettingsRepository,
   VariablesSettingsRepository
 }
@@ -43,6 +44,7 @@ import com.archimond7450.archiemate.http.ChannelSettings.{
   Settings as ChannelSettings
 }
 import com.archimond7450.archiemate.http.Polls.ChannelPolls
+import com.archimond7450.archiemate.http.Predictions.ChannelPredictions
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.{
@@ -94,6 +96,8 @@ object TwitchChatbot {
       settings: AutomaticMessagesSettings
   ) extends Command
   final case class NewPolls(polls: ChannelPolls) extends Command
+  final case class NewPredictions(predictions: ChannelPredictions)
+      extends Command
   final case class Broadcaster(broadcaster: GetTokenUser) extends Command
   private final case class FailedToGetSettings(ex: Throwable) extends Command
   final case class Mods(mods: Option[GetModerators]) extends Command
@@ -106,6 +110,9 @@ object TwitchChatbot {
       extends Command // TODO: Change outer Option to Try
   final case class PollHistory(polls: Option[List[TwitchApi.Poll]])
       extends Command
+  final case class PredictionHistory(
+      predictions: Option[List[TwitchApi.Prediction]]
+  ) extends Command
   final case class EventSubEvent(event: eventsub.Event) extends Command
   final case class Afk(chatterUserId: String) extends Command
   private case object ChattersTimer extends Command
@@ -135,6 +142,8 @@ object TwitchChatbot {
       channelSettings: ChannelSettings,
       polls: ChannelPolls,
       currentPoll: Option[TwitchApi.Poll],
+      predictions: ChannelPredictions,
+      currentPrediction: Option[TwitchApi.Prediction],
       broadcaster: GetTokenUser,
       eventSubListener: ActorRef[EventSubListener.Command],
       ircListener: ActorRef[IRCListener.Command],
@@ -198,6 +207,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       overlaysSettingsOption: Option[OverlaysSettings] = None,
       automaticMessagesSettingsOption: Option[AutomaticMessagesSettings] = None,
       polls: Option[ChannelPolls] = None,
+      predictions: Option[ChannelPredictions] = None,
       broadcasterOption: Option[GetTokenUser] = None
   )
 
@@ -336,6 +346,19 @@ class TwitchChatbot(twitchRoomId: String)(using
             TwitchChatbot.FailedToGetSettings(ex)
         }
 
+        ctx.ask[ArchieMateMediator.Command, ChannelPredictions](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendPredictionsRepositoryCommand(
+              PredictionsRepository.GetPredictions(ref, params.twitchRoomId)
+            )
+        ) {
+          case Success(predictions) =>
+            TwitchChatbot.NewPredictions(predictions)
+          case Failure(ex) =>
+            TwitchChatbot.FailedToGetSettings(ex)
+        }
+
         ctx.askWithStatus[
           ArchieMateMediator.Command,
           TwitchApiResponse.GetTokenUser
@@ -385,6 +408,7 @@ class TwitchChatbot(twitchRoomId: String)(using
     params.overlaysSettingsOption,
     params.automaticMessagesSettingsOption,
     params.polls,
+    params.predictions,
     params.broadcasterOption
   ) match {
     case (
@@ -397,6 +421,7 @@ class TwitchChatbot(twitchRoomId: String)(using
           Some(overlaysSettings),
           Some(automaticMessagesSettings),
           Some(polls),
+          Some(predictions),
           Some(broadcaster)
         ) =>
       withSettings(
@@ -411,6 +436,7 @@ class TwitchChatbot(twitchRoomId: String)(using
           automaticMessagesSettings
         ),
         polls,
+        predictions,
         broadcaster
       )
 
@@ -442,6 +468,9 @@ class TwitchChatbot(twitchRoomId: String)(using
         case TwitchChatbot.NewPolls(polls) =>
           initial2(params.copy(polls = Some(polls)))
 
+        case TwitchChatbot.NewPredictions(predictions) =>
+          initial2(params.copy(predictions = Some(predictions)))
+
         case TwitchChatbot.Broadcaster(broadcaster) =>
           initial2(params.copy(broadcasterOption = Some(broadcaster)))
 
@@ -462,6 +491,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       tokenId: String,
       channelSettings: ChannelSettings,
       polls: ChannelPolls,
+      predictions: ChannelPredictions,
       broadcaster: GetTokenUser
   ): Behavior[TwitchChatbot.Command] = {
     val eventSubListener = ctx.spawn(
@@ -484,12 +514,14 @@ class TwitchChatbot(twitchRoomId: String)(using
     askForChatters(tokenId, broadcaster)
     askForStream(tokenId, broadcaster)
     askForPollsHistory(tokenId, broadcaster)
+    askForPredictionsHistory(tokenId, broadcaster)
 
     initializing(
       InitializingParameters(
         tokenId,
         channelSettings,
         polls,
+        predictions,
         broadcaster,
         eventSubListener,
         ircListener
@@ -501,6 +533,7 @@ class TwitchChatbot(twitchRoomId: String)(using
       tokenId: String,
       channelSettings: ChannelSettings,
       polls: ChannelPolls,
+      predictions: ChannelPredictions,
       broadcaster: GetTokenUser,
       eventSubListener: ActorRef[EventSubListener.Command],
       ircListener: ActorRef[IRCListener.Command],
@@ -510,14 +543,15 @@ class TwitchChatbot(twitchRoomId: String)(using
       followers: Option[GetChannelFollowers] = None,
       chatters: Option[GetChatters] = None,
       stream: Option[Option[TwitchApi.Stream]] = None,
-      pollHistory: Option[List[TwitchApi.Poll]] = None
+      pollHistory: Option[List[TwitchApi.Poll]] = None,
+      predictionHistory: Option[List[TwitchApi.Prediction]] = None
   )
 
   private def initializing(
       params: InitializingParameters
   ): Behavior[TwitchChatbot.Command] = {
     if (
-      params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.followers.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty
+      params.mods.nonEmpty && params.vips.nonEmpty && params.subs.nonEmpty && params.followers.nonEmpty && params.chatters.nonEmpty && params.stream.nonEmpty && params.pollHistory.nonEmpty && params.predictionHistory.nonEmpty
     ) {
       supervisor ! TwitchChatbotsSupervisor.JoinOK(params.broadcaster.id)
 
@@ -571,6 +605,10 @@ class TwitchChatbot(twitchRoomId: String)(using
             params.channelSettings,
             params.polls,
             params.pollHistory.get.find(_.status == "ACTIVE"),
+            params.predictions,
+            params.predictionHistory.get.find(prediction =>
+              prediction.status == "ACTIVE" || prediction.status == "LOCKED"
+            ),
             params.broadcaster,
             params.eventSubListener,
             params.ircListener,
@@ -604,10 +642,14 @@ class TwitchChatbot(twitchRoomId: String)(using
         case TwitchChatbot.PollHistory(Some(polls)) =>
           initializing(params.copy(pollHistory = Some(polls)))
 
+        case TwitchChatbot.PredictionHistory(Some(predictions)) =>
+          initializing(params.copy(predictionHistory = Some(predictions)))
+
         case TwitchChatbot.Mods(None) | TwitchChatbot.VIPs(None) |
             TwitchChatbot.Subs(None) | TwitchChatbot.Followers(None) |
             TwitchChatbot.Chatters(None) | TwitchChatbot.Stream(None) |
-            TwitchChatbot.PollHistory(None) =>
+            TwitchChatbot.PollHistory(None) |
+            TwitchChatbot.PredictionHistory(None) =>
           supervisor ! TwitchChatbotsSupervisor.AuthorizationNeeded(
             params.broadcaster.id
           )
@@ -917,6 +959,11 @@ class TwitchChatbot(twitchRoomId: String)(using
     case TwitchChatbot.NewPolls(polls) =>
       operational(
         params.copy(polls = polls)
+      )
+
+    case TwitchChatbot.NewPredictions(predictions) =>
+      operational(
+        params.copy(predictions = predictions)
       )
 
     case TwitchChatbot.Broadcaster(broadcaster) =>
@@ -1380,19 +1427,112 @@ class TwitchChatbot(twitchRoomId: String)(using
       )
       operational(params = params.copy(currentPoll = None))
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionBeginEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPredictionBeginEvent) =>
+      operational(params =
+        params.copy(currentPrediction =
+          Some(
+            TwitchApi.Prediction(
+              id = e.id,
+              broadcasterId = e.broadcasterUserId,
+              broadcasterName = e.broadcasterUserName,
+              broadcasterLogin = e.broadcasterUserLogin,
+              title = e.title,
+              winningOutcomeId = None,
+              outcomes = e.outcomes.map(outcome =>
+                TwitchApi.PredictionOutcome(
+                  id = outcome.id,
+                  title = outcome.title,
+                  users = 0,
+                  channelPoints = 0,
+                  topPredictors = None,
+                  color = outcome.color
+                )
+              ),
+              predictionWindow =
+                ChronoUnit.SECONDS.between(e.locksAt, e.startedAt).toInt,
+              status = "ACTIVE",
+              createdAt = e.startedAt,
+              endedAt = None,
+              lockedAt = None
+            )
+          )
+        )
+      )
 
     case TwitchChatbot.EventSubEvent(
-          _: eventsub.ChannelPredictionProgressEvent
+          e: eventsub.ChannelPredictionProgressEvent
         ) =>
-      Behaviors.same
+      val prediction = params.currentPrediction.get
+      operational(params =
+        params.copy(currentPrediction =
+          Some(
+            prediction.copy(outcomes =
+              e.outcomes.map(outcome =>
+                TwitchApi.PredictionOutcome(
+                  id = outcome.id,
+                  title = outcome.title,
+                  users = outcome.users,
+                  channelPoints = outcome.channelPoints,
+                  topPredictors = Some(
+                    outcome.topPredictors.map(prediction =>
+                      TwitchApi.UserPrediction(
+                        userId = prediction.userId,
+                        userName = prediction.userName,
+                        userLogin = prediction.userLogin,
+                        channelPointsUsed = prediction.channelPointsUsed,
+                        channelPointsWon = prediction.channelPointsWon
+                      )
+                    )
+                  ),
+                  color = outcome.color
+                )
+              )
+            )
+          )
+        )
+      )
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionLockEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPredictionLockEvent) =>
+      val prediction = params.currentPrediction.get
+      operational(params =
+        params.copy(currentPrediction =
+          Some(
+            prediction.copy(
+              outcomes = e.outcomes.map(outcome =>
+                TwitchApi.PredictionOutcome(
+                  id = outcome.id,
+                  title = outcome.title,
+                  users = outcome.users,
+                  channelPoints = outcome.channelPoints,
+                  topPredictors = Some(
+                    outcome.topPredictors.map(prediction =>
+                      TwitchApi.UserPrediction(
+                        userId = prediction.userId,
+                        userName = prediction.userName,
+                        userLogin = prediction.userLogin,
+                        channelPointsUsed = prediction.channelPointsUsed,
+                        channelPointsWon = prediction.channelPointsWon
+                      )
+                    )
+                  ),
+                  color = outcome.color
+                )
+              ),
+              status = "LOCKED",
+              lockedAt = Some(e.lockedAt)
+            )
+          )
+        )
+      )
 
-    case TwitchChatbot.EventSubEvent(_: eventsub.ChannelPredictionEndEvent) =>
-      Behaviors.same
+    case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPredictionEndEvent) =>
+      e.outcomes.find(_.id == e.winningOutcomeId) match {
+        case None =>
+          ctx.log.error("Invalid prediction end event {}: Winning outcome id does not match any outcomes.", e)
+        case Some(outcome) =>
+          IRCListener.SendMessage(s"Prediction ended! Winning outcome was \"${outcome.title}\".")
+      }
+      operational(params = params.copy(currentPrediction = None))
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelVIPAddEvent) =>
       ctx.log.debug("User {} added as a new VIP", e.userName)
@@ -1734,6 +1874,35 @@ class TwitchChatbot(twitchRoomId: String)(using
           ex
         )
         TwitchChatbot.PollHistory(None)
+    }
+  }
+
+  private def askForPredictionsHistory(
+      tokenId: String,
+      broadcaster: GetTokenUser
+  ): Unit = {
+    ctx.askWithStatus[
+      ArchieMateMediator.Command,
+      TwitchApiResponse.GetPredictions
+    ](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiPaginationHandlerServiceCommand(
+          TwitchApiPaginationHandlerService.GetPredictions(
+            TwitchApiClient.GetPredictions(ref, tokenId, broadcaster.id)
+          )
+        )
+    ) {
+      case Success(TwitchApiResponse.GetPredictions(predictions, _)) =>
+        TwitchChatbot.PredictionHistory(Some(predictions))
+
+      case Failure(ex) =>
+        ctx.log.error(
+          "Could not retrieve channel {} prediction history",
+          broadcaster.login,
+          ex
+        )
+        TwitchChatbot.PredictionHistory(None)
     }
   }
 }

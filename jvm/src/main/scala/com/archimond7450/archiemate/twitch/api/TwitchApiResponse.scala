@@ -229,4 +229,20 @@ object TwitchApiResponse {
     given Decoder[CreateOrEndPoll] = ConfiguredDecoder.derived
     given Encoder[CreateOrEndPoll] = ConfiguredEncoder.derived
   }
+
+  final case class GetPredictions(
+      data: List[TwitchApi.Prediction],
+      pagination: TwitchApi.Pagination
+  ) extends TwitchApiResponse
+  object GetPredictions {
+    given Decoder[GetPredictions] = ConfiguredDecoder.derived
+    given Encoder[GetPredictions] = ConfiguredEncoder.derived
+  }
+
+  final case class CreateOrEndPrediction(data: List[TwitchApi.Prediction])
+      extends TwitchApiResponse
+  object CreateOrEndPrediction {
+    given Decoder[CreateOrEndPrediction] = ConfiguredDecoder.derived
+    given Encoder[CreateOrEndPrediction] = ConfiguredEncoder.derived
+  }
 }

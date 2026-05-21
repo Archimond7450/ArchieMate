@@ -28,6 +28,8 @@ object TwitchApiPaginationHandlerService {
   final case class GetStream(clientCmd: TwitchApiClient.GetStream)
       extends Command
   final case class GetPolls(clientCmd: TwitchApiClient.GetPolls) extends Command
+  final case class GetPredictions(clientCmd: TwitchApiClient.GetPredictions)
+      extends Command
 
   private final case class ChattersResponse(
       cmd: GetChatters,
@@ -56,6 +58,10 @@ object TwitchApiPaginationHandlerService {
   private final case class PollsResponse(
       cmd: GetPolls,
       tryPolls: Try[TwitchApiResponse.GetPolls]
+  ) extends Command
+  private final case class PredictionsResponse(
+      cmd: GetPredictions,
+      tryPredictions: Try[TwitchApiResponse.GetPredictions]
   ) extends Command
 
   def apply()(using
@@ -89,7 +95,9 @@ class TwitchApiPaginationHandlerService(using
         TwitchApiResponse.GetChannelFollowers
       ]] = Map.empty,
       stream: Map[GetStream, List[TwitchApiResponse.GetStream]] = Map.empty,
-      polls: Map[GetPolls, List[TwitchApiResponse.GetPolls]] = Map.empty
+      polls: Map[GetPolls, List[TwitchApiResponse.GetPolls]] = Map.empty,
+      predictions: Map[GetPredictions, List[TwitchApiResponse.GetPredictions]] =
+        Map.empty
   )
 
   private def active(
@@ -120,6 +128,9 @@ class TwitchApiPaginationHandlerService(using
     case cmd @ GetPolls(clientCmd) =>
       askForPolls(cmd)
       active(state.copy(polls = state.polls + (cmd -> Nil)))
+    case cmd @ GetPredictions(clientCmd) =>
+      askForPredictions(cmd)
+      active(state.copy(predictions = state.predictions + (cmd -> Nil)))
     case ChattersResponse(cmd, Failure(ex)) =>
       cmd.clientCmd.replyTo ! StatusReply.error(ex)
       active(state.copy(chatters = state.chatters - cmd))
@@ -141,6 +152,9 @@ class TwitchApiPaginationHandlerService(using
     case PollsResponse(cmd, Failure(ex)) =>
       cmd.clientCmd.replyTo ! StatusReply.error(ex)
       active(state.copy(polls = state.polls - cmd))
+    case PredictionsResponse(cmd, Failure(ex)) =>
+      cmd.clientCmd.replyTo ! StatusReply.error(ex)
+      active(state.copy(predictions = state.predictions - cmd))
     case ChattersResponse(cmd, Success(chatters)) =>
       chatters.pagination.cursor match {
         case Some(cursor) =>
@@ -260,6 +274,25 @@ class TwitchApiPaginationHandlerService(using
           )
           active(state.copy(polls = state.polls - cmd))
       }
+    case PredictionsResponse(cmd, Success(predictions)) =>
+      predictions.pagination.cursor match {
+        case Some(cursor) =>
+          askForPredictions(cmd, cursor = Some(cursor))
+          active(
+            state.copy(predictions =
+              state.predictions + (cmd -> (state.predictions(
+                cmd
+              ) :+ predictions))
+            )
+          )
+        case _ =>
+          val predictionsData = state.predictions(cmd) :+ predictions
+          val finalData = predictionsData.flatMap(_.data).toSet
+          cmd.clientCmd.replyTo ! StatusReply.success(
+            predictions.copy(data = finalData.toList)
+          )
+          active(state.copy(predictions = state.predictions - cmd))
+      }
   }
 
   private def askForChatters(
@@ -355,5 +388,21 @@ class TwitchApiPaginationHandlerService(using
           cmd.clientCmd.copy(replyTo = ref, cursor = cursor)
         )
     )(PollsResponse(cmd, _))
+  }
+
+  private def askForPredictions(
+      cmd: GetPredictions,
+      cursor: Option[String] = None
+  ): Unit = {
+    ctx.askWithStatus[
+      ArchieMateMediator.Command,
+      TwitchApiResponse.GetPredictions
+    ](
+      mediator,
+      ref =>
+        ArchieMateMediator.SendTwitchApiClientCommand(
+          cmd.clientCmd.copy(replyTo = ref, cursor = cursor)
+        )
+    )(PredictionsResponse(cmd, _))
   }
 }

@@ -70,4 +70,34 @@ object TwitchApiRequest {
     given Decoder[EndPollRequestData] = ConfiguredDecoder.derived
     given Encoder[EndPollRequestData] = ConfiguredEncoder.derived
   }
+
+  final case class CreatePredictionRequestData(
+      broadcasterId: String,
+      title: String,
+      outcomes: List[PredictionOutcome],
+      predictionWindow: Int
+  )
+  object CreatePredictionRequestData {
+    given Decoder[CreatePredictionRequestData] = ConfiguredDecoder.derived
+    given Encoder[CreatePredictionRequestData] = ConfiguredEncoder.derived
+  }
+
+  final case class PredictionOutcome(title: String)
+  object PredictionOutcome {
+    given Decoder[PredictionOutcome] = ConfiguredDecoder.derived
+    given Encoder[PredictionOutcome] = ConfiguredEncoder.derived
+  }
+
+  final case class EndPredictionRequestData(
+      broadcasterId: String,
+      id: String,
+      status: String,
+      winningOutcomeId: Option[String]
+  )
+  object EndPredictionRequestData {
+    given Decoder[EndPredictionRequestData] = ConfiguredDecoder.derived
+    given Encoder[EndPredictionRequestData] = dropNulls(
+      ConfiguredEncoder.derived
+    )
+  }
 }

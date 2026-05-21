@@ -13,4 +13,5 @@ object SerializerIDs {
   val variablesSettingsRepositoryId: Int = 206
 
   val pollsRepositoryId: Int = 300
+  val predictionsRepositoryId: Int = 301
 }
