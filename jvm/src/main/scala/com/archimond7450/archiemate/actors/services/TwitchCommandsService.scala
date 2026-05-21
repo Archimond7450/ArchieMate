@@ -3180,7 +3180,7 @@ class TwitchCommandsService(using
                     cmd,
                     chatters,
                     Some(
-                      s"$${sender}, You did not specify the alias for the prediction to be deleted."
+                      s"$${sender}, You did not specify the outcome to resolve the prediction with. Retry the command with 0 - 9 for indexing or outcome substring."
                     )
                   )
                 case indexStr if indexStr.toIntOption.nonEmpty =>
