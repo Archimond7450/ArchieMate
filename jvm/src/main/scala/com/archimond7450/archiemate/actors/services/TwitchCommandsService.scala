@@ -2783,18 +2783,23 @@ class TwitchCommandsService(using
       settings: KnownGreetsSettings,
       twitchRoomId: String,
       followers: Map[String, TwitchApi.UserFollowage]
-  ): Boolean = settings.mode match {
-    case KnownGreetsMode.All      => !isBroadcaster(userState, twitchRoomId)
-    case KnownGreetsMode.Mods     => isMod(userState)
-    case KnownGreetsMode.ModsVips => isMod(userState) || isVip(userState)
-    case KnownGreetsMode.ModsVipsSubs =>
-      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
-        userState
-      ) || isSub(userState))
-    case KnownGreetsMode.ModsVipsSubsFollows =>
-      !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
-        userState
-      ) || isSub(userState) || isFollower(userState, followers))
+  ): Boolean = {
+    val dontGreet = userState.flags.contains(TwitchChatbot.UserFlag.DontGreet)
+    settings.mode match {
+      case KnownGreetsMode.All =>
+        !isBroadcaster(userState, twitchRoomId) && !dontGreet
+      case KnownGreetsMode.Mods => isMod(userState) && !dontGreet
+      case KnownGreetsMode.ModsVips =>
+        isMod(userState) || isVip(userState) && !dontGreet
+      case KnownGreetsMode.ModsVipsSubs =>
+        !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
+          userState
+        ) || isSub(userState)) && !dontGreet
+      case KnownGreetsMode.ModsVipsSubsFollows =>
+        !isBroadcaster(userState, twitchRoomId) && (isMod(userState) || isVip(
+          userState
+        ) || isSub(userState) || isFollower(userState, followers)) && !dontGreet
+    }
   }
 
   private def isBroadcaster(

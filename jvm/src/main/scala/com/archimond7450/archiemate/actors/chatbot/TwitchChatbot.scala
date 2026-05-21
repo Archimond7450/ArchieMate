@@ -118,7 +118,7 @@ object TwitchChatbot {
     object Vip extends UserFlag
     object Sub extends UserFlag
     object Online extends UserFlag
-    object Spoke extends UserFlag
+    object DontGreet extends UserFlag
     object Afk extends UserFlag
     object Ignore extends UserFlag
   }
@@ -701,7 +701,9 @@ class TwitchChatbot(twitchRoomId: String)(using
       operational(
         params.copy(
           users = params.users ++ newUsers.map((userId, userState) =>
-            userId -> userState.copy(flags = userState.flags + UserFlag.Online)
+            userId -> userState.copy(flags =
+              userState.flags + UserFlag.Online + UserFlag.DontGreet
+            )
           )
         )
       )
@@ -841,7 +843,7 @@ class TwitchChatbot(twitchRoomId: String)(using
         users = newUsers.map((userId, userState) =>
           userId -> userState.copy(flags =
             userState.flags ++ (if (userId == e.chatterUserId)
-                                  Set(UserFlag.Online)
+                                  Set(UserFlag.Online, UserFlag.DontGreet)
                                 else Set.empty)
           )
         )
@@ -1490,7 +1492,9 @@ class TwitchChatbot(twitchRoomId: String)(using
         }
 
       val newUsers = params.users.map((userId, userState) =>
-        userId -> userState.copy(flags = userState.flags - UserFlag.Online)
+        userId -> userState.copy(flags =
+          userState.flags - UserFlag.Online - UserFlag.DontGreet
+        )
       )
 
       operational(
