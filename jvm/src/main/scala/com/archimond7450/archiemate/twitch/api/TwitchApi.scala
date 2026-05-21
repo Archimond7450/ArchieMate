@@ -149,4 +149,48 @@ object TwitchApi {
     given Decoder[PollChoice] = ConfiguredDecoder.derived
     given Encoder[PollChoice] = ConfiguredEncoder.derived
   }
+
+  final case class Prediction(
+      id: String,
+      broadcasterId: String,
+      broadcasterName: String,
+      broadcasterLogin: String,
+      title: String,
+      winningOutcomeId: Option[String],
+      outcomes: List[PredictionOutcome],
+      predictionWindow: Int,
+      status: String,
+      createdAt: OffsetDateTime,
+      endedAt: Option[OffsetDateTime],
+      lockedAt: Option[OffsetDateTime]
+  )
+  object Prediction {
+    given Decoder[Prediction] = ConfiguredDecoder.derived
+    given Encoder[Prediction] = ConfiguredEncoder.derived
+  }
+
+  final case class PredictionOutcome(
+      id: String,
+      title: String,
+      users: Int,
+      channelPoints: Int,
+      topPredictors: Option[List[UserPrediction]],
+      color: String
+  )
+  object PredictionOutcome {
+    given Decoder[PredictionOutcome] = ConfiguredDecoder.derived
+    given Encoder[PredictionOutcome] = ConfiguredEncoder.derived
+  }
+
+  final case class UserPrediction(
+      userId: String,
+      userName: String,
+      userLogin: String,
+      channelPointsUsed: Int,
+      channelPointsWon: Option[Int]
+  )
+  object UserPrediction {
+    given Decoder[UserPrediction] = ConfiguredDecoder.derived
+    given Encoder[UserPrediction] = ConfiguredEncoder.derived
+  }
 }

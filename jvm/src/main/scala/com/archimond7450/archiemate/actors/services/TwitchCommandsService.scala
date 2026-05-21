@@ -6,6 +6,7 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
   AutomaticMessagesSettingsRepository,
   CommandsSettingsRepository,
   PollsRepository,
+  PredictionsRepository,
   VariablesSettingsRepository
 }
 import com.archimond7450.archiemate.actors.services.TwitchCommandsService.actorName
@@ -19,7 +20,7 @@ import com.archimond7450.archiemate.extensions.StringExtensions.{
   asIndex,
   asVariableRegex
 }
-import com.archimond7450.archiemate.http.{ChannelSettings, Polls}
+import com.archimond7450.archiemate.http.{ChannelSettings, Polls, Predictions}
 import com.archimond7450.archiemate.http.ChannelSettings.{
   BuiltInCommandsSettings,
   ChannelCommand,
@@ -2102,7 +2103,7 @@ class TwitchCommandsService(using
           val actionEnd = strParameters.indexOf(' ')
           val (action, afterAction) = {
             if (actionEnd == -1 && strParameters.isEmpty) (Actions.HELP, "")
-            else if (actionEnd == -1) (strParameters, "")
+            else if (actionEnd == -1) (strParameters.toLowerCase(), "")
             else
               (
                 strParameters.substring(0, actionEnd).toLowerCase(),
@@ -2277,7 +2278,7 @@ class TwitchCommandsService(using
                         cmd,
                         chatters,
                         Some(
-                          s"$${sender}, the poll with alias '$alias' was not found.'"
+                          s"$${sender}, the poll with alias '$alias' was not found."
                         )
                       )
                     case Some(oldPoll) =>
@@ -2373,7 +2374,7 @@ class TwitchCommandsService(using
 
                       case Failure(ex) =>
                         ctx.log.error(
-                          "There was an exception when waiting for polls repository to delete command {} in channel {}.",
+                          "There was an exception when waiting for polls repository to delete poll {} in channel {}.",
                           oldPoll,
                           channelName,
                           ex
@@ -2569,6 +2570,719 @@ class TwitchCommandsService(using
                           s"$${sender}, I cannot confirm the current poll was ended... $problemDiscord"
                         )
                       )
+                  }
+              }
+
+            case _ =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(usage)
+              )
+          }
+        }
+      }
+    }
+
+    object Prediction extends BuiltInCommand {
+      override val name: String = "prediction"
+
+      object Actions {
+        val HELP = "help"
+        val ADD = "add"
+        val CREATE = "create"
+        val ALIAS = "alias"
+        val EDIT = "edit"
+        val UPDATE = "update"
+        val CHANGE = "change"
+        val DELETE = "delete"
+        val REMOVE = "remove"
+        val QUICK = "quick"
+        val START = "start"
+        val CANCEL = "cancel"
+        val LOCK = "lock"
+        val RESOLVE = "resolve"
+
+        val ALL_PREDICTION_ACTIONS: List[String] = List(
+          HELP,
+          ADD,
+          CREATE,
+          ALIAS,
+          EDIT,
+          UPDATE,
+          CHANGE,
+          DELETE,
+          REMOVE,
+          QUICK,
+          START,
+          CANCEL,
+          LOCK,
+          RESOLVE
+        )
+      }
+
+      private val usage =
+        s"$${sender}, Usage: !prediction (${Actions.ALL_PREDICTION_ACTIONS.mkString("|")} (alias) (timeInSeconds|nextAlias|\"Prediction title\") (\"Outcome 1\")..."
+      private val syntax =
+        s"$${sender}, invalid syntax. Use the \" character to surround the prediction title and the outcomes."
+
+      private val afterActionAddEditRegex: Regex =
+        "(\\S+)\\s+(\\\"[^\\\"]*\\\")\\s+(((\\\"[^\\\"]*\\\")\\s*)+)".r
+      private val quickActionRegex: Regex =
+        "(\\S+)\\s+(\\\"[^\\\"]*\\\")\\s+(((\\\"[^\\\"]*\\\")\\s*)+)(\\d+)".r
+
+      override val getCommandResponse: (
+          TwitchCommandsService.RespondToCommand,
+          List[String],
+          String,
+          ActorRef[TwitchChatbot.Command]
+      ) => Unit = (cmd, chatters, strParameters, _) => {
+        val broadcasterId = cmd.chatbotParams.broadcaster.id
+        val isModerator = cmd.chatbotParams.users.keySet
+          .contains(cmd.e.chatterUserId) && cmd.chatbotParams
+          .users(cmd.e.chatterUserId)
+          .flags
+          .contains(TwitchChatbot.UserFlag.Mod)
+
+        if (cmd.e.chatterUserId != broadcasterId && !isModerator) {
+          ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+            cmd,
+            chatters,
+            Some(s"$${sender}, You do not have permission to use this command.")
+          )
+        } else {
+          val actionEnd = strParameters.indexOf(' ')
+          val (action, afterAction) = {
+            if (actionEnd == -1 && strParameters.isEmpty) (Actions.HELP, "")
+            else if (actionEnd == -1) (strParameters.toLowerCase(), "")
+            else
+              (
+                strParameters.substring(0, actionEnd).toLowerCase(),
+                strParameters.substring(actionEnd).trim
+              )
+          }
+          ctx.log.debug(
+            s"!prediction strParameters = $strParameters | action = $action, afterAction = $afterAction"
+          )
+          val channelName = cmd.chatbotParams.broadcaster.login
+          action match {
+            case Actions.HELP =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(usage)
+              )
+
+            case Actions.ADD | Actions.CREATE =>
+              afterAction match {
+                case afterActionAddEditRegex(
+                      alias,
+                      titleQuote,
+                      outcomesQuotes,
+                      _,
+                      _
+                    ) =>
+                  val title = titleQuote.substring(1, titleQuote.length - 1)
+                  val outcomes =
+                    outcomesQuotes.split('\"').filter(_.trim.nonEmpty)
+                  val newPrediction = Predictions.Prediction(
+                    scala.Predef.Set(alias),
+                    title,
+                    outcomes.toSet
+                  )
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    PredictionsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendPredictionsRepositoryCommand(
+                        PredictionsRepository
+                          .AddPrediction(ref, broadcasterId, newPrediction)
+                      )
+                  ) {
+                    case Success(PredictionsRepository.Acknowledged) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the prediction '$alias' was successfully added."
+                        )
+                      )
+                    case Failure(ex) =>
+                      ctx.log.error(
+                        "There was an exception when waiting for response from predictions repository when asked to add a prediction {} to channel {}",
+                        newPrediction,
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the prediction '$alias' was added... $problemDiscord"
+                        )
+                      )
+                  }
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(syntax)
+                  )
+              }
+            case Actions.ALIAS =>
+              afterAction.trim.split(' ') match {
+                case Array(currentAlias, anotherAlias) =>
+                  cmd.chatbotParams.predictions.predictions
+                    .find(_._2.aliases.contains(currentAlias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the prediction with alias '$currentAlias' was not found."
+                        )
+                      )
+                    case Some(oldPrediction) =>
+                      ctx.ask[
+                        ArchieMateMediator.Command,
+                        PredictionsRepository.Acknowledged.type
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendPredictionsRepositoryCommand(
+                            PredictionsRepository.EditPrediction(
+                              ref,
+                              broadcasterId,
+                              oldPrediction._1,
+                              oldPrediction._2.copy(aliases =
+                                oldPrediction._2.aliases + anotherAlias
+                              )
+                            )
+                          )
+                      ) {
+                        case Success(PredictionsRepository.Acknowledged) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the prediction with alias '$currentAlias' had another alias '$anotherAlias' added to it."
+                            )
+                          )
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was en exception when waiting for predictions repository to update prediction {} to also contain alias {} in channel {}",
+                            oldPrediction,
+                            anotherAlias,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the prediction with alias '$currentAlias' had another alias '$anotherAlias' added to it... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, the syntax was not correct. Alias expects current alias and a new alias = both should be one word."
+                    )
+                  )
+              }
+            case Actions.EDIT | Actions.CHANGE | Actions.UPDATE =>
+              afterAction match {
+                case afterActionAddEditRegex(
+                      alias,
+                      titleQuote,
+                      outcomesQuotes,
+                      _,
+                      _
+                    ) =>
+                  val title = titleQuote.substring(1, titleQuote.length - 1)
+                  val outcomes =
+                    outcomesQuotes.split('\"').filter(_.trim.nonEmpty)
+                  val editedPrediction = Predictions.Prediction(
+                    scala.Predef.Set(alias),
+                    title,
+                    outcomes.toSet
+                  )
+                  cmd.chatbotParams.predictions.predictions
+                    .find(_._2.aliases.contains(alias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the prediction with alias '$alias' was not found."
+                        )
+                      )
+                    case Some(oldPrediction) =>
+                      ctx.ask[
+                        ArchieMateMediator.Command,
+                        PredictionsRepository.Acknowledged.type
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendPredictionsRepositoryCommand(
+                            PredictionsRepository.EditPrediction(
+                              ref,
+                              broadcasterId,
+                              oldPrediction._1,
+                              editedPrediction
+                            )
+                          )
+                      ) {
+                        case Success(PredictionsRepository.Acknowledged) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the prediction '$alias' was successfully edited."
+                            )
+                          )
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for response from predictions repository when asked to edit a prediction {} to {} in channel {}",
+                            oldPrediction,
+                            editedPrediction,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the prediction '$alias' was edited... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+                case _ =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(syntax)
+                  )
+              }
+            case Actions.DELETE | Actions.REMOVE =>
+              val alias = afterAction.trim
+              if (alias.isEmpty) {
+                ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                  cmd,
+                  chatters,
+                  Some(
+                    s"$${sender}, You did not specify the alias for the prediction to be deleted."
+                  )
+                )
+              } else {
+                cmd.chatbotParams.predictions.predictions
+                  .find(_._2.aliases.contains(alias)) match {
+                  case None =>
+                    ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, the poll with alias '$alias' was not found."
+                      )
+                    )
+                  case Some(oldPrediction) =>
+                    ctx.ask[
+                      ArchieMateMediator.Command,
+                      PredictionsRepository.Acknowledged.type
+                    ](
+                      mediator,
+                      ref =>
+                        ArchieMateMediator.SendPredictionsRepositoryCommand(
+                          PredictionsRepository.DeletePrediction(
+                            ref,
+                            broadcasterId,
+                            oldPrediction._1
+                          )
+                        )
+                    ) {
+                      case Success(PredictionsRepository.Acknowledged) =>
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender}, the prediction '$alias' was successfully deleted."
+                          )
+                        )
+                      case Failure(ex) =>
+                        ctx.log.error(
+                          "There was an exception when waiting for predictions repository to delete prediction {} in channel {}",
+                          oldPrediction,
+                          channelName,
+                          ex
+                        )
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender}, I cannot confirm the poll '$alias' was deleted... $problemDiscord"
+                          )
+                        )
+                    }
+                }
+              }
+            case Actions.QUICK =>
+              strParameters match {
+                case quickActionRegex(
+                      alias,
+                      titleQuote,
+                      outcomesQuotes,
+                      _,
+                      _,
+                      durationStr
+                    ) =>
+                  val title = titleQuote.substring(1, titleQuote.length - 1)
+                  val outcomes =
+                    outcomesQuotes.split('\"').filter(_.trim.nonEmpty)
+                  ctx.askWithStatus[
+                    ArchieMateMediator.Command,
+                    TwitchApiResponse.CreateOrEndPrediction
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendTwitchApiClientCommand(
+                        TwitchApiClient.CreatePrediction(
+                          ref,
+                          cmd.chatbotParams.tokenId,
+                          broadcasterId,
+                          title,
+                          outcomes.toSet,
+                          durationStr.toInt
+                        )
+                      )
+                  ) {
+                    case Success(_) =>
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the quick prediction was successfully started."
+                        )
+                      )
+                    case Failure(ex) =>
+                      ctx.log.error(
+                        "There was an exception when waiting for twitch api client to start quick prediction in channel {}.",
+                        channelName,
+                        ex
+                      )
+                      TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, I cannot confirm the quick prediction was started... $problemDiscord"
+                        )
+                      )
+                  }
+                case _ =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(usage)
+                  )
+              }
+            case Actions.START =>
+              val afterAlias = afterAction.indexOf(' ')
+              val alias = afterAction.substring(0, afterAlias).trim
+              afterAction.substring(afterAlias).trim.toIntOption match {
+                case None =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, invalid syntax: expected number of seconds after alias."
+                    )
+                  )
+                case Some(durationSeconds) =>
+                  cmd.chatbotParams.predictions.predictions
+                    .find(_._2.aliases.contains(alias)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, there are no predictions with alias '$alias'."
+                        )
+                      )
+                    case Some((predictionId, prediction)) =>
+                      ctx.askWithStatus[
+                        ArchieMateMediator.Command,
+                        TwitchApiResponse.CreateOrEndPrediction
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendTwitchApiClientCommand(
+                            TwitchApiClient.CreatePrediction(
+                              ref,
+                              cmd.chatbotParams.tokenId,
+                              broadcasterId,
+                              prediction.title,
+                              prediction.outcomes,
+                              durationSeconds
+                            )
+                          )
+                      ) {
+                        case Success(_) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the prediction '$alias' was successfully started."
+                            )
+                          )
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for twitch api client to start prediction {} in channel {}.",
+                            prediction,
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the prediction '$alias' was started... $problemDiscord"
+                            )
+                          )
+                      }
+                  }
+              }
+            case Actions.CANCEL
+                if cmd.chatbotParams.currentPrediction.isEmpty =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(
+                  s"$${sender}, currently there is no active prediction to cancel."
+                )
+              )
+
+            case Actions.CANCEL =>
+              ctx.askWithStatus[
+                ArchieMateMediator.Command,
+                TwitchApiResponse.CreateOrEndPrediction
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendTwitchApiClientCommand(
+                    TwitchApiClient.CancelPrediction(
+                      ref,
+                      cmd.chatbotParams.tokenId,
+                      broadcasterId,
+                      cmd.chatbotParams.currentPrediction.get.id
+                    )
+                  )
+              ) {
+                case Success(_) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, the current prediction was successfully canceled."
+                    )
+                  )
+                case Failure(ex) =>
+                  ctx.log.error(
+                    "There was an exception when waiting for twitch api client to cancel current prediction in channel {}.",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the current prediction was canceled... $problemDiscord"
+                    )
+                  )
+              }
+
+            case Actions.LOCK if cmd.chatbotParams.currentPrediction.isEmpty =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(
+                  s"$${sender}, currently there is no active prediction to lock."
+                )
+              )
+
+            case Actions.LOCK
+                if cmd.chatbotParams.currentPrediction.get.status != "ACTIVE" =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(s"$${sender}, the current prediction is already locked.")
+              )
+
+            case Actions.LOCK =>
+              ctx.askWithStatus[
+                ArchieMateMediator.Command,
+                TwitchApiResponse.CreateOrEndPrediction
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendTwitchApiClientCommand(
+                    TwitchApiClient.LockPrediction(
+                      ref,
+                      cmd.chatbotParams.tokenId,
+                      broadcasterId,
+                      cmd.chatbotParams.currentPrediction.get.id
+                    )
+                  )
+              ) {
+                case Success(_) =>
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, the current prediction was successfully locked."
+                    )
+                  )
+                case Failure(ex) =>
+                  ctx.log.error(
+                    "There was an exception when waiting for twitch api client to lock current prediction in channel {}.",
+                    channelName,
+                    ex
+                  )
+                  TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, I cannot confirm the current prediction was locked... $problemDiscord"
+                    )
+                  )
+              }
+
+            case Actions.RESOLVE
+                if cmd.chatbotParams.currentPrediction.isEmpty =>
+              ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                cmd,
+                chatters,
+                Some(
+                  s"$${sender}, currently there is no active prediction to resolve."
+                )
+              )
+
+            case Actions.RESOLVE =>
+              afterAction.trim match {
+                case "" =>
+                  ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                    cmd,
+                    chatters,
+                    Some(
+                      s"$${sender}, You did not specify the alias for the prediction to be deleted."
+                    )
+                  )
+                case indexStr if indexStr.toIntOption.nonEmpty =>
+                  val prediction = cmd.chatbotParams.currentPrediction.get
+                  val index = indexStr.toInt
+                  if (index >= prediction.outcomes.length) {
+                    ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                      cmd,
+                      chatters,
+                      Some(
+                        s"$${sender}, the current prediction does not have that many outcomes."
+                      )
+                    )
+                  } else {
+                    ctx.askWithStatus[
+                      ArchieMateMediator.Command,
+                      TwitchApiResponse.CreateOrEndPrediction
+                    ](
+                      mediator,
+                      ref =>
+                        ArchieMateMediator.SendTwitchApiClientCommand(
+                          TwitchApiClient.ResolvePrediction(
+                            ref,
+                            cmd.chatbotParams.tokenId,
+                            broadcasterId,
+                            prediction.id,
+                            prediction.outcomes(indexStr.toInt).id
+                          )
+                        )
+                    ) {
+                      case Success(_) =>
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender}, the current prediction was successfully resolved."
+                          )
+                        )
+                      case Failure(ex) =>
+                        ctx.log.error(
+                          "There was an exception when waiting for twitch api client to resolve current prediction for channel {}.",
+                          channelName,
+                          ex
+                        )
+                        TwitchCommandsService.ReturnCommandResponse(
+                          cmd,
+                          chatters,
+                          Some(
+                            s"$${sender}, I cannot confirm the current prediction was resolved... $problemDiscord"
+                          )
+                        )
+                    }
+                  }
+                case outcomeStr =>
+                  cmd.chatbotParams.currentPrediction.get.outcomes
+                    .find(_.title.contains(outcomeStr)) match {
+                    case None =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        Some(
+                          s"$${sender}, the current prediction does not contain such outcome."
+                        )
+                      )
+                    case Some(outcome) =>
+                      ctx.askWithStatus[
+                        ArchieMateMediator.Command,
+                        TwitchApiResponse.CreateOrEndPrediction
+                      ](
+                        mediator,
+                        ref =>
+                          ArchieMateMediator.SendTwitchApiClientCommand(
+                            TwitchApiClient.ResolvePrediction(
+                              ref,
+                              cmd.chatbotParams.tokenId,
+                              broadcasterId,
+                              cmd.chatbotParams.currentPrediction.get.id,
+                              outcome.id
+                            )
+                          )
+                      ) {
+                        case Success(_) =>
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, the current prediction was successfully resolved."
+                            )
+                          )
+                        case Failure(ex) =>
+                          ctx.log.error(
+                            "There was an exception when waiting for twitch api client to resolve current prediction for channel {}.",
+                            channelName,
+                            ex
+                          )
+                          TwitchCommandsService.ReturnCommandResponse(
+                            cmd,
+                            chatters,
+                            Some(
+                              s"$${sender}, I cannot confirm the current prediction was resolved.... $problemDiscord"
+                            )
+                          )
+                      }
                   }
               }
 
