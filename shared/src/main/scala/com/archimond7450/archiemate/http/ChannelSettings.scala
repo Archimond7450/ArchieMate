@@ -37,7 +37,8 @@ object ChannelSettings {
       followage: Boolean = false,
       afk: Boolean = false,
       greets: Boolean = false,
-      poll: Boolean = false
+      poll: Boolean = false,
+      prediction: Boolean = false
   )
 
   case object BuiltInCommandsSettings {

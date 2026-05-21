@@ -54,6 +54,10 @@ object DashboardBuiltInCommandsConfiguration {
               val poll: Var[Boolean] = state.zoomLazy(_.poll)((old, newPoll) =>
                 old.copy(poll = newPoll)
               )
+              val prediction: Var[Boolean] =
+                state.zoomLazy(_.prediction)((old, newPrediction) =>
+                  old.copy(prediction = newPrediction)
+                )
 
               form(
                 onSubmit.preventDefault --> { _ => },
@@ -96,6 +100,11 @@ object DashboardBuiltInCommandsConfiguration {
                   cls("flex items-start flex-col md:flex-row"),
                   pElement("!poll"),
                   switch("poll", "Off", "On", poll)
+                ),
+                div(
+                  cls("flex items-start flex-col md:flex-row"),
+                  pElement("!prediction"),
+                  switch("prediction", "Off", "On", prediction)
                 ),
                 SaveButton.render[BuiltInCommandsSettings](
                   state,

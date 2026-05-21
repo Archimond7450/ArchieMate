@@ -3309,7 +3309,8 @@ class TwitchCommandsService(using
       Followage.name -> Followage,
       Afk.name -> Afk,
       Greets.name -> Greets,
-      Poll.name -> Poll
+      Poll.name -> Poll,
+      Prediction.name -> Prediction
     )
 
     val isBuilInCommandEnabled
@@ -3325,7 +3326,8 @@ class TwitchCommandsService(using
       Followage.name -> (_.followage),
       Afk.name -> (_.afk),
       Greets.name -> (_.greets),
-      Poll.name -> (_.poll)
+      Poll.name -> (_.poll),
+      Prediction.name -> (_.prediction)
     )
   }
 
