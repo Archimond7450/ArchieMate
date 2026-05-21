@@ -1212,7 +1212,8 @@ class TwitchApiClient(using
           )
           .asJson
           .noSpaces
-      )
+      ),
+      tokenId = Some(cmd.tokenId)
     )
   }
 
