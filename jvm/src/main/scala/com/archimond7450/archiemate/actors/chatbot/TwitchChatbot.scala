@@ -607,7 +607,7 @@ class TwitchChatbot(twitchRoomId: String)(using
             params.pollHistory.get.find(_.status == "ACTIVE"),
             params.predictions,
             params.predictionHistory.get.find(prediction =>
-              prediction.status == "ACTIVE" || prediction.status == "LOCKED"
+              prediction.status.toUpperCase() == "ACTIVE" || prediction.status.toUpperCase() == "LOCKED"
             ),
             params.broadcaster,
             params.eventSubListener,
@@ -1526,11 +1526,18 @@ class TwitchChatbot(twitchRoomId: String)(using
       )
 
     case TwitchChatbot.EventSubEvent(e: eventsub.ChannelPredictionEndEvent) =>
-      e.outcomes.find(_.id == e.winningOutcomeId) match {
-        case None =>
-          ctx.log.error("Invalid prediction end event {}: Winning outcome id does not match any outcomes.", e)
-        case Some(outcome) =>
-          IRCListener.SendMessage(s"Prediction ended! Winning outcome was \"${outcome.title}\".")
+      if (e.status.toUpperCase() != "CANCELED") {
+        e.outcomes.find(_.id == e.winningOutcomeId) match {
+          case None =>
+            ctx.log.error(
+              "Invalid prediction end event {}: Winning outcome id does not match any outcomes.",
+              e
+            )
+          case Some(outcome) =>
+            IRCListener.SendMessage(
+              s"Prediction ended! Winning outcome was \"${outcome.title}\"."
+            )
+        }
       }
       operational(params = params.copy(currentPrediction = None))
 

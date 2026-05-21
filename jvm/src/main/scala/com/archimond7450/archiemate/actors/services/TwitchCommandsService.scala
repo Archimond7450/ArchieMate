@@ -3116,7 +3116,8 @@ class TwitchCommandsService(using
               )
 
             case Actions.LOCK
-                if cmd.chatbotParams.currentPrediction.get.status != "ACTIVE" =>
+                if cmd.chatbotParams.currentPrediction.get.status
+                  .toUpperCase() != "ACTIVE" =>
               ctx.self ! TwitchCommandsService.ReturnCommandResponse(
                 cmd,
                 chatters,
