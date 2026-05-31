@@ -207,24 +207,24 @@ object TwitchUserSessionsRepositorySpec {
   )
   val tokenType = "bearer"
   val sessionId1Token: TwitchApiResponse.GetToken = TwitchApiResponse.GetToken(
-    access_token = "123",
-    expires_in = 14141,
-    refresh_token = "1a2b3c",
+    accessToken = "123",
+    expiresIn = 14141,
+    refreshToken = "1a2b3c",
     scope = scopes,
-    token_type = tokenType
+    tokenType = tokenType
   )
   val sessionId2Token: TwitchApiResponse.GetToken = TwitchApiResponse.GetToken(
-    access_token = "456",
-    expires_in = 14253,
-    refresh_token = "4d5e6f",
+    accessToken = "456",
+    expiresIn = 14253,
+    refreshToken = "4d5e6f",
     scope = noScopes,
-    token_type = tokenType
+    tokenType = tokenType
   )
   val sessionId3Token: TwitchApiResponse.GetToken = TwitchApiResponse.GetToken(
-    access_token = "111",
-    expires_in = 11111,
-    refresh_token = "1a1a1a",
+    accessToken = "111",
+    expiresIn = 11111,
+    refreshToken = "1a1a1a",
     scope = scopes,
-    token_type = tokenType
+    tokenType = tokenType
   )
 }

@@ -46,8 +46,8 @@ final class UserController(using
               UserResponse(
                 user.id,
                 user.login,
-                user.display_name,
-                user.profile_image_url
+                user.displayName,
+                user.profileImageUrl
               )
             )
 

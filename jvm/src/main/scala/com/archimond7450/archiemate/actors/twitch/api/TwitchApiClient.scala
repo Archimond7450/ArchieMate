@@ -472,7 +472,7 @@ class TwitchApiClient(using
     val authHeaders = request.token match {
       case Some(actualToken) =>
         List(
-          RawHeader("Authorization", s"Bearer ${actualToken.access_token}"),
+          RawHeader("Authorization", s"Bearer ${actualToken.accessToken}"),
           RawHeader("Client-Id", settings.twitchAppClientId)
         )
 
@@ -746,7 +746,7 @@ class TwitchApiClient(using
           "client_id" -> settings.twitchAppClientId,
           "client_secret" -> settings.twitchAppClientSecret,
           "grant_type" -> "refresh_token",
-          "refresh_token" -> cmd.originalRequest.token.get.refresh_token
+          "refresh_token" -> cmd.originalRequest.token.get.refreshToken
         )
       )
     ).to[RequestEntity]
@@ -886,7 +886,7 @@ class TwitchApiClient(using
       entity = HttpEntity(
         ContentTypes.`application/json`,
         TwitchApiRequest
-          .ModifyChannelInformationRequestData(game_id = Some(cmd.gameId))
+          .ModifyChannelInformationRequestData(gameId = Some(cmd.gameId))
           .asJson
           .noSpaces
       ),

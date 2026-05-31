@@ -276,7 +276,7 @@ object OAuthControllerHelperService {
               ref =>
                 ArchieMateMediator.SendTwitchApiClientCommand(
                   TwitchApiClient
-                    .GetTokenUserFromAccessToken(ref, token.access_token)
+                    .GetTokenUserFromAccessToken(ref, token.accessToken)
                 )
             ) {
               case Success(tokenUser: TwitchApiResponse.GetTokenUser) =>

@@ -1681,7 +1681,7 @@ class TwitchChatbot(twitchRoomId: String)(using
         params.copy(
           broadcaster = params.broadcaster.copy(
             login = e.userLogin,
-            display_name = e.userName,
+            displayName = e.userName,
             description = e.description
           )
         )

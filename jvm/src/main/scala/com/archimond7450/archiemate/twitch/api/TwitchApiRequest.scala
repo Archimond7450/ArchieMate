@@ -9,7 +9,7 @@ import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 
 object TwitchApiRequest {
   final case class ModifyChannelInformationRequestData(
-      game_id: Option[String] = None,
+      gameId: Option[String] = None,
       title: Option[String] = None,
       tags: Option[Set[String]] = None
   )

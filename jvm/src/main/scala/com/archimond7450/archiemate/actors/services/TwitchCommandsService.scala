@@ -888,7 +888,7 @@ class TwitchCommandsService(using
               TwitchCommandsService.ReturnCommandResponse(
                 cmd,
                 chatters,
-                Some(s"$${sender}, the channel game is \"${info.game_name}\".")
+                Some(s"$${sender}, the channel game is \"${info.gameName}\".")
               )
 
             case Failure(ex) =>
@@ -1204,7 +1204,7 @@ class TwitchCommandsService(using
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val isBroadcaster = broadcasterId == cmd.e.chatterUserId
-        val channelName = cmd.chatbotParams.broadcaster.display_name
+        val channelName = cmd.chatbotParams.broadcaster.displayName
 
         val actionEnd = strParameters.indexOf(' ')
         val (action, afterAction) = {
@@ -3410,7 +3410,7 @@ class TwitchCommandsService(using
               ChannelChatMessageEvent(
                 broadcasterUserId = chatbotParams.broadcaster.id,
                 broadcasterUserLogin = chatbotParams.broadcaster.login,
-                broadcasterUserName = chatbotParams.broadcaster.display_name,
+                broadcasterUserName = chatbotParams.broadcaster.displayName,
                 chatterUserId = "0",
                 chatterUserLogin = "all",
                 chatterUserName = "",
