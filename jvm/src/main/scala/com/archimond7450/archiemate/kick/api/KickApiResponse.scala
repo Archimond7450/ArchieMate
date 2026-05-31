@@ -5,6 +5,8 @@ import io.circe.{Decoder, Encoder}
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 import org.apache.pekko.http.scaladsl.model.StatusCode
 
+import java.time.OffsetDateTime
+
 sealed trait KickApiResponse
 
 object KickApiResponse {
@@ -82,4 +84,78 @@ object KickApiResponse {
     given Decoder[PostChatMessageData] = ConfiguredDecoder.derived
     given Encoder[PostChatMessageData] = ConfiguredEncoder.derived
   }
+
+  final case class GetCategories(
+      data: List[GetCategoriesData],
+      message: Option[String],
+      pagination: Option[Pagination]
+  ) extends KickApiResponse
+  object GetCategories {
+    given Decoder[GetCategories] = ConfiguredDecoder.derived
+    given Encoder[GetCategories] = ConfiguredEncoder.derived
+  }
+
+  final case class GetCategoriesData(
+      id: Int,
+      name: String,
+      tags: List[String],
+      thumbnail: String
+  ) extends KickApiResponse
+  object GetCategoriesData {
+    given Decoder[GetCategoriesData] = ConfiguredDecoder.derived
+    given Encoder[GetCategoriesData] = ConfiguredEncoder.derived
+  }
+
+  final case class Pagination(nextCursor: String)
+  object Pagination {
+    given Decoder[Pagination] = ConfiguredDecoder.derived
+    given Encoder[Pagination] = ConfiguredEncoder.derived
+  }
+
+  final case class GetChannels(data: List[Channel], message: Option[String])
+      extends KickApiResponse
+  object GetChannels {
+    given Decoder[GetChannels] = ConfiguredDecoder.derived
+    given Encoder[GetChannels] = ConfiguredEncoder.derived
+  }
+
+  final case class Channel(
+      activeSubscribersCount: Option[Int],
+      bannerPicture: String,
+      broadcasterUserId: Int,
+      canceledSubscribersCount: Option[Int],
+      category: Category,
+      channelDescription: String,
+      slug: String,
+      stream: StreamInfo,
+      streamTitle: String
+  ) extends KickApiResponse
+  object Channel {
+    given Decoder[Channel] = ConfiguredDecoder.derived
+    given Encoder[Channel] = ConfiguredEncoder.derived
+  }
+
+  final case class Category(id: String, name: String, thumbnail: String)
+  object Category {
+    given Decoder[Category] = ConfiguredDecoder.derived
+    given Encoder[Category] = ConfiguredEncoder.derived
+  }
+
+  final case class StreamInfo(
+      customTags: List[String],
+      isLive: Boolean,
+      isMature: Boolean,
+      key: Option[String],
+      language: String,
+      startTime: OffsetDateTime,
+      thumbnail: String,
+      url: String,
+      viewerCount: Int
+  )
+  object StreamInfo {
+    given Decoder[StreamInfo] = ConfiguredDecoder.derived
+    given Encoder[StreamInfo] = ConfiguredEncoder.derived
+  }
+
+  case object ChannelUpdated
 }
