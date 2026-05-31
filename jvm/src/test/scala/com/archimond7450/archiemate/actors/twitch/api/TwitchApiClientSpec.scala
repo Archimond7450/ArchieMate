@@ -52,11 +52,11 @@ class TwitchApiClientSpec
         httpRequest.uri shouldEqual Uri("https://id.twitch.tv/oauth2/token")
 
         val fakeBody = TwitchApiResponse.GetToken(
-          access_token = "accesstoken",
-          expires_in = 54321,
-          refresh_token = "refreshtoken",
+          accessToken = "accesstoken",
+          expiresIn = 54321,
+          refreshToken = "refreshtoken",
           scope = Some(Nil),
-          token_type = "bearer"
+          tokenType = "bearer"
         )
 
         val fakeResponse = HttpClient.Response(
@@ -425,17 +425,17 @@ class TwitchApiClientSpec
         val fakeBody = TwitchApiResponse.GetChannelInformation(
           data = List(
             TwitchApiResponse.ChannelInformation(
-              broadcaster_id = archimond7450Id,
-              broadcaster_login = archimond7450.toLowerCase,
-              broadcaster_name = archimond7450,
-              broadcaster_language = "en",
-              game_name = warcraft3,
-              game_id = warcraft3Id,
+              broadcasterId = archimond7450Id,
+              broadcasterLogin = archimond7450.toLowerCase,
+              broadcasterName = archimond7450,
+              broadcasterLanguage = "en",
+              gameName = warcraft3,
+              gameId = warcraft3Id,
               title = "Archimond7450's channel title",
               delay = 0,
               tags = Nil,
-              content_classification_labels = Nil,
-              is_branded_content = false
+              contentClassificationLabels = Nil,
+              isBrandedContent = false
             )
           )
         )
@@ -1262,31 +1262,31 @@ class TwitchApiClientSpec
 
 object TwitchApiClientSpec {
   val exampleToken = TwitchApiResponse.GetToken(
-    access_token = "accesstoken",
-    expires_in = 54321,
-    refresh_token = "refreshtoken",
+    accessToken = "accesstoken",
+    expiresIn = 54321,
+    refreshToken = "refreshtoken",
     scope = Some(Nil),
-    token_type = "bearer"
+    tokenType = "bearer"
   )
   val exampleTokenUser = TwitchApiResponse.GetTokenUser(
     id = "1",
     login = "testuser",
-    display_name = "TestUser",
+    displayName = "TestUser",
     `type` = "",
-    broadcaster_type = "",
+    broadcasterType = "",
     description = "Description",
-    profile_image_url = "",
-    offline_image_url = "",
-    view_count = 0,
+    profileImageUrl = "",
+    offlineImageUrl = "",
+    viewCount = 0,
     email = None,
-    created_at = OffsetDateTime.now
+    createdAt = OffsetDateTime.now
   )
   val oldToken = TwitchApiResponse.GetToken(
-    access_token = "oldaccesstoken",
-    expires_in = 54321,
-    refresh_token = "oldrefreshtoken",
+    accessToken = "oldaccesstoken",
+    expiresIn = 54321,
+    refreshToken = "oldrefreshtoken",
     scope = Some(Nil),
-    token_type = "bearer"
+    tokenType = "bearer"
   )
   val archimond7450Id = "147113965"
   val archimond7450 = "Archimond7450"

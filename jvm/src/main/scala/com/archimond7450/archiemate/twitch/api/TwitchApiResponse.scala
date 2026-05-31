@@ -18,15 +18,15 @@ sealed trait TwitchApiResponse
 object TwitchApiResponse {
   final case class NOK(status: StatusCode)
       extends RuntimeException(
-        s"The HTTP request failed with HTTP status $status"
+        s"The Twitch HTTP request failed with HTTP status $status"
       )
 
   final case class GetToken(
-      access_token: String,
-      expires_in: Int,
-      refresh_token: String,
+      accessToken: String,
+      expiresIn: Int,
+      refreshToken: String,
       scope: Option[List[String]],
-      token_type: String
+      tokenType: String
   ) extends TwitchApiResponse
 
   object GetToken {
@@ -35,11 +35,11 @@ object TwitchApiResponse {
   }
 
   final case class ValidateToken(
-      client_id: String,
+      clientId: String,
       login: String,
       scopes: List[String],
-      user_id: String,
-      expires_in: Int
+      userId: String,
+      expiresIn: Int
   ) extends TwitchApiResponse
 
   object ValidateToken {
@@ -50,15 +50,15 @@ object TwitchApiResponse {
   final case class GetTokenUser(
       id: String,
       login: String,
-      display_name: String,
+      displayName: String,
       `type`: String,
-      broadcaster_type: String,
+      broadcasterType: String,
       description: String,
-      profile_image_url: String,
-      offline_image_url: String,
-      view_count: Int,
+      profileImageUrl: String,
+      offlineImageUrl: String,
+      viewCount: Int,
       email: Option[String],
-      created_at: OffsetDateTime
+      createdAt: OffsetDateTime
   ) extends TwitchApiResponse
   object GetTokenUser {
     given Decoder[GetTokenUser] = ConfiguredDecoder.derived
@@ -91,17 +91,17 @@ object TwitchApiResponse {
   }
 
   final case class ChannelInformation(
-      broadcaster_id: String,
-      broadcaster_login: String,
-      broadcaster_name: String,
-      broadcaster_language: String,
-      game_name: String,
-      game_id: String,
+      broadcasterId: String,
+      broadcasterLogin: String,
+      broadcasterName: String,
+      broadcasterLanguage: String,
+      gameName: String,
+      gameId: String,
       title: String,
       delay: Int,
       tags: List[String],
-      content_classification_labels: List[String],
-      is_branded_content: Boolean
+      contentClassificationLabels: List[String],
+      isBrandedContent: Boolean
   ) extends TwitchApiResponse
   object ChannelInformation {
     given Decoder[ChannelInformation] = ConfiguredDecoder.derived

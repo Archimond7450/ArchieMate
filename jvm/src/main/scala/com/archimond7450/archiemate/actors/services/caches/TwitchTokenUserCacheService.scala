@@ -10,28 +10,40 @@ object TwitchTokenUserCacheService {
   val actorName = "TwitchTokenUserCacheService"
 
   sealed trait Command
-  final case class CacheTokenUser(tokenUser: TwitchApiResponse.GetTokenUser) extends Command
-  final case class GetTokenUserFromUserId(replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]], userId: String) extends Command
-  final case class GetTokenUserFromUserName(replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]], userName: String) extends Command
+  final case class CacheTokenUser(tokenUser: TwitchApiResponse.GetTokenUser)
+      extends Command
+  final case class GetTokenUserFromUserId(
+      replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]],
+      userId: String
+  ) extends Command
+  final case class GetTokenUserFromUserName(
+      replyTo: ActorRef[Option[TwitchApiResponse.GetTokenUser]],
+      userName: String
+  ) extends Command
 
-  def apply(): Behavior[Command] = Behaviors.supervise[Command] {
-    Behaviors.setup { ctx =>
-      given ActorContext[Command] = ctx
+  def apply(): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
 
-      ready()
+        ready()
+      }
     }
-  }.onFailure[Throwable](SupervisorStrategy.resume)
+    .onFailure[Throwable](SupervisorStrategy.resume)
 
-  private def ready(tokenUsers: Map[String, TwitchApiResponse.GetTokenUser] = Map.empty)(using ActorContext[Command]): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case CacheTokenUser(tokenUser) =>
-      ready(tokenUsers + (tokenUser.id -> tokenUser))
+  private def ready(
+      tokenUsers: Map[String, TwitchApiResponse.GetTokenUser] = Map.empty
+  )(using ActorContext[Command]): Behavior[Command] =
+    Behaviors.receiveAndLogMessage {
+      case CacheTokenUser(tokenUser) =>
+        ready(tokenUsers + (tokenUser.id -> tokenUser))
 
-    case GetTokenUserFromUserId(replyTo, userId) =>
-      replyTo ! tokenUsers.get(userId)
-      Behaviors.same
+      case GetTokenUserFromUserId(replyTo, userId) =>
+        replyTo ! tokenUsers.get(userId)
+        Behaviors.same
 
-    case GetTokenUserFromUserName(replyTo, userName) =>
-      replyTo ! tokenUsers.find(_._2.login == userName).map(_._2)
-      Behaviors.same
-  }
+      case GetTokenUserFromUserName(replyTo, userName) =>
+        replyTo ! tokenUsers.find(_._2.login == userName).map(_._2)
+        Behaviors.same
+    }
 }

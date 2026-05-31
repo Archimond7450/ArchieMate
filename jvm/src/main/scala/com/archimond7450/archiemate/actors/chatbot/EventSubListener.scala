@@ -7,7 +7,12 @@ import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.eventsub.*
 import io.circe.jawn.decode
-import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors, StashBuffer, TimerScheduler}
+import org.apache.pekko.actor.typed.scaladsl.{
+  ActorContext,
+  Behaviors,
+  StashBuffer,
+  TimerScheduler
+}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
@@ -33,21 +38,23 @@ object EventSubListener {
       twitchChatbot: ActorRef[TwitchChatbot.Command],
       mediator: ActorRef[ArchieMateMediator.Command],
       settings: Settings
-  ): Behavior[Command] = Behaviors.supervise[Command] {
-    Behaviors.setup { ctx =>
-      given ActorContext[Command] = ctx
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        given ActorContext[Command] = ctx
 
-      Behaviors.withTimers { scheduler =>
-        given TimerScheduler[Command] = scheduler
+        Behaviors.withTimers { scheduler =>
+          given TimerScheduler[Command] = scheduler
 
-        Behaviors.withStash(64) { buffer =>
-          given StashBuffer[Command] = buffer
+          Behaviors.withStash(64) { buffer =>
+            given StashBuffer[Command] = buffer
 
-          new EventSubListener(tokenId, broadcaster).initial
+            new EventSubListener(tokenId, broadcaster).initial
+          }
         }
       }
     }
-  }.onFailure[Throwable](SupervisorStrategy.resume)
+    .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
 private class EventSubListener(
@@ -564,6 +571,6 @@ private class EventSubListener(
   private def logIgnoreBinary(data: ByteString, state: String): Unit =
     ctx.log.info("Ignoring the binary message {} in the {} state", data, state)
   private def logIgnore(msg: Command, state: String): Unit =
-    ctx.log.warn("Ignoring the command {} in the {} state", msg, state)
+    ctx.log.debug("Ignoring the command {} in the {} state", msg, state)
 
 }
