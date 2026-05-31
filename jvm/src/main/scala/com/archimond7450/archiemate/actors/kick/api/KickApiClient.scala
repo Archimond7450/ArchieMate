@@ -11,13 +11,17 @@ import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient.{
 import com.archimond7450.archiemate.actors.{ArchieMateMediator, HttpClient}
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
-import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
+import com.archimond7450.archiemate.helpers.JsonHelper.{
+  decodeOrThrow,
+  decodeToTry
+}
 import com.archimond7450.archiemate.kick.api.{KickApiRequest, KickApiResponse}
 import io.circe.Decoder
 import io.circe.syntax.EncoderOps
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.http.scaladsl.marshalling.Marshal
+import org.apache.pekko.http.scaladsl.model.Uri.Query
 import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
@@ -95,6 +99,25 @@ object KickApiClient {
       replyToMessageId: Option[String] = None
   ) extends PublicCommand
 
+  final case class GetCategories(
+      replyTo: ActorRef[StatusReply[KickApiResponse.GetCategories]],
+      tokenId: String,
+      name: String
+  ) extends PublicCommand
+
+  final case class GetChannel(
+      replyTo: ActorRef[StatusReply[KickApiResponse.Channel]],
+      tokenId: String
+  ) extends PublicCommand
+
+  final case class UpdateChannel(
+      replyTo: ActorRef[StatusReply[KickApiResponse.ChannelUpdated.type]],
+      tokenId: String,
+      categoryId: Option[Int],
+      customTags: Option[List[String]],
+      streamTitle: Option[String]
+  ) extends PublicCommand
+
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
   ): Behavior[Command] = Behaviors
@@ -152,6 +175,18 @@ class KickApiClient(using
 
     case cmd: PostChatMessage =>
       processPostChatMessage(cmd)
+      Behaviors.same
+
+    case cmd: GetCategories =>
+      processGetCategories(cmd)
+      Behaviors.same
+
+    case cmd: GetChannel =>
+      processGetChannel(cmd)
+      Behaviors.same
+
+    case cmd: UpdateChannel =>
+      processUpdateChannel(cmd)
       Behaviors.same
   }
 
@@ -255,7 +290,7 @@ class KickApiClient(using
 
       case cmd: GetTokenUserFromTokenId =>
         val tryUsers = decodeResponse[KickApiResponse.GetUsers](json)
-        val tryResponse = tryUsers.map(users => users.data.last)
+        val tryResponse = tryUsers.map(_.data.last)
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
         tryResponse.foreach { tokenUser =>
           mediator ! ArchieMateMediator.SendKickTokenUserCacheServiceCommand(
@@ -265,13 +300,26 @@ class KickApiClient(using
 
       case cmd: GetTokenUserFromAccessToken =>
         val tryUsers = decodeResponse[KickApiResponse.GetUsers](json)
-        val tryResponse = tryUsers.map(users => users.data.last)
+        val tryResponse = tryUsers.map(_.data.last)
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
 
       case cmd: PostChatMessage =>
         cmd.replyTo ! tryResponseToStatusReply(
           decodeResponse[KickApiResponse.PostChatMessage](json)
         )
+
+      case cmd: GetCategories =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[KickApiResponse.GetCategories](json)
+        )
+
+      case cmd: GetChannel =>
+        val tryChannels = decodeResponse[KickApiResponse.GetChannels](json)
+        val tryResponse = tryChannels.map(_.data.last)
+        cmd.replyTo ! tryResponseToStatusReply(tryResponse)
+
+      case cmd: UpdateChannel =>
+        cmd.replyTo ! StatusReply.success(KickApiResponse.ChannelUpdated)
     }
   }
 
@@ -290,6 +338,15 @@ class KickApiClient(using
         cmd.replyTo ! StatusReply.error(resp.cause)
 
       case cmd: PostChatMessage =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetCategories =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetChannel =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: UpdateChannel =>
         cmd.replyTo ! StatusReply.error(resp.cause)
     }
   }
@@ -362,7 +419,7 @@ class KickApiClient(using
         Request(
           originalCommand = cmd,
           method = HttpMethods.POST,
-          uri = "https://id.kick.com/oauth/token",
+          uri = Uri("https://id.kick.com/oauth/token"),
           entity = formData,
           shouldRefresh = false
         )
@@ -379,7 +436,7 @@ class KickApiClient(using
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = "https://api.kick.com/public/v1/users",
+      uri = Uri("https://api.kick.com/public/v1/users"),
       tokenId = Some(cmd.tokenId)
     )
   }
@@ -391,7 +448,7 @@ class KickApiClient(using
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.GET,
-      uri = "https://api.kick.com/public/v1/users",
+      uri = Uri("https://api.kick.com/public/v1/users"),
       token = Some(KickApiResponse.GetToken(cmd.accessToken, "", "", "", "")),
       shouldRefresh = false
     )
@@ -402,7 +459,7 @@ class KickApiClient(using
     ctx.self ! Request(
       originalCommand = cmd,
       method = HttpMethods.POST,
-      uri = "https://api.kick.com/public/v1/chat",
+      uri = Uri("https://api.kick.com/public/v1/chat"),
       entity = HttpEntity(
         ContentTypes.`application/json`,
         KickApiRequest
@@ -410,6 +467,49 @@ class KickApiClient(using
             content = cmd.content,
             `type` = "bot",
             replyToMessageId = cmd.replyToMessageId
+          )
+          .asJson
+          .noSpaces
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processGetCategories(cmd: GetCategories): Unit = {
+    ctx.log.debug("processGetCategories(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = Uri("https://api.kick.com/public/v2/categories").withQuery(
+        Query("name" -> cmd.name)
+      ),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processGetChannel(cmd: GetChannel): Unit = {
+    ctx.log.debug("processGetChannel(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = Uri("https://api.kick.com/public/v1/channels"),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processUpdateChannel(cmd: UpdateChannel): Unit = {
+    ctx.log.debug("processUpdateChannel(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.PATCH,
+      uri = Uri("https://api.kick.com/public/v1/channels"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        KickApiRequest
+          .UpdateChannel(
+            categoryId = cmd.categoryId,
+            customTags = cmd.customTags,
+            streamTitle = cmd.streamTitle
           )
           .asJson
           .noSpaces
