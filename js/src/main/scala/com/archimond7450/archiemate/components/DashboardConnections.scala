@@ -79,7 +79,7 @@ object DashboardConnections {
                 } else {
                   a(
                     cls(
-                      "bg-[#00E701] text-black font-bold rounded-md px-4 py-2 md:mx-2 md:my-4 hover:bg-purple-700 transition"
+                      "bg-[#00E701] text-black font-bold rounded-md px-4 py-2 md:mx-2 md:my-4 hover:bg-green-600 transition"
                     ),
                     href("/oauth/kick/connection"),
                     "Connect"
