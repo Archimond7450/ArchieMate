@@ -37,6 +37,10 @@ object DashboardBasicChatbotConfiguration {
                 state.zoomLazy(_.join)((old, join) => old.copy(join = join))
               form(
                 onSubmit.preventDefault --> { _ => },
+                div(
+                  cls("flex items-start flex-col md:flex-row"),
+                  switch("join-twitch", "Leave", "Join", joinTwitch)
+                ),
                 SaveButton.render[BasicChatbotSettings](
                   state,
                   currentSettings =>
@@ -44,10 +48,6 @@ object DashboardBasicChatbotConfiguration {
                       basicChatbotSettingsEndpoint,
                       currentSettings
                     )
-                ),
-                div(
-                  cls("flex items-start flex-col md:flex-row"),
-                  switch("join-twitch", "Leave", "Join", joinTwitch)
                 )
               )
 
