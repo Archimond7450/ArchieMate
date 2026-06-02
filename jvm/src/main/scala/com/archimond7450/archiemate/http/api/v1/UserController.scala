@@ -7,7 +7,7 @@ import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.failWithoutSessionCookie
 import com.archimond7450.archiemate.http.IController
-import com.archimond7450.archiemate.http.User.UserResponse
+import com.archimond7450.archiemate.http.User.{UserInfo, UserResponse}
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
 import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
@@ -40,24 +40,37 @@ final class UserController(using
           )
         ) {
           case Success(
-                UserControllerHelperService.GetUserOKResponse(Success(user))
+                UserControllerHelperService.GetUserOKResponse(
+                  Success(twitchUser),
+                  Success(kickUser)
+                )
               ) =>
             complete(
               UserResponse(
-                user.id,
-                user.login,
-                user.displayName,
-                user.profileImageUrl
+                UserInfo(
+                  userId = twitchUser.id,
+                  userName = twitchUser.login,
+                  userDisplayName = twitchUser.displayName,
+                  profilePictureUrl = twitchUser.profileImageUrl
+                ),
+                kickUser.map(user =>
+                  UserInfo(
+                    userId = user.userId.toString,
+                    userName = user.name.toLowerCase(),
+                    userDisplayName = user.name,
+                    profilePictureUrl = user.profilePicture
+                  )
+                )
               )
             )
 
-          case Success(
-                UserControllerHelperService.GetUserOKResponse(Failure(ex))
-              ) =>
-            complete(StatusCodes.InternalServerError)
-
           case Success(UserControllerHelperService.InvalidJWT) =>
             complete(StatusCodes.Unauthorized)
+
+          case Success(
+                UserControllerHelperService.GetUserOKResponse(_, _)
+              ) =>
+            complete(StatusCodes.InternalServerError)
 
           case Failure(ex) =>
             complete(StatusCodes.InternalServerError)

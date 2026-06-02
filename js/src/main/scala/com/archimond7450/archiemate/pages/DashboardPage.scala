@@ -1,39 +1,13 @@
 package com.archimond7450.archiemate.pages
 
 import com.archimond7450.archiemate.App.{Login, Page}
-import com.archimond7450.archiemate.components.{
-  DashboardAutomaticMessagesConfiguration,
-  DashboardBasicChatbotConfiguration,
-  DashboardBasicChatbotConfigurationUnavailable,
-  DashboardBuiltInCommandsConfiguration,
-  DashboardCommandsConfiguration,
-  DashboardConnections,
-  DashboardTwitchInformation,
-  DashboardVariablesConfiguration
-}
+import com.archimond7450.archiemate.components.{DashboardAutomaticMessagesConfiguration, DashboardBasicChatbotConfiguration, DashboardBasicChatbotConfigurationUnavailable, DashboardBuiltInCommandsConfiguration, DashboardCommandsConfiguration, DashboardConnections, DashboardKickInformation, DashboardTwitchInformation, DashboardVariablesConfiguration}
 import com.archimond7450.archiemate.{Loaded, Loading, LoadingState}
 import com.archimond7450.archiemate.elements.Buttons.asyncButton
-import com.archimond7450.archiemate.elements.StyledStandardElements.{
-  h1Element,
-  h1ElementMapped,
-  h2Element,
-  pElement
-}
+import com.archimond7450.archiemate.elements.StyledStandardElements.{h1Element, h1ElementMapped, h2Element, pElement}
 import com.archimond7450.archiemate.elements.Switches.switch
-import com.archimond7450.archiemate.helpers.FetchHelpers.{
-  fetchAutomaticMessagesSettings,
-  fetchBasicChatbotSettings,
-  fetchBuiltInCommandsSettings,
-  fetchCommandsSettings,
-  fetchGetStream,
-  fetchOverlaysSettings,
-  fetchTimersSettings,
-  fetchVariablesSettings
-}
-import com.archimond7450.archiemate.http.ChannelSettings.{
-  BasicChatbotSettings,
-  Settings
-}
+import com.archimond7450.archiemate.helpers.FetchHelpers.{fetchAutomaticMessagesSettings, fetchBasicChatbotSettings, fetchBuiltInCommandsSettings, fetchCommandsSettings, fetchGetStream, fetchOverlaysSettings, fetchTimersSettings, fetchVariablesSettings}
+import com.archimond7450.archiemate.http.ChannelSettings.{BasicChatbotSettings, Settings}
 import com.archimond7450.archiemate.http.Connections.Connections
 import com.archimond7450.archiemate.http.User.UserResponse
 import com.archimond7450.archiemate.models.AuthModel.LoggedOut
@@ -74,7 +48,13 @@ object DashboardPage {
               (_, _) => false
             )
           div(
-            DashboardTwitchInformation.render(user),
+            DashboardTwitchInformation.render(user.twitchUserInfo),
+            child <-- authModel.stateSignal.map {
+              case Loaded(Success(AuthModel.LoggedIn(UserResponse(_, Some(kickUserInfo))))) =>
+                DashboardKickInformation.render(kickUserInfo)
+              case _ =>
+                div()
+            },
             div(
               cls("mt-12 border rounded-lg"),
               h2Element("Connections"),
