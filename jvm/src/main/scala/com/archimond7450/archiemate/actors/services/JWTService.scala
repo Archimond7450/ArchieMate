@@ -25,7 +25,7 @@ object JWTService {
   final case class DecodeJWT(replyTo: ActorRef[DecodeJWTResponse], jwt: String)
       extends Command
   sealed trait DecodeJWTResponse
-  final case class DecodedJWT(userId: String, sessionId: String)
+  final case class DecodedJWT(twitchUserId: String, sessionId: String)
       extends DecodeJWTResponse
   case object InvalidJWT extends DecodeJWTResponse
 

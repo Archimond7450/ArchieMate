@@ -19,6 +19,18 @@ object HttpControllerHelpers {
     }
   }
 
+  def withOptionalSessionCookie(
+      innerRoute: Option[HttpCookiePair] => Route
+  )(using settings: Settings): Route = {
+    optionalCookie("session") {
+      case Some(jwt) =>
+        updateSessionCookie(jwt) { newJwt =>
+          innerRoute(Some(newJwt))
+        }
+      case None => innerRoute(None)
+    }
+  }
+
   def logoutSessionCookie(
       innerRoute: => Route
   )(using settings: Settings): Route = {

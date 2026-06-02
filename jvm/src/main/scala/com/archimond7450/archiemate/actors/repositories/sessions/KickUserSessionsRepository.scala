@@ -28,20 +28,20 @@ object KickUserSessionsRepository {
   )
 
   sealed trait Command
-  case class SetToken(tokenId: String, userId: String, token: GetToken)
+  case class SetToken(tokenId: String, twitchUserId: String, token: GetToken)
       extends Command
   case class RefreshToken(tokenId: String, token: GetToken) extends Command
   case class GetTokenFromId(
       replyTo: ActorRef[ReturnedTokenFromId],
       tokenId: String
   ) extends Command
-  case class GetTokenIdForUserId(
-      replyTo: ActorRef[ReturnedTokenIdForUserId],
-      userId: String
+  case class GetTokenIdForTwitchUserId(
+      replyTo: ActorRef[ReturnedTokenIdForTwitchUserId],
+      twitchUserId: String
   ) extends Command
 
   case class ReturnedTokenFromId(token: Option[GetToken])
-  case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
+  case class ReturnedTokenIdForTwitchUserId(maybeTokenId: Option[String])
 
   private sealed trait Event
   private object Event {
@@ -51,7 +51,7 @@ object KickUserSessionsRepository {
 
   private final case class TokenSet(
       kickTokenId: String,
-      userId: String,
+      twitchUserId: String,
       token: GetToken
   ) extends Event
   private object TokenSet {
@@ -117,8 +117,8 @@ object KickUserSessionsRepository {
   private val commandHandler: (State, Command) => ReplyEffect[Event, State] = {
     (state, command) =>
       command match {
-        case SetToken(tokenId, userId, token) =>
-          Effect.persist(TokenSet(tokenId, userId, token)).thenNoReply()
+        case SetToken(tokenId, twitchUserId, token) =>
+          Effect.persist(TokenSet(tokenId, twitchUserId, token)).thenNoReply()
 
         case RefreshToken(tokenId, token) =>
           val userOption = state.users.find(_._2.tokens.contains(tokenId))
@@ -137,12 +137,12 @@ object KickUserSessionsRepository {
             ReturnedTokenFromId(tokenOption)
           }
 
-        case GetTokenIdForUserId(replyTo, userId) =>
+        case GetTokenIdForTwitchUserId(replyTo, twitchUserId) =>
           Effect.none.thenReply(replyTo) { state =>
-            val userStateOption = state.users.get(userId)
+            val userStateOption = state.users.get(twitchUserId)
             val tokenOption =
               userStateOption.flatMap(_.tokens.find(_._2.scope.nonEmpty))
-            ReturnedTokenIdForUserId(tokenOption.map(_._1))
+            ReturnedTokenIdForTwitchUserId(tokenOption.map(_._1))
           }
       }
   }
@@ -163,12 +163,12 @@ object KickUserSessionsRepository {
   private def updatedState(
       state: State,
       tokenId: String,
-      userId: String,
+      twitchUserId: String,
       token: GetToken,
       userState: UserState
   ): State = {
     val newTokens = userState.tokens + (tokenId -> token)
     val newUserState = UserState(newTokens)
-    State(state.users + (userId -> newUserState))
+    State(state.users + (twitchUserId -> newUserState))
   }
 }

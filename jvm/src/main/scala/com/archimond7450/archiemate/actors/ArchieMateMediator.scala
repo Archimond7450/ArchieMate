@@ -20,6 +20,7 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
 }
 import com.archimond7450.archiemate.actors.services.{
   JWTService,
+  KickLoginValidatorService,
   TwitchApiPaginationHandlerService,
   TwitchLoginValidatorService
 }
@@ -37,6 +38,7 @@ import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
+import com.archimond7450.archiemate.helpers.PkceHelpers
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import org.apache.pekko.actor.typed.{
   ActorRef,
@@ -120,6 +122,9 @@ object ArchieMateMediator {
   final case class SendTwitchLoginValidatorServiceCommand(
       cmd: TwitchLoginValidatorService.Command
   ) extends Command
+  final case class SendKickLoginValidatorServiceCommand(
+      cmd: KickLoginValidatorService.Command
+  ) extends Command
   final case class SendTwitchApiClientCommand(cmd: TwitchApiClient.Command)
       extends Command
   final case class SendKickApiClientCommand(cmd: KickApiClient.Command)
@@ -130,6 +135,7 @@ object ArchieMateMediator {
   def apply()(using
       randomProvider: RandomProvider,
       timeProvider: TimeProvider,
+      pkceHelpers: PkceHelpers,
       settings: Settings
   ): Behavior[Command] = Behaviors
     .supervise[Command] {
@@ -145,6 +151,7 @@ final class ArchieMateMediator(using
     ctx: ActorContext[ArchieMateMediator.Command],
     randomProvider: RandomProvider,
     timeProvider: TimeProvider,
+    pkceHelpers: PkceHelpers,
     settings: Settings
 ) {
   import ArchieMateMediator.*
@@ -200,9 +207,10 @@ final class ArchieMateMediator(using
       twitchApiPaginationHandlerService: ActorRef[
         TwitchApiPaginationHandlerService.Command
       ],
-      twitchLoginValidatorServiceCommand: ActorRef[
+      twitchLoginValidatorService: ActorRef[
         TwitchLoginValidatorService.Command
       ],
+      kickLoginValidatorService: ActorRef[KickLoginValidatorService.Command],
       twitchApiClient: ActorRef[TwitchApiClient.Command],
       kickApiClient: ActorRef[KickApiClient.Command],
       youTubeApiClient: ActorRef[YouTubeApiClient.Command]
@@ -286,9 +294,13 @@ final class ArchieMateMediator(using
         TwitchApiPaginationHandlerService(),
         TwitchApiPaginationHandlerService.actorName
       ),
-      twitchLoginValidatorServiceCommand = ctx.spawn(
+      twitchLoginValidatorService = ctx.spawn(
         TwitchLoginValidatorService(),
         TwitchLoginValidatorService.actorName
+      ),
+      kickLoginValidatorService = ctx.spawn(
+        KickLoginValidatorService(),
+        KickLoginValidatorService.actorName
       ),
       twitchApiClient = ctx.spawn(TwitchApiClient(), TwitchApiClient.actorName),
       kickApiClient = ctx.spawn(KickApiClient(), KickApiClient.actorName),
@@ -389,7 +401,7 @@ final class ArchieMateMediator(using
       Behaviors.same
 
     case SendTwitchLoginValidatorServiceCommand(cmd) =>
-      state.twitchLoginValidatorServiceCommand ! cmd
+      state.twitchLoginValidatorService ! cmd
       Behaviors.same
 
     case SendTwitchApiClientCommand(cmd) =>
