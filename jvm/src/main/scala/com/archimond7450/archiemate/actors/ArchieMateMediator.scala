@@ -404,6 +404,10 @@ final class ArchieMateMediator(using
       state.twitchLoginValidatorService ! cmd
       Behaviors.same
 
+    case SendKickLoginValidatorServiceCommand(cmd) =>
+      state.kickLoginValidatorService ! cmd
+      Behaviors.same
+
     case SendTwitchApiClientCommand(cmd) =>
       state.twitchApiClient ! cmd
       Behaviors.same
