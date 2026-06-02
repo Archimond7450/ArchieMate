@@ -6,7 +6,13 @@ import io.circe.{Decoder, Encoder}
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 
 object User {
-  case class UserResponse(userId: String, userName: String, userDisplayName: String, profilePictureUrl: String)
+  case class UserInfo(userId: String, userName: String, userDisplayName: String, profilePictureUrl: String)
+  object UserInfo {
+    given Decoder[UserInfo] = ConfiguredDecoder.derived
+    given Encoder[UserInfo] = ConfiguredEncoder.derived
+  }
+
+  case class UserResponse(twitchUserInfo: UserInfo, kickUserInfo: Option[UserInfo])
   object UserResponse {
     given Decoder[UserResponse] = ConfiguredDecoder.derived
     given Encoder[UserResponse] = JsonHelper.dropNulls(ConfiguredEncoder.derived)
