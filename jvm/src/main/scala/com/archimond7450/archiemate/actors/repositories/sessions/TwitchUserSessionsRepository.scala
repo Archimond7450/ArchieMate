@@ -14,7 +14,11 @@ import io.circe.{Decoder, Encoder}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
-import org.apache.pekko.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  ReplyEffect
+}
 import org.apache.pekko.serialization.Serializer
 
 import java.io.NotSerializableException
@@ -51,23 +55,23 @@ object TwitchUserSessionsRepository {
     given Encoder[Event] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenSet(
+  private final case class TwitchTokenSet(
       twitchTokenId: String,
       userId: String,
       token: GetToken
   ) extends Event
-  private object TokenSet {
-    given Decoder[TokenSet] = ConfiguredDecoder.derived
-    given Encoder[TokenSet] = ConfiguredEncoder.derived
+  private object TwitchTokenSet {
+    given Decoder[TwitchTokenSet] = ConfiguredDecoder.derived
+    given Encoder[TwitchTokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenRefreshed(
+  private final case class TwitchTokenRefreshed(
       twitchTokenId: String,
       token: GetToken
   ) extends Event
-  private object TokenRefreshed {
-    given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
-    given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
+  private object TwitchTokenRefreshed {
+    given Decoder[TwitchTokenRefreshed] = ConfiguredDecoder.derived
+    given Encoder[TwitchTokenRefreshed] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
@@ -83,47 +87,49 @@ object TwitchUserSessionsRepository {
 
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.supervise[Command] {
-    Behaviors.setup { ctx =>
-      EventSourcedBehavior
-        .withEnforcedReplies[Command, Event, State](
-          persistenceId = PersistenceId.ofUniqueId(actorName),
-          emptyState = State(),
-          commandHandler = commandHandler,
-          eventHandler = eventHandler
-        )
-        .receiveSignal { case (state, RecoveryCompleted) =>
-          state.users.foreach { (userId, userState) =>
-            val tokenId = userState.tokens
-              .find(_._2.scope.nonEmpty)
-              .getOrElse(userState.tokens.last)
-              ._1
-            mediator ! ArchieMateMediator.SendTwitchApiClientCommand(
-              TwitchApiClient.GetTokenUserFromTokenId(
-                ctx.system.ignoreRef,
+  ): Behavior[Command] = Behaviors
+    .supervise[Command] {
+      Behaviors.setup { ctx =>
+        EventSourcedBehavior
+          .withEnforcedReplies[Command, Event, State](
+            persistenceId = PersistenceId.ofUniqueId(actorName),
+            emptyState = State(),
+            commandHandler = commandHandler,
+            eventHandler = eventHandler
+          )
+          .receiveSignal { case (state, RecoveryCompleted) =>
+            state.users.foreach { (userId, userState) =>
+              val tokenId = userState.tokens
+                .find(_._2.scope.nonEmpty)
+                .getOrElse(userState.tokens.last)
+                ._1
+              mediator ! ArchieMateMediator.SendTwitchApiClientCommand(
+                TwitchApiClient.GetTokenUserFromTokenId(
+                  ctx.system.ignoreRef,
+                  tokenId
+                )
+              )
+              ctx.log.debug(
+                "Sent GetTokenUserFromTokenId to twitchApiClient for userId {} and tokenId {}",
+                userId,
                 tokenId
               )
-            )
-            ctx.log.debug(
-              "Sent GetTokenUserFromTokenId to twitchApiClient for userId {} and tokenId {}",
-              userId,
-              tokenId
-            )
+            }
           }
-        }
+      }
     }
-  }.onFailure[Throwable](SupervisorStrategy.restart)
+    .onFailure[Throwable](SupervisorStrategy.restart)
 
   private val commandHandler: (State, Command) => ReplyEffect[Event, State] = {
     (state, command) =>
       command match {
         case SetToken(tokenId, userId, token) =>
-          Effect.persist(TokenSet(tokenId, userId, token)).thenNoReply()
+          Effect.persist(TwitchTokenSet(tokenId, userId, token)).thenNoReply()
 
         case RefreshToken(tokenId, token) =>
           val userOption = state.users.find(_._2.tokens.contains(tokenId))
           if (userOption.nonEmpty) {
-            Effect.persist(TokenRefreshed(tokenId, token)).thenNoReply()
+            Effect.persist(TwitchTokenRefreshed(tokenId, token)).thenNoReply()
           } else {
             Effect.none.thenNoReply()
           }
@@ -149,11 +155,11 @@ object TwitchUserSessionsRepository {
 
   private val eventHandler: (State, Event) => State = { (state, event) =>
     event match {
-      case TokenSet(tokenId, userId, token) =>
+      case TwitchTokenSet(tokenId, userId, token) =>
         val userState = state.users.getOrElse(userId, UserState())
         updatedState(state, tokenId, userId, token, userState)
 
-      case TokenRefreshed(tokenId, token) =>
+      case TwitchTokenRefreshed(tokenId, token) =>
         val (userId, userState) =
           state.users.find(_._2.tokens.contains(tokenId)).get
         updatedState(state, tokenId, userId, token, userState)
