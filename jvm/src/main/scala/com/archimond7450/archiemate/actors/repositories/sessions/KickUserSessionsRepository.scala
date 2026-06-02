@@ -49,23 +49,23 @@ object KickUserSessionsRepository {
     given Encoder[Event] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenSet(
+  private final case class KickTokenSet(
       kickTokenId: String,
       twitchUserId: String,
       token: GetToken
   ) extends Event
-  private object TokenSet {
-    given Decoder[TokenSet] = ConfiguredDecoder.derived
-    given Encoder[TokenSet] = ConfiguredEncoder.derived
+  private object KickTokenSet {
+    given Decoder[KickTokenSet] = ConfiguredDecoder.derived
+    given Encoder[KickTokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class TokenRefreshed(
+  private final case class KickTokenRefreshed(
       kickTokenId: String,
       token: GetToken
   ) extends Event
-  private object TokenRefreshed {
-    given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
-    given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
+  private object KickTokenRefreshed {
+    given Decoder[KickTokenRefreshed] = ConfiguredDecoder.derived
+    given Encoder[KickTokenRefreshed] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
@@ -118,12 +118,12 @@ object KickUserSessionsRepository {
     (state, command) =>
       command match {
         case SetToken(tokenId, twitchUserId, token) =>
-          Effect.persist(TokenSet(tokenId, twitchUserId, token)).thenNoReply()
+          Effect.persist(KickTokenSet(tokenId, twitchUserId, token)).thenNoReply()
 
         case RefreshToken(tokenId, token) =>
           val userOption = state.users.find(_._2.tokens.contains(tokenId))
           if (userOption.nonEmpty) {
-            Effect.persist(TokenRefreshed(tokenId, token)).thenNoReply()
+            Effect.persist(KickTokenRefreshed(tokenId, token)).thenNoReply()
           } else {
             Effect.none.thenNoReply()
           }
@@ -149,11 +149,11 @@ object KickUserSessionsRepository {
 
   private val eventHandler: (State, Event) => State = { (state, event) =>
     event match {
-      case TokenSet(tokenId, userId, token) =>
+      case KickTokenSet(tokenId, userId, token) =>
         val userState = state.users.getOrElse(userId, UserState())
         updatedState(state, tokenId, userId, token, userState)
 
-      case TokenRefreshed(tokenId, token) =>
+      case KickTokenRefreshed(tokenId, token) =>
         val (userId, userState) =
           state.users.find(_._2.tokens.contains(tokenId)).get
         updatedState(state, tokenId, userId, token, userState)
