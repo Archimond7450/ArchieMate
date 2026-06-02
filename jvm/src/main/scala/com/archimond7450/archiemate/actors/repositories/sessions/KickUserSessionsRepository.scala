@@ -49,29 +49,29 @@ object KickUserSessionsRepository {
     given Encoder[Event] = ConfiguredEncoder.derived
   }
 
-  private final case class KickTokenSet(
+  private final case class TokenSet(
       kickTokenId: String,
       twitchUserId: String,
       token: GetToken
   ) extends Event
-  private object KickTokenSet {
-    given Decoder[KickTokenSet] = ConfiguredDecoder.derived
-    given Encoder[KickTokenSet] = ConfiguredEncoder.derived
+  private object TokenSet {
+    given Decoder[TokenSet] = ConfiguredDecoder.derived
+    given Encoder[TokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class KickTokenRefreshed(
+  private final case class TokenRefreshed(
       kickTokenId: String,
       token: GetToken
   ) extends Event
-  private object KickTokenRefreshed {
-    given Decoder[KickTokenRefreshed] = ConfiguredDecoder.derived
-    given Encoder[KickTokenRefreshed] = ConfiguredEncoder.derived
+  private object TokenRefreshed {
+    given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
+    given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
       extends GenericSerializer[Event](
         actorName,
-        SerializerIDs.twitchUserSessionsRepositoryId
+        SerializerIDs.kickUserSessionsRepositoryId
       ) {
 
     override val toEvent: PartialFunction[AnyRef, Event] = {
@@ -118,12 +118,12 @@ object KickUserSessionsRepository {
     (state, command) =>
       command match {
         case SetToken(tokenId, twitchUserId, token) =>
-          Effect.persist(KickTokenSet(tokenId, twitchUserId, token)).thenNoReply()
+          Effect.persist(TokenSet(tokenId, twitchUserId, token)).thenNoReply()
 
         case RefreshToken(tokenId, token) =>
           val userOption = state.users.find(_._2.tokens.contains(tokenId))
           if (userOption.nonEmpty) {
-            Effect.persist(KickTokenRefreshed(tokenId, token)).thenNoReply()
+            Effect.persist(TokenRefreshed(tokenId, token)).thenNoReply()
           } else {
             Effect.none.thenNoReply()
           }
@@ -149,11 +149,11 @@ object KickUserSessionsRepository {
 
   private val eventHandler: (State, Event) => State = { (state, event) =>
     event match {
-      case KickTokenSet(tokenId, userId, token) =>
+      case TokenSet(tokenId, userId, token) =>
         val userState = state.users.getOrElse(userId, UserState())
         updatedState(state, tokenId, userId, token, userState)
 
-      case KickTokenRefreshed(tokenId, token) =>
+      case TokenRefreshed(tokenId, token) =>
         val (userId, userState) =
           state.users.find(_._2.tokens.contains(tokenId)).get
         updatedState(state, tokenId, userId, token, userState)

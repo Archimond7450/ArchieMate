@@ -3,6 +3,7 @@ package com.archimond7450.archiemate
 object SerializerIDs {
   val twitchUserSessionsRepositoryId: Int = 100
   val youTubeChannelSessionsRepositoryId: Int = 101
+  val kickUserSessionsRepositoryId: Int = 102
 
   val automaticMessagesSettingsRepositoryId: Int = 200
   val basicChatbotSettingsRepositoryId: Int = 201
