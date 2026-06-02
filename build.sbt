@@ -52,32 +52,32 @@ lazy val ArchieMateCross = crossProject(JVMPlatform, JSPlatform)
     name := "ArchieMate Backend",
     libraryDependencies ++= Seq(
       // Pekko
-      "org.apache.pekko" %% "pekko-actor-typed" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence-typed" % "1.2.0",
-      "org.apache.pekko" %% "pekko-persistence-testkit" % "1.2.0" % Test,
-      "org.apache.pekko" %% "pekko-stream" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http-spray-json" % "1.2.0",
-      "org.apache.pekko" %% "pekko-http-testkit" % "1.2.0" % Test,
-      "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.2.0" % Test,
-      "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.1.1",
-      "org.apache.pekko" %% "pekko-persistence-query" % "1.2.0",
+      "org.apache.pekko" %% "pekko-actor-typed" % "1.6.0",
+      "org.apache.pekko" %% "pekko-persistence" % "1.6.0",
+      "org.apache.pekko" %% "pekko-persistence-typed" % "1.6.0",
+      "org.apache.pekko" %% "pekko-persistence-testkit" % "1.6.0" % Test,
+      "org.apache.pekko" %% "pekko-stream" % "1.6.0",
+      "org.apache.pekko" %% "pekko-http" % "1.3.0",
+      "org.apache.pekko" %% "pekko-http-spray-json" % "1.3.0",
+      "org.apache.pekko" %% "pekko-http-testkit" % "1.3.0" % Test,
+      "org.apache.pekko" %% "pekko-actor-testkit-typed" % "1.6.0" % Test,
+      "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.2.0",
+      "org.apache.pekko" %% "pekko-persistence-query" % "1.6.0",
 
       // Logback
-      "ch.qos.logback" % "logback-classic" % "1.5.18",
+      "ch.qos.logback" % "logback-classic" % "1.5.34",
 
       // Typesafe Config
-      "com.typesafe" % "config" % "1.4.5",
+      "com.typesafe" % "config" % "1.4.8",
 
       // PostgreSQL
-      "org.postgresql" % "postgresql" % "42.7.7",
+      "org.postgresql" % "postgresql" % "42.7.11",
 
       // JWT
-      "com.github.jwt-scala" %% "jwt-circe" % "11.0.3",
+      "com.github.jwt-scala" %% "jwt-circe" % "11.0.4",
 
       // Circe
-      "com.github.pjfanning" %% "pekko-http-circe" % "3.3.0"
+      "com.github.pjfanning" %% "pekko-http-circe" % "3.9.1"
     )
   )
   .jsSettings(
