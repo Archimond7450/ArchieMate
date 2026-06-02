@@ -37,6 +37,7 @@ import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import com.archimond7450.archiemate.extensions.*
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.logoutSessionCookie
+import com.archimond7450.archiemate.helpers.PkceHelpers
 import com.archimond7450.archiemate.http.OAuthController
 import com.archimond7450.archiemate.http.api.v1.{
   SettingsController,
@@ -51,6 +52,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.util.Timeout
 
+import java.security.SecureRandom
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration.DurationInt
 
@@ -100,6 +102,7 @@ object UserGuardian {
 
       given RandomProvider = new RandomProvider
       given TimeProvider = new TimeProvider
+      given PkceHelpers = new PkceHelpers(new SecureRandom())
 
       given Settings = settings
 
