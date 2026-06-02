@@ -19,7 +19,7 @@ object KickApiResponse {
       accessToken: String,
       tokenType: String,
       refreshToken: String,
-      expiresIn: String,
+      expiresIn: Int,
       scope: String
   ) extends KickApiResponse
 
