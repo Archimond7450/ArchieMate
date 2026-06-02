@@ -34,7 +34,7 @@ object DashboardKickInformation {
         ),
         href(s"https://kick.com/${user.userName}"),
         target("_blank"),
-        "Twitch Channel"
+        "Kick Channel"
       ),
       a(
         cls(
@@ -42,7 +42,7 @@ object DashboardKickInformation {
         ),
         href(s"https://kick.com/popout/${user.userName}/chat"),
         target("_blank"),
-        "Twitch Chat"
+        "Kick Chat"
       )
     )
   )
