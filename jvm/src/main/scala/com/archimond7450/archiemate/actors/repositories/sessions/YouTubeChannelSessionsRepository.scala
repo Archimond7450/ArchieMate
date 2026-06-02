@@ -45,23 +45,23 @@ object YouTubeChannelSessionsRepository {
     given Encoder[Event] = ConfiguredEncoder.derived
   }
 
-  private final case class YoutubeTokenSet(
+  private final case class TokenSet(
       youtubeTokenId: String,
       userId: String,
       token: GetToken
   ) extends Event
-  private object YoutubeTokenSet {
-    given Decoder[YoutubeTokenSet] = ConfiguredDecoder.derived
-    given Encoder[YoutubeTokenSet] = ConfiguredEncoder.derived
+  private object TokenSet {
+    given Decoder[TokenSet] = ConfiguredDecoder.derived
+    given Encoder[TokenSet] = ConfiguredEncoder.derived
   }
 
-  private final case class YoutubeTokenRefreshed(
+  private final case class TokenRefreshed(
       youtubeTokenId: String,
       token: GetToken
   ) extends Event
-  private object YoutubeTokenRefreshed {
-    given Decoder[YoutubeTokenRefreshed] = ConfiguredDecoder.derived
-    given Encoder[YoutubeTokenRefreshed] = ConfiguredEncoder.derived
+  private object TokenRefreshed {
+    given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
+    given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
@@ -114,12 +114,12 @@ object YouTubeChannelSessionsRepository {
     (state, command) =>
       command match {
         case SetToken(tokenId, userId, token) =>
-          Effect.persist(YoutubeTokenSet(tokenId, userId, token)).thenNoReply()
+          Effect.persist(TokenSet(tokenId, userId, token)).thenNoReply()
 
         case RefreshToken(tokenId, token) =>
           val userOption = state.users.find(_._2.tokens.contains(tokenId))
           if (userOption.nonEmpty) {
-            Effect.persist(YoutubeTokenRefreshed(tokenId, token)).thenNoReply()
+            Effect.persist(TokenRefreshed(tokenId, token)).thenNoReply()
           } else {
             Effect.none.thenNoReply()
           }
@@ -147,11 +147,11 @@ object YouTubeChannelSessionsRepository {
 
   private val eventHandler: (State, Event) => State = { (state, event) =>
     event match {
-      case YoutubeTokenSet(tokenId, userId, token) =>
+      case TokenSet(tokenId, userId, token) =>
         val userState = state.users.getOrElse(userId, UserState())
         updatedState(state, tokenId, userId, token, userState)
 
-      case YoutubeTokenRefreshed(tokenId, token) =>
+      case TokenRefreshed(tokenId, token) =>
         val (userId, userState) =
           state.users.find(_._2.tokens.contains(tokenId)).get
         updatedState(state, tokenId, userId, token, userState)
