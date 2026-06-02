@@ -449,7 +449,7 @@ class KickApiClient(using
       originalCommand = cmd,
       method = HttpMethods.GET,
       uri = Uri("https://api.kick.com/public/v1/users"),
-      token = Some(KickApiResponse.GetToken(cmd.accessToken, "", "", "", "")),
+      token = Some(KickApiResponse.GetToken(cmd.accessToken, "", "", 0, "")),
       shouldRefresh = false
     )
   }
