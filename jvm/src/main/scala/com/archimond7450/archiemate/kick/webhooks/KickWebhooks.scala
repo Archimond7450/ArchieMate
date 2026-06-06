@@ -2,6 +2,7 @@ package com.archimond7450.archiemate.kick.webhooks
 
 import com.archimond7450.archiemate.CirceConfiguration.kickConfiguration
 import io.circe.{Decoder, Encoder}
+import io.circe.jawn.decode
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 
 import java.time.OffsetDateTime
@@ -9,8 +10,18 @@ import java.time.OffsetDateTime
 object KickWebhooks {
   sealed trait KickWebhook
   object KickWebhook {
-    given Decoder[KickWebhook] = ConfiguredDecoder.derived
-    given Encoder[KickWebhook] = ConfiguredEncoder.derived
+    def decodeJson(
+        eventType: String,
+        version: String,
+        json: String
+    ): Either[Throwable, KickWebhook] = (eventType, version) match {
+      case ("channel.message.sent", "1") =>
+        decode[KickWebhooks.ChatMessageSentV1](json)
+      case ("channel.followed", "1") =>
+        decode[KickWebhooks.ChannelFollowedV1](json)
+      case _ =>
+        Left(RuntimeException("Unsupported event/version combination"))
+    }
   }
 
   final case class ChatMessageSentV1(
@@ -60,7 +71,11 @@ object KickWebhooks {
     given Encoder[ChatMessageIdentity] = ConfiguredEncoder.derived
   }
 
-  final case class UserBadge(text: String, `type`: String, count: Option[Int])
+  final case class UserBadge(
+      text: String,
+      `type`: String,
+      count: Option[Int] = None
+  )
   object UserBadge {
     given Decoder[UserBadge] = ConfiguredDecoder.derived
     given Encoder[UserBadge] = ConfiguredEncoder.derived
