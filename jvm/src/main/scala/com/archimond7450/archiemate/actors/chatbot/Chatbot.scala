@@ -1753,7 +1753,7 @@ class Chatbot(twitchRoomId: String)(using
               ArchieMateMediator.SendKickApiClientCommand(
                 KickApiClient.GetEventsSubscriptions(ref, kickTokenId)
               )
-          ) { resp: Try[KickApiResponse.GetEventsSubscriptions] =>
+          ) { (resp: Try[KickApiResponse.GetEventsSubscriptions]) =>
             Chatbot.KickWebhooksSubscriptions(resp.map(_.data))
           }
         case None =>
@@ -1771,7 +1771,7 @@ class Chatbot(twitchRoomId: String)(using
       val actualSubscriptions: Set[(String, Int)] =
         subscriptions.map(sub => (sub.event, sub.version)).toSet
       expectedSubscriptions.diff(actualSubscriptions) match {
-        case Set.empty =>
+        case nothing if nothing.isEmpty =>
         case subsToAsk =>
           val subs: List[KickApiRequest.KickEvent] =
             subsToAsk.map(KickApiRequest.KickEvent.apply).toList
