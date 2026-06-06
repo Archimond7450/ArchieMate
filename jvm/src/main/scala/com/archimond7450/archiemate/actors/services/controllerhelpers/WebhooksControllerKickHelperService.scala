@@ -45,6 +45,7 @@ object WebhooksControllerKickHelperService {
         Behaviors.logMessages {
           Behaviors.withTimers { scheduler =>
             Behaviors.withStash(10) { buffer =>
+              ctx.self ! AskForNewPublicKey
               Behaviors.receiveMessage {
                 case AskForNewPublicKey =>
                   askForKey()
