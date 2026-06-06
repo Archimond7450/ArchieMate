@@ -1810,12 +1810,16 @@ class Chatbot(twitchRoomId: String)(using
         Behaviors.same
 
       case Chatbot.NewKickWebhook(e: KickWebhooks.ChatMessageSentV1) =>
-        if (e.content.trim().toLowerCase() == "!commands") {
-          KickApiClient.PostChatMessage(
-            ctx.system.ignoreRef,
-            params.kickTokenIdOption.get,
-            s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
-          )
+        e.content.toLowerCase() match {
+          case "!commands" =>
+            mediator ! ArchieMateMediator.SendKickApiClientCommand(
+              KickApiClient.PostChatMessage(
+                ctx.system.ignoreRef,
+                params.kickTokenIdOption.get,
+                s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
+              )
+            )
+          case _ =>
         }
         Behaviors.same
 
@@ -1823,10 +1827,12 @@ class Chatbot(twitchRoomId: String)(using
         params.channelSettings.automaticMessagesSettings.follow.foreach { msg =>
           val msgWithUser =
             msg.replaceAll("user".asVariableRegex, e.follower.username)
-          KickApiClient.PostChatMessage(
-            ctx.system.ignoreRef,
-            params.kickTokenIdOption.get,
-            msgWithUser
+          mediator ! ArchieMateMediator.SendKickApiClientCommand(
+            KickApiClient.PostChatMessage(
+              ctx.system.ignoreRef,
+              params.kickTokenIdOption.get,
+              msgWithUser
+            )
           )
         }
         Behaviors.same
