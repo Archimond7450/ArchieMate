@@ -52,8 +52,12 @@ class WebhooksController(using mediator: ActorRef[ArchieMateMediator.Command])(
           )
         ) {
           case Success(true) =>
-            decodeToTry[KickWebhooks.KickWebhook](body) match {
-              case Success(webhook) =>
+            KickWebhooks.KickWebhook.decodeJson(
+              eventType,
+              eventVersion,
+              body
+            ) match {
+              case Right(webhook) =>
                 val kickBroadcasterId = webhook match {
                   case KickWebhooks.ChannelFollowedV1(broadcaster, follower) =>
                     broadcaster.userId
@@ -75,7 +79,7 @@ class WebhooksController(using mediator: ActorRef[ArchieMateMediator.Command])(
                   )
                 )
                 complete(StatusCodes.NoContent)
-              case Failure(ex) =>
+              case Left(ex) =>
                 log.error(ex, "Couldn't decode webhook body")
                 complete(StatusCodes.InternalServerError)
             }

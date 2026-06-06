@@ -9,7 +9,6 @@ import scala.io.Source
 import scala.language.postfixOps
 
 class IncomingMessageSpec extends AnyWordSpecLike with Matchers {
-  // val TEST_JSON_DIRECTORY = "src/test/resources/twitch/eventsub"
   val TEST_JSON_DIRECTORY = "twitch/eventsub"
 
   def readFile(resourcePath: String): String = {
