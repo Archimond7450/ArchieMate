@@ -21,7 +21,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
     "ChatMessageSentV1 is received" should {
       "be correctly decoded" in {
         val json =
-          readFile(s"$TEST_JSON_DIRECTORY/channel.message.sent.v1.json")
+          readFile(s"$TEST_JSON_DIRECTORY/chat.message.sent.v1.json")
         val expected = KickWebhooks.ChatMessageSentV1(
           messageId = "unique_message_id_123",
           repliesTo = Some(
@@ -98,7 +98,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
           )
         )
         KickWebhooks.KickWebhook.decodeJson(
-          "channel.message.sent",
+          "chat.message.sent",
           "1",
           json
         ) shouldEqual Right(expected)

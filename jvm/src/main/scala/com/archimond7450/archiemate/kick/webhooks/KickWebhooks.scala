@@ -15,7 +15,7 @@ object KickWebhooks {
         version: String,
         json: String
     ): Either[Throwable, KickWebhook] = (eventType, version) match {
-      case ("channel.message.sent", "1") =>
+      case ("chat.message.sent", "1") =>
         decode[KickWebhooks.ChatMessageSentV1](json)
       case ("channel.followed", "1") =>
         decode[KickWebhooks.ChannelFollowedV1](json)
