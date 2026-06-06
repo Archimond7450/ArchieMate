@@ -6,7 +6,7 @@
     <!-- Console appender-->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
+            <level>TRACE</level>
         </filter>
         <encoder>
             <pattern>[%-5level] [%marker] [%thread] - %msg%n</pattern>
@@ -14,7 +14,7 @@
     </appender>
 
     <!-- Default file appender with filter of other logs -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!--appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/ArchieMate.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_DIR}/ArchieMate-%d{yyyy-MM-dd}.log.gz</fileNamePattern>
@@ -24,7 +24,7 @@
         <encoder>
             <pattern>[%date{ISO8601}] [%-5level] [%logger] [%marker] [%thread] - %msg | MDC: {%mdc}%n</pattern>
         </encoder>
-    </appender>
+    </appender-->
 
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
         <queueSize>8192</queueSize>
