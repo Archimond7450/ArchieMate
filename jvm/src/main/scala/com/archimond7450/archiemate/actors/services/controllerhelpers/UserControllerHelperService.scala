@@ -5,7 +5,6 @@ import com.archimond7450.archiemate.actors.kick.api.KickApiClient
 import com.archimond7450.archiemate.actors.repositories.sessions.KickUserSessionsRepository
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.kick.api.KickApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
@@ -61,107 +60,120 @@ object UserControllerHelperService {
 
         given ActorContext[Command] = ctx
 
-        Behaviors.receiveAndLogMessage {
-          case cmd @ GetUser(replyTo, jwt) =>
-            ctx.ask[ArchieMateMediator.Command, JWTService.DecodeJWTResponse](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendJWTServiceCommand(
-                  JWTService.DecodeJWT(ref, jwt)
+        Behaviors.logMessages {
+          Behaviors.receiveMessage {
+            case cmd @ GetUser(replyTo, jwt) =>
+              ctx.ask[ArchieMateMediator.Command, JWTService.DecodeJWTResponse](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendJWTServiceCommand(
+                    JWTService.DecodeJWT(ref, jwt)
+                  )
+              ) {
+                case Success(JWTService.DecodedJWT(userId, sessionId)) =>
+                  GetUserWithTwitchIds(
+                    originalCommand = cmd,
+                    twitchUserId = userId,
+                    tokenId = sessionId
+                  )
+
+                case Success(JWTService.InvalidJWT) =>
+                  val cause = Failure(RuntimeException(invalidJWTMessage))
+                  GetUserWithResponse(cmd, cause, cause)
+
+                case Failure(ex) =>
+                  val cause = Failure(ex)
+                  GetUserWithResponse(cmd, cause, cause)
+              }
+
+              Behaviors.same
+
+            case GetUserWithTwitchIds(originalCommand, twitchUserId, tokenId) =>
+              ctx.askWithStatus[
+                ArchieMateMediator.Command,
+                TwitchApiResponse.GetTokenUser
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendTwitchApiClientCommand(
+                    TwitchApiClient.GetTokenUserFromTokenId(ref, tokenId)
+                  )
+              ) { resp =>
+                GetUserKickTokenId(originalCommand, twitchUserId, resp)
+              }
+              Behaviors.same
+
+            case GetUserKickTokenId(
+                  originalCommand,
+                  twitchUserId,
+                  twitchUser
+                ) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                KickUserSessionsRepository.ReturnedTokenIdForUserId
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
+                    KickUserSessionsRepository
+                      .GetTokenIdForTwitchUserId(ref, twitchUserId)
+                  )
+              ) {
+                case Success(
+                      KickUserSessionsRepository.ReturnedTokenIdForUserId(
+                        Some(tokenId)
+                      )
+                    ) =>
+                  GetUserWithKickIds(originalCommand, twitchUser, tokenId)
+
+                case Success(
+                      KickUserSessionsRepository.ReturnedTokenIdForUserId(
+                        None
+                      )
+                    ) =>
+                  GetUserWithResponse(
+                    originalCommand,
+                    twitchUser,
+                    Success(None)
+                  )
+
+                case Failure(ex) =>
+                  GetUserWithResponse(originalCommand, twitchUser, Failure(ex))
+              }
+              Behaviors.same
+
+            case GetUserWithKickIds(originalCommand, twitchUser, kickTokenId) =>
+              ctx.askWithStatus[
+                ArchieMateMediator.Command,
+                KickApiResponse.User
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendKickApiClientCommand(
+                    KickApiClient.GetTokenUserFromTokenId(ref, kickTokenId)
+                  )
+              ) { resp =>
+                GetUserWithResponse(
+                  originalCommand,
+                  twitchUser,
+                  resp.map(Some(_))
                 )
-            ) {
-              case Success(JWTService.DecodedJWT(userId, sessionId)) =>
-                GetUserWithTwitchIds(
-                  originalCommand = cmd,
-                  twitchUserId = userId,
-                  tokenId = sessionId
+              }
+              Behaviors.same
+
+            case GetUserWithResponse(
+                  originalCommand,
+                  Failure(ex1: RuntimeException),
+                  Failure(ex2: RuntimeException)
                 )
+                if ex1.getMessage == invalidJWTMessage && ex2.getMessage == invalidJWTMessage =>
+              originalCommand.replyTo ! InvalidJWT
+              Behaviors.same
 
-              case Success(JWTService.InvalidJWT) =>
-                val cause = Failure(RuntimeException(invalidJWTMessage))
-                GetUserWithResponse(cmd, cause, cause)
-
-              case Failure(ex) =>
-                val cause = Failure(ex)
-                GetUserWithResponse(cmd, cause, cause)
-            }
-
-            Behaviors.same
-
-          case GetUserWithTwitchIds(originalCommand, twitchUserId, tokenId) =>
-            ctx.askWithStatus[
-              ArchieMateMediator.Command,
-              TwitchApiResponse.GetTokenUser
-            ](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendTwitchApiClientCommand(
-                  TwitchApiClient.GetTokenUserFromTokenId(ref, tokenId)
-                )
-            ) { resp =>
-              GetUserKickTokenId(originalCommand, twitchUserId, resp)
-            }
-            Behaviors.same
-
-          case GetUserKickTokenId(originalCommand, twitchUserId, twitchUser) =>
-            ctx.ask[
-              ArchieMateMediator.Command,
-              KickUserSessionsRepository.ReturnedTokenIdForUserId
-            ](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
-                  KickUserSessionsRepository
-                    .GetTokenIdForTwitchUserId(ref, twitchUserId)
-                )
-            ) {
-              case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
-                      Some(tokenId)
-                    )
-                  ) =>
-                GetUserWithKickIds(originalCommand, twitchUser, tokenId)
-
-              case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
-                      None
-                    )
-                  ) =>
-                GetUserWithResponse(originalCommand, twitchUser, Success(None))
-
-              case Failure(ex) =>
-                GetUserWithResponse(originalCommand, twitchUser, Failure(ex))
-            }
-            Behaviors.same
-
-          case GetUserWithKickIds(originalCommand, twitchUser, kickTokenId) =>
-            ctx.askWithStatus[ArchieMateMediator.Command, KickApiResponse.User](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendKickApiClientCommand(
-                  KickApiClient.GetTokenUserFromTokenId(ref, kickTokenId)
-                )
-            ) { resp =>
-              GetUserWithResponse(
-                originalCommand,
-                twitchUser,
-                resp.map(Some(_))
-              )
-            }
-            Behaviors.same
-
-          case GetUserWithResponse(
-                originalCommand,
-                Failure(ex1: RuntimeException),
-                Failure(ex2: RuntimeException)
-              )
-              if ex1.getMessage == invalidJWTMessage && ex2.getMessage == invalidJWTMessage =>
-            originalCommand.replyTo ! InvalidJWT
-            Behaviors.same
-
-          case GetUserWithResponse(originalCommand, twitchUser, kickUser) =>
-            originalCommand.replyTo ! GetUserOKResponse(twitchUser, kickUser)
-            Behaviors.same
+            case GetUserWithResponse(originalCommand, twitchUser, kickUser) =>
+              originalCommand.replyTo ! GetUserOKResponse(twitchUser, kickUser)
+              Behaviors.same
+          }
         }
       }
     }

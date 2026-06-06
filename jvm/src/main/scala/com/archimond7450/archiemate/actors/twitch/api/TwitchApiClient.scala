@@ -4,7 +4,6 @@ import com.archimond7450.archiemate.CirceConfiguration.twitchConfiguration
 import com.archimond7450.archiemate.actors.{ArchieMateMediator, HttpClient}
 import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.{
   decodeOrThrow,
@@ -301,134 +300,136 @@ class TwitchApiClient(using
   val settings = Settings(ctx.system)
   given Timeout = settings.askTimeout
 
-  def operational(): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case cmd: Request =>
-      processRequest(cmd)
-      Behaviors.same
+  def operational(): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case cmd: Request =>
+        processRequest(cmd)
+        Behaviors.same
 
-    case cmd: WrappedSuccessfulResponse =>
-      processWrappedSuccessfulResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedSuccessfulResponse =>
+        processWrappedSuccessfulResponse(cmd)
+        Behaviors.same
 
-    case cmd: WrappedFailedResponse =>
-      processWrappedFailedResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedFailedResponse =>
+        processWrappedFailedResponse(cmd)
+        Behaviors.same
 
-    case cmd: RefreshToken =>
-      processRefreshToken(cmd)
-      Behaviors.same
+      case cmd: RefreshToken =>
+        processRefreshToken(cmd)
+        Behaviors.same
 
-    case cmd: TokenRefreshed =>
-      processTokenRefreshed(cmd)
-      Behaviors.same
+      case cmd: TokenRefreshed =>
+        processTokenRefreshed(cmd)
+        Behaviors.same
 
-    case cmd: GetToken =>
-      processGetToken(cmd)
-      Behaviors.same
+      case cmd: GetToken =>
+        processGetToken(cmd)
+        Behaviors.same
 
-    case cmd: GetTokenUserFromTokenId =>
-      processGetTokenUserFromTokenId(cmd)
-      Behaviors.same
+      case cmd: GetTokenUserFromTokenId =>
+        processGetTokenUserFromTokenId(cmd)
+        Behaviors.same
 
-    case cmd: GetTokenUserFromAccessToken =>
-      processGetTokenUserFromAccessToken(cmd)
-      Behaviors.same
+      case cmd: GetTokenUserFromAccessToken =>
+        processGetTokenUserFromAccessToken(cmd)
+        Behaviors.same
 
-    case cmd: GetGameByName =>
-      processGetGameByName(cmd)
-      Behaviors.same
+      case cmd: GetGameByName =>
+        processGetGameByName(cmd)
+        Behaviors.same
 
-    case cmd: ChangeChannelToUnknownGame =>
-      processChangeChannelToUnknownGame(cmd)
-      Behaviors.same
+      case cmd: ChangeChannelToUnknownGame =>
+        processChangeChannelToUnknownGame(cmd)
+        Behaviors.same
 
-    case cmd: ChangeChannelGame =>
-      processChangeChannelGame(cmd)
-      Behaviors.same
+      case cmd: ChangeChannelGame =>
+        processChangeChannelGame(cmd)
+        Behaviors.same
 
-    case cmd: ChangeChannelTitle =>
-      processChangeChannelTitle(cmd)
-      Behaviors.same
+      case cmd: ChangeChannelTitle =>
+        processChangeChannelTitle(cmd)
+        Behaviors.same
 
-    case cmd: GetChannelInformation =>
-      processGetChannelInformation(cmd)
-      Behaviors.same
+      case cmd: GetChannelInformation =>
+        processGetChannelInformation(cmd)
+        Behaviors.same
 
-    case cmd: GetChatters =>
-      processGetChatters(cmd)
-      Behaviors.same
+      case cmd: GetChatters =>
+        processGetChatters(cmd)
+        Behaviors.same
 
-    case cmd: GetModerators =>
-      processGetModerators(cmd)
-      Behaviors.same
+      case cmd: GetModerators =>
+        processGetModerators(cmd)
+        Behaviors.same
 
-    case cmd: GetVIPs =>
-      processGetVIPs(cmd)
-      Behaviors.same
+      case cmd: GetVIPs =>
+        processGetVIPs(cmd)
+        Behaviors.same
 
-    case cmd: GetSubs =>
-      processGetSubs(cmd)
-      Behaviors.same
+      case cmd: GetSubs =>
+        processGetSubs(cmd)
+        Behaviors.same
 
-    case cmd: SendShoutout =>
-      processSendShoutout(cmd)
-      Behaviors.same
+      case cmd: SendShoutout =>
+        processSendShoutout(cmd)
+        Behaviors.same
 
-    case cmd: GetChannelFollowers =>
-      processGetChannelFollowers(cmd)
-      Behaviors.same
+      case cmd: GetChannelFollowers =>
+        processGetChannelFollowers(cmd)
+        Behaviors.same
 
-    case cmd: CheckUserFollowage =>
-      processCheckUserFollowage(cmd)
-      Behaviors.same
+      case cmd: CheckUserFollowage =>
+        processCheckUserFollowage(cmd)
+        Behaviors.same
 
-    case cmd: CreateEventSubWebsocketSubscription =>
-      processCreateEventSubWebsocketSubscription(cmd)
-      Behaviors.same
+      case cmd: CreateEventSubWebsocketSubscription =>
+        processCreateEventSubWebsocketSubscription(cmd)
+        Behaviors.same
 
-    case cmd: GetStream =>
-      processGetStream(cmd)
-      Behaviors.same
+      case cmd: GetStream =>
+        processGetStream(cmd)
+        Behaviors.same
 
-    case cmd: GetEmoteSets =>
-      processGetEmoteSets(cmd)
-      Behaviors.same
+      case cmd: GetEmoteSets =>
+        processGetEmoteSets(cmd)
+        Behaviors.same
 
-    case cmd: GetPolls =>
-      processGetPolls(cmd)
-      Behaviors.same
+      case cmd: GetPolls =>
+        processGetPolls(cmd)
+        Behaviors.same
 
-    case cmd: CreatePoll =>
-      processCreatePoll(cmd)
-      Behaviors.same
+      case cmd: CreatePoll =>
+        processCreatePoll(cmd)
+        Behaviors.same
 
-    case cmd: EndPoll =>
-      processEndPoll(cmd)
-      Behaviors.same
+      case cmd: EndPoll =>
+        processEndPoll(cmd)
+        Behaviors.same
 
-    case cmd: GetPredictions =>
-      processGetPredictions(cmd)
-      Behaviors.same
+      case cmd: GetPredictions =>
+        processGetPredictions(cmd)
+        Behaviors.same
 
-    case cmd: CreatePrediction =>
-      processCreatePrediction(cmd)
-      Behaviors.same
+      case cmd: CreatePrediction =>
+        processCreatePrediction(cmd)
+        Behaviors.same
 
-    case cmd: ResolvePrediction =>
-      processResolvePrediction(cmd)
-      Behaviors.same
+      case cmd: ResolvePrediction =>
+        processResolvePrediction(cmd)
+        Behaviors.same
 
-    case cmd: CancelPrediction =>
-      processCancelPrediction(cmd)
-      Behaviors.same
+      case cmd: CancelPrediction =>
+        processCancelPrediction(cmd)
+        Behaviors.same
 
-    case cmd: LockPrediction =>
-      processLockPrediction(cmd)
-      Behaviors.same
+      case cmd: LockPrediction =>
+        processLockPrediction(cmd)
+        Behaviors.same
 
-    case cmd: EndPrediction =>
-      processEndPrediction(cmd)
-      Behaviors.same
+      case cmd: EndPrediction =>
+        processEndPrediction(cmd)
+        Behaviors.same
+    }
   }
 
   private def processRequest(request: Request): Unit = {

@@ -37,7 +37,6 @@ import com.archimond7450.archiemate.actors.services.controllerhelpers.{
 }
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.PkceHelpers
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
@@ -322,117 +321,119 @@ final class ArchieMateMediator(using
 
   def operational(
       state: State = State.initial
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case SendHttpClientRequest(cmd) =>
-      state.httpClient ! cmd
-      Behaviors.same
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case SendHttpClientRequest(cmd) =>
+        state.httpClient ! cmd
+        Behaviors.same
 
-    case SendChatbotsSupervisorCommand(cmd) =>
-      state.chatbotsSupervisor ! cmd
-      Behaviors.same
+      case SendChatbotsSupervisorCommand(cmd) =>
+        state.chatbotsSupervisor ! cmd
+        Behaviors.same
 
-    case SendTwitchUserSessionsRepositoryCommand(cmd) =>
-      state.twitchUserSessionsRepository ! cmd
-      Behaviors.same
+      case SendTwitchUserSessionsRepositoryCommand(cmd) =>
+        state.twitchUserSessionsRepository ! cmd
+        Behaviors.same
 
-    case SendKickUserSessionsRepositoryCommand(cmd) =>
-      state.kickUserSessionsRepository ! cmd
-      Behaviors.same
+      case SendKickUserSessionsRepositoryCommand(cmd) =>
+        state.kickUserSessionsRepository ! cmd
+        Behaviors.same
 
-    case SendYouTubeChannelSessionsRepositoryCommand(cmd) =>
-      state.youTubeChannelSessionsRepository ! cmd
-      Behaviors.same
+      case SendYouTubeChannelSessionsRepositoryCommand(cmd) =>
+        state.youTubeChannelSessionsRepository ! cmd
+        Behaviors.same
 
-    case SendAutomaticMessagesSettingsRepositoryCommand(cmd) =>
-      state.automaticMessagesSettingsRepository ! cmd
-      Behaviors.same
+      case SendAutomaticMessagesSettingsRepositoryCommand(cmd) =>
+        state.automaticMessagesSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendBasicChatbotSettingsRepositoryCommand(cmd) =>
-      state.basicChatbotSettingsRepository ! cmd
-      Behaviors.same
+      case SendBasicChatbotSettingsRepositoryCommand(cmd) =>
+        state.basicChatbotSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendBuiltInCommandsSettingsRepositoryCommand(cmd) =>
-      state.builtInCommandsSettingsRepository ! cmd
-      Behaviors.same
+      case SendBuiltInCommandsSettingsRepositoryCommand(cmd) =>
+        state.builtInCommandsSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendCommandsSettingsRepositoryCommand(cmd) =>
-      state.commandsSettingsRepository ! cmd
-      Behaviors.same
+      case SendCommandsSettingsRepositoryCommand(cmd) =>
+        state.commandsSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendOverlaysSettingsRepositoryCommand(cmd) =>
-      state.overlaysSettingsRepository ! cmd
-      Behaviors.same
+      case SendOverlaysSettingsRepositoryCommand(cmd) =>
+        state.overlaysSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendTimersSettingsRepositoryCommand(cmd) =>
-      state.timersSettingsRepository ! cmd
-      Behaviors.same
+      case SendTimersSettingsRepositoryCommand(cmd) =>
+        state.timersSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendVariablesSettingsRepositoryCommand(cmd) =>
-      state.variablesSettingsRepository ! cmd
-      Behaviors.same
+      case SendVariablesSettingsRepositoryCommand(cmd) =>
+        state.variablesSettingsRepository ! cmd
+        Behaviors.same
 
-    case SendPollsRepositoryCommand(cmd) =>
-      state.pollsRepository ! cmd
-      Behaviors.same
+      case SendPollsRepositoryCommand(cmd) =>
+        state.pollsRepository ! cmd
+        Behaviors.same
 
-    case SendPredictionsRepositoryCommand(cmd) =>
-      state.predictionsRepository ! cmd
-      Behaviors.same
+      case SendPredictionsRepositoryCommand(cmd) =>
+        state.predictionsRepository ! cmd
+        Behaviors.same
 
-    case SendTwitchTokenUserCacheServiceCommand(cmd) =>
-      state.twitchTokenUserCacheService ! cmd
-      Behaviors.same
+      case SendTwitchTokenUserCacheServiceCommand(cmd) =>
+        state.twitchTokenUserCacheService ! cmd
+        Behaviors.same
 
-    case SendKickTokenUserCacheServiceCommand(cmd) =>
-      state.kickTokenUserCacheService ! cmd
-      Behaviors.same
+      case SendKickTokenUserCacheServiceCommand(cmd) =>
+        state.kickTokenUserCacheService ! cmd
+        Behaviors.same
 
-    case SendCommandsControllerHelperServiceCommand(cmd) =>
-      state.commandsControllerHelperService ! cmd
-      Behaviors.same
+      case SendCommandsControllerHelperServiceCommand(cmd) =>
+        state.commandsControllerHelperService ! cmd
+        Behaviors.same
 
-    case SendOAuthControllerHelperServiceCommand(cmd) =>
-      state.oauthControllerHelperService ! cmd
-      Behaviors.same
+      case SendOAuthControllerHelperServiceCommand(cmd) =>
+        state.oauthControllerHelperService ! cmd
+        Behaviors.same
 
-    case SendSettingsControllerHelperServiceCommand(cmd) =>
-      state.settingsControllerHelperService ! cmd
-      Behaviors.same
+      case SendSettingsControllerHelperServiceCommand(cmd) =>
+        state.settingsControllerHelperService ! cmd
+        Behaviors.same
 
-    case SendUserControllerHelperServiceCommand(cmd) =>
-      state.userControllerHelperService ! cmd
-      Behaviors.same
+      case SendUserControllerHelperServiceCommand(cmd) =>
+        state.userControllerHelperService ! cmd
+        Behaviors.same
 
-    case SendWebhooksControllerKickHelperServiceCommand(cmd) =>
-      state.webhooksControllerKickHelperService ! cmd
-      Behaviors.same
+      case SendWebhooksControllerKickHelperServiceCommand(cmd) =>
+        state.webhooksControllerKickHelperService ! cmd
+        Behaviors.same
 
-    case SendJWTServiceCommand(cmd) =>
-      state.jwtService ! cmd
-      Behaviors.same
+      case SendJWTServiceCommand(cmd) =>
+        state.jwtService ! cmd
+        Behaviors.same
 
-    case SendTwitchApiPaginationHandlerServiceCommand(cmd) =>
-      state.twitchApiPaginationHandlerService ! cmd
-      Behaviors.same
+      case SendTwitchApiPaginationHandlerServiceCommand(cmd) =>
+        state.twitchApiPaginationHandlerService ! cmd
+        Behaviors.same
 
-    case SendTwitchLoginValidatorServiceCommand(cmd) =>
-      state.twitchLoginValidatorService ! cmd
-      Behaviors.same
+      case SendTwitchLoginValidatorServiceCommand(cmd) =>
+        state.twitchLoginValidatorService ! cmd
+        Behaviors.same
 
-    case SendKickLoginValidatorServiceCommand(cmd) =>
-      state.kickLoginValidatorService ! cmd
-      Behaviors.same
+      case SendKickLoginValidatorServiceCommand(cmd) =>
+        state.kickLoginValidatorService ! cmd
+        Behaviors.same
 
-    case SendTwitchApiClientCommand(cmd) =>
-      state.twitchApiClient ! cmd
-      Behaviors.same
+      case SendTwitchApiClientCommand(cmd) =>
+        state.twitchApiClient ! cmd
+        Behaviors.same
 
-    case SendKickApiClientCommand(cmd) =>
-      state.kickApiClient ! cmd
-      Behaviors.same
+      case SendKickApiClientCommand(cmd) =>
+        state.kickApiClient ! cmd
+        Behaviors.same
 
-    case SendYouTubeApiClientCommand(cmd) =>
-      state.youTubeApiClient ! cmd
-      Behaviors.same
+      case SendYouTubeApiClientCommand(cmd) =>
+        state.youTubeApiClient ! cmd
+        Behaviors.same
+    }
   }
 }

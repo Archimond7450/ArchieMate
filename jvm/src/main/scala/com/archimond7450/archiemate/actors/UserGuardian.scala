@@ -35,7 +35,6 @@ import org.apache.pekko.actor.typed.{
 }
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import com.archimond7450.archiemate.extensions.*
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.logoutSessionCookie
 import com.archimond7450.archiemate.helpers.PkceHelpers
 import com.archimond7450.archiemate.http.{OAuthController, WebhooksController}
@@ -91,70 +90,77 @@ object UserGuardian {
   private def withSettings(using
       ctx: ActorContext[Command],
       settings: Settings
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case StartHttp =>
-      val (interface, port) = (settings.httpInterface, settings.httpPort)
-      ctx.log.info("Starting HTTP server at {}:{}", interface, port)
-      given ClassicActorSystemProvider = ctx.system.classicSystem
-      given Scheduler = ctx.system.scheduler
-      given Timeout = settings.askTimeout
-      val server = Http().newServerAt(interface = interface, port = port)
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case StartHttp =>
+        val (interface, port) = (settings.httpInterface, settings.httpPort)
+        ctx.log.info("Starting HTTP server at {}:{}", interface, port)
+        given ClassicActorSystemProvider = ctx.system.classicSystem
+        given Scheduler = ctx.system.scheduler
+        given Timeout = settings.askTimeout
+        val server = Http().newServerAt(interface = interface, port = port)
 
-      given RandomProvider = new RandomProvider
-      given TimeProvider = new TimeProvider
-      given PkceHelpers = new PkceHelpers(new SecureRandom())
+        given RandomProvider = new RandomProvider
+        given TimeProvider = new TimeProvider
+        given PkceHelpers = new PkceHelpers(new SecureRandom())
 
-      given Settings = settings
+        given Settings = settings
 
-      given ActorRef[ArchieMateMediator.Command] =
-        ctx.spawn(ArchieMateMediator(), ArchieMateMediator.actorName)
+        given ActorRef[ArchieMateMediator.Command] =
+          ctx.spawn(ArchieMateMediator(), ArchieMateMediator.actorName)
 
-      val v1BaseController = new V1BaseController
-      val OAuthController = new OAuthController
-      val webhooksController = new WebhooksController
+        val v1BaseController = new V1BaseController
+        val OAuthController = new OAuthController
+        val webhooksController = new WebhooksController
 
-      def logout: Route = (get & path("logout" / "confirm")) {
-        logoutSessionCookie {
-          redirect("/", StatusCodes.TemporaryRedirect)
+        def logout: Route = (get & path("logout" / "confirm")) {
+          logoutSessionCookie {
+            redirect("/", StatusCodes.TemporaryRedirect)
+          }
         }
-      }
 
-      val routes =
-        logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ webhooksController.getAllRoutes ~ getFromResourceDirectory(
-          "public"
-        ) ~ getFromResource("public/index.html")
+        val routes =
+          logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ webhooksController.getAllRoutes ~ getFromResourceDirectory(
+            "public"
+          ) ~ getFromResource("public/index.html")
 
-      ctx.pipeToSelf(server.bind(routes)) {
-        case Success(binding) => HttpBound(binding)
-        case Failure(ex)      => HttpFailed(ex)
-      }
+        ctx.pipeToSelf(server.bind(routes)) {
+          case Success(binding) => HttpBound(binding)
+          case Failure(ex)      => HttpFailed(ex)
+        }
 
-      Behaviors.same
+        Behaviors.same
 
-    case HttpFailed(ex) =>
-      ctx.log.error("Failed to bind the HTTP server!", ex)
-      Behaviors.stopped
+      case HttpFailed(ex) =>
+        ctx.log.error("Failed to bind the HTTP server!", ex)
+        Behaviors.stopped
 
-    case HttpBound(binding) =>
-      ctx.log.info("HTTP server successfully bound to {}", binding.localAddress)
-      binding.addToCoordinatedShutdown(10.seconds)(ctx.system.classicSystem)
+      case HttpBound(binding) =>
+        ctx.log.info(
+          "HTTP server successfully bound to {}",
+          binding.localAddress
+        )
+        binding.addToCoordinatedShutdown(10.seconds)(ctx.system.classicSystem)
 
-      ready
+        ready
 
-    case Stop =>
-      Behaviors.stopped
+      case Stop =>
+        Behaviors.stopped
+    }
   }
 
   private def ready(using
       ctx: ActorContext[Command],
       settings: Settings
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case Stop =>
-      ctx.log.info("Stopping ArchieMate!")
-      Behaviors.stopped
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case Stop =>
+        ctx.log.info("Stopping ArchieMate!")
+        Behaviors.stopped
 
-    case msg =>
-      ctx.log.debug("Ignoring message {}", msg)
-      Behaviors.same
+      case msg =>
+        ctx.log.debug("Ignoring message {}", msg)
+        Behaviors.same
+    }
   }
 }

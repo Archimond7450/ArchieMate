@@ -2,7 +2,6 @@ package com.archimond7450.archiemate.actors.youtube.api
 
 import com.archimond7450.archiemate.actors.{ArchieMateMediator, HttpClient}
 import com.archimond7450.archiemate.actors.repositories.sessions.YouTubeChannelSessionsRepository
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.decodeToTry
 import com.archimond7450.archiemate.youtube.api.YouTubeApiResponse
@@ -109,42 +108,44 @@ class YouTubeApiClient()(using
   private val oauthBaseUrl = "https://oauth2.googleapis.com"
   private val v3baseUrl = "https://www.googleapis.com/youtube/v3"
 
-  def operational(): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case cmd: Request =>
-      processRequest(cmd)
-      Behaviors.same
+  def operational(): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case cmd: Request =>
+        processRequest(cmd)
+        Behaviors.same
 
-    case cmd: WrappedSuccessfulResponse =>
-      processWrappedSuccessfulResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedSuccessfulResponse =>
+        processWrappedSuccessfulResponse(cmd)
+        Behaviors.same
 
-    case cmd: WrappedFailedResponse =>
-      processWrappedFailedResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedFailedResponse =>
+        processWrappedFailedResponse(cmd)
+        Behaviors.same
 
-    case cmd: RefreshToken =>
-      processRefreshToken(cmd)
-      Behaviors.same
+      case cmd: RefreshToken =>
+        processRefreshToken(cmd)
+        Behaviors.same
 
-    case cmd: TokenRefreshed =>
-      processTokenRefreshed(cmd)
-      Behaviors.same
+      case cmd: TokenRefreshed =>
+        processTokenRefreshed(cmd)
+        Behaviors.same
 
-    case cmd: GetToken =>
-      processGetToken(cmd)
-      Behaviors.same
+      case cmd: GetToken =>
+        processGetToken(cmd)
+        Behaviors.same
 
-    case cmd: GetChannelFromTokenId =>
-      processGetChannelFromTokenId(cmd)
-      Behaviors.same
+      case cmd: GetChannelFromTokenId =>
+        processGetChannelFromTokenId(cmd)
+        Behaviors.same
 
-    case cmd: GetChannelFromAccessToken =>
-      processGetChannelFromAccessToken(cmd)
-      Behaviors.same
+      case cmd: GetChannelFromAccessToken =>
+        processGetChannelFromAccessToken(cmd)
+        Behaviors.same
 
-    case cmd: GetLiveBroadcast =>
-      processGetLiveBroadcast(cmd)
-      Behaviors.same
+      case cmd: GetLiveBroadcast =>
+        processGetLiveBroadcast(cmd)
+        Behaviors.same
+    }
   }
 
   private def processRequest(request: Request): Unit = {

@@ -9,10 +9,8 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
   PredictionsRepository,
   VariablesSettingsRepository
 }
-import com.archimond7450.archiemate.actors.services.TwitchCommandsService.actorName
 import com.archimond7450.archiemate.actors.twitch.api
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.ListExtension.randomOrDefault
 import com.archimond7450.archiemate.twitch.eventsub
 import com.archimond7450.archiemate.extensions.Settings
@@ -51,8 +49,8 @@ object TwitchCommandsService {
 
   sealed trait Command
   final case class RespondToCommand(
-                                     chatbotParams: Chatbot.OperationalParameters,
-                                     e: eventsub.ChannelChatMessageEvent
+      chatbotParams: Chatbot.OperationalParameters,
+      e: eventsub.ChannelChatMessageEvent
   ) extends Command
   private final case class ReturnCommandResponse(
       cmd: RespondToCommand,
@@ -63,15 +61,15 @@ object TwitchCommandsService {
       chatbotParams: Chatbot.OperationalParameters
   ) extends Command
   final case class GreetUsers(
-                               chatbotParams: Chatbot.OperationalParameters,
-                               userStateMap: Map[String, Chatbot.UserState]
+      chatbotParams: Chatbot.OperationalParameters,
+      userStateMap: Map[String, Chatbot.UserState]
   ) extends Command
 
   def apply()(using
-              mediator: ActorRef[ArchieMateMediator.Command],
-              chatbot: ActorRef[Chatbot.Command],
-              randomProvider: RandomProvider,
-              timeProvider: TimeProvider
+      mediator: ActorRef[ArchieMateMediator.Command],
+      chatbot: ActorRef[Chatbot.Command],
+      randomProvider: RandomProvider,
+      timeProvider: TimeProvider
   ): Behavior[Command] = Behaviors
     .supervise[Command] {
       Behaviors.setup { ctx =>
@@ -83,11 +81,11 @@ object TwitchCommandsService {
 }
 
 class TwitchCommandsService(using
-                            private val ctx: ActorContext[TwitchCommandsService.Command],
-                            private val mediator: ActorRef[ArchieMateMediator.Command],
-                            private val chatbot: ActorRef[Chatbot.Command],
-                            private val randomProvider: RandomProvider,
-                            private val timeProvider: TimeProvider
+    private val ctx: ActorContext[TwitchCommandsService.Command],
+    private val mediator: ActorRef[ArchieMateMediator.Command],
+    private val chatbot: ActorRef[Chatbot.Command],
+    private val randomProvider: RandomProvider,
+    private val timeProvider: TimeProvider
 ) {
   private val settings = Settings(ctx.system)
   given Timeout = settings.askTimeout
@@ -3333,173 +3331,180 @@ class TwitchCommandsService(using
   }
 
   def operational(): Behavior[TwitchCommandsService.Command] = {
-    Behaviors.receiveAndLogMessage {
-      case cmd @ TwitchCommandsService.RespondToCommand(chatbotParams, e) =>
-        e.message.text.trim match {
-          case commandRegex(strChatters, _, commandName, _, strParameters) =>
-            val chatters: List[String] =
-              if (strChatters == null) Nil else strChatters.split("\\s+").toList
-            val parameters: String =
-              if (strParameters == null) "" else strParameters.trim
-            commandName.toLowerCase() match {
-              case builtInCommandName
-                  if BuiltInCommands.builtInCommands.contains(
-                    builtInCommandName
-                  ) && BuiltInCommands.isBuilInCommandEnabled(
-                    builtInCommandName
-                  )(
-                    cmd.chatbotParams.channelSettings.builtInCommandsSettings
-                  ) =>
-                BuiltInCommands
-                  .builtInCommands(builtInCommandName)
-                  .getCommandResponse(cmd, chatters, parameters, chatbot)
+    Behaviors.logMessages {
+      Behaviors.receiveMessage {
+        case cmd @ TwitchCommandsService.RespondToCommand(chatbotParams, e) =>
+          e.message.text.trim match {
+            case commandRegex(strChatters, _, commandName, _, strParameters) =>
+              val chatters: List[String] =
+                if (strChatters == null) Nil
+                else strChatters.split("\\s+").toList
+              val parameters: String =
+                if (strParameters == null) "" else strParameters.trim
+              commandName.toLowerCase() match {
+                case builtInCommandName
+                    if BuiltInCommands.builtInCommands.contains(
+                      builtInCommandName
+                    ) && BuiltInCommands.isBuilInCommandEnabled(
+                      builtInCommandName
+                    )(
+                      cmd.chatbotParams.channelSettings.builtInCommandsSettings
+                    ) =>
+                  BuiltInCommands
+                    .builtInCommands(builtInCommandName)
+                    .getCommandResponse(cmd, chatters, parameters, chatbot)
 
-              case channelCommandName =>
-                chatbotParams.channelSettings.commandsSettings.commands
-                  .find(_.name == channelCommandName) match {
-                  case Some(
-                        ChannelCommand(id, name, response, true)
-                      ) => // alias
-                    ctx.self ! cmd.copy(e =
-                      cmd.e.copy(message =
-                        cmd.e.message
-                          .copy(text = s"$strChatters $response $strParameters")
+                case channelCommandName =>
+                  chatbotParams.channelSettings.commandsSettings.commands
+                    .find(_.name == channelCommandName) match {
+                    case Some(
+                          ChannelCommand(id, name, response, true)
+                        ) => // alias
+                      ctx.self ! cmd.copy(e =
+                        cmd.e.copy(message =
+                          cmd.e.message
+                            .copy(text =
+                              s"$strChatters $response $strParameters"
+                            )
+                        )
                       )
-                    )
-                  case normalCommand =>
-                    ctx.self ! TwitchCommandsService.ReturnCommandResponse(
-                      cmd,
-                      chatters,
-                      normalCommand.map(_.response)
-                    )
-                }
-            }
-            Behaviors.same
-
-          case _ =>
-            Behaviors.same
-        }
-
-      case TwitchCommandsService.ReturnCommandResponse(
-            cmd,
-            chatters,
-            responseOption
-          ) =>
-        responseOption.foreach { response =>
-          cmd.chatbotParams.ircListener ! IRCListener.SendMessage(
-            BuiltInVariables.expandBuiltInVariables(cmd.e, chatters, response)
-          )
-        }
-        Behaviors.same
-
-      case TwitchCommandsService.RespondForTimer(chatbotParams) =>
-        val responseOption: Option[String] =
-          chatbotParams.lastTimers.last match {
-            case Left(commandName) =>
-              chatbotParams.channelSettings.commandsSettings.commands
-                .find(_.name == commandName)
-                .map(_.response)
-            case Right(manualTimerId) =>
-              chatbotParams.channelSettings.timersSettings.manualTimers
-                .find(_.id == manualTimerId)
-                .map(_.response)
-          }
-        responseOption.foreach { response =>
-          chatbotParams.ircListener ! IRCListener.SendMessage(
-            BuiltInVariables.expandBuiltInVariables(
-              ChannelChatMessageEvent(
-                broadcasterUserId = chatbotParams.broadcaster.id,
-                broadcasterUserLogin = chatbotParams.broadcaster.login,
-                broadcasterUserName = chatbotParams.broadcaster.displayName,
-                chatterUserId = "0",
-                chatterUserLogin = "all",
-                chatterUserName = "",
-                messageId = "",
-                message = ChatMessage(text = response, fragments = Nil),
-                message_type = "",
-                badges = Nil,
-                cheer = None,
-                color = "",
-                reply = None,
-                channel_points_custom_reward_id = None,
-                channel_points_animation_id = None
-              ),
-              Nil,
-              response
-            )
-          )
-        }
-        Behaviors.same
-
-      case TwitchCommandsService.GreetUsers(chatbotParams, userStateMap) =>
-        chatbotParams.channelSettings.automaticMessagesSettings.knownGreets match {
-          case Some(knownGreetsSettings) =>
-            val shouldGreetUsersId = userStateMap
-              .filter((_, userState) =>
-                shouldGreet(
-                  userState,
-                  knownGreetsSettings,
-                  chatbotParams.broadcaster.id,
-                  chatbotParams.followers
-                )
-              )
-              .keySet
-
-            val newShouldGreetUsersId =
-              shouldGreetUsersId.diff(chatbotParams.users.keySet)
-
-            val newlyOnlineShouldGreetUsersId =
-              shouldGreetUsersId.filter(greetUserId =>
-                chatbotParams.users.exists((userId, user) =>
-                  greetUserId == userId && !user.flags.contains(
-                    Chatbot.UserFlag.Online
-                  ) && !user.flags.contains(Chatbot.UserFlag.Ignore)
-                )
-              )
-
-            val allGreetsUserId =
-              newShouldGreetUsersId ++ newlyOnlineShouldGreetUsersId
-
-            allGreetsUserId.foreach { userId =>
-              val optionFollower = chatbotParams.followers.get(userId)
-              val optionFollowerUser = optionFollower.map(follower =>
-                TwitchApi.User(
-                  follower.user_id,
-                  follower.user_login,
-                  follower.user_name
-                )
-              )
-              val optionFollowerUserState =
-                optionFollowerUser.map(Chatbot.UserState(_))
-              val optionUserState =
-                chatbotParams.users.get(userId).orElse(optionFollowerUserState)
-              optionUserState match {
-                case Some(userState) =>
-                  val (greet, name) = getGreetAndName(
-                    userState,
-                    knownGreetsSettings
-                  )
-                  val finalGreet =
-                    greet.replaceAll("user".asVariableRegex, name)
-                  chatbotParams.ircListener ! IRCListener.SendMessage(
-                    finalGreet
-                  )
-                case None =>
+                    case normalCommand =>
+                      ctx.self ! TwitchCommandsService.ReturnCommandResponse(
+                        cmd,
+                        chatters,
+                        normalCommand.map(_.response)
+                      )
+                  }
               }
+              Behaviors.same
+
+            case _ =>
+              Behaviors.same
+          }
+
+        case TwitchCommandsService.ReturnCommandResponse(
+              cmd,
+              chatters,
+              responseOption
+            ) =>
+          responseOption.foreach { response =>
+            cmd.chatbotParams.ircListener ! IRCListener.SendMessage(
+              BuiltInVariables.expandBuiltInVariables(cmd.e, chatters, response)
+            )
+          }
+          Behaviors.same
+
+        case TwitchCommandsService.RespondForTimer(chatbotParams) =>
+          val responseOption: Option[String] =
+            chatbotParams.lastTimers.last match {
+              case Left(commandName) =>
+                chatbotParams.channelSettings.commandsSettings.commands
+                  .find(_.name == commandName)
+                  .map(_.response)
+              case Right(manualTimerId) =>
+                chatbotParams.channelSettings.timersSettings.manualTimers
+                  .find(_.id == manualTimerId)
+                  .map(_.response)
             }
+          responseOption.foreach { response =>
+            chatbotParams.ircListener ! IRCListener.SendMessage(
+              BuiltInVariables.expandBuiltInVariables(
+                ChannelChatMessageEvent(
+                  broadcasterUserId = chatbotParams.broadcaster.id,
+                  broadcasterUserLogin = chatbotParams.broadcaster.login,
+                  broadcasterUserName = chatbotParams.broadcaster.displayName,
+                  chatterUserId = "0",
+                  chatterUserLogin = "all",
+                  chatterUserName = "",
+                  messageId = "",
+                  message = ChatMessage(text = response, fragments = Nil),
+                  message_type = "",
+                  badges = Nil,
+                  cheer = None,
+                  color = "",
+                  reply = None,
+                  channel_points_custom_reward_id = None,
+                  channel_points_animation_id = None
+                ),
+                Nil,
+                response
+              )
+            )
+          }
+          Behaviors.same
 
-          case None =>
-        }
+        case TwitchCommandsService.GreetUsers(chatbotParams, userStateMap) =>
+          chatbotParams.channelSettings.automaticMessagesSettings.knownGreets match {
+            case Some(knownGreetsSettings) =>
+              val shouldGreetUsersId = userStateMap
+                .filter((_, userState) =>
+                  shouldGreet(
+                    userState,
+                    knownGreetsSettings,
+                    chatbotParams.broadcaster.id,
+                    chatbotParams.followers
+                  )
+                )
+                .keySet
 
-        Behaviors.same
+              val newShouldGreetUsersId =
+                shouldGreetUsersId.diff(chatbotParams.users.keySet)
+
+              val newlyOnlineShouldGreetUsersId =
+                shouldGreetUsersId.filter(greetUserId =>
+                  chatbotParams.users.exists((userId, user) =>
+                    greetUserId == userId && !user.flags.contains(
+                      Chatbot.UserFlag.Online
+                    ) && !user.flags.contains(Chatbot.UserFlag.Ignore)
+                  )
+                )
+
+              val allGreetsUserId =
+                newShouldGreetUsersId ++ newlyOnlineShouldGreetUsersId
+
+              allGreetsUserId.foreach { userId =>
+                val optionFollower = chatbotParams.followers.get(userId)
+                val optionFollowerUser = optionFollower.map(follower =>
+                  TwitchApi.User(
+                    follower.user_id,
+                    follower.user_login,
+                    follower.user_name
+                  )
+                )
+                val optionFollowerUserState =
+                  optionFollowerUser.map(Chatbot.UserState(_))
+                val optionUserState =
+                  chatbotParams.users
+                    .get(userId)
+                    .orElse(optionFollowerUserState)
+                optionUserState match {
+                  case Some(userState) =>
+                    val (greet, name) = getGreetAndName(
+                      userState,
+                      knownGreetsSettings
+                    )
+                    val finalGreet =
+                      greet.replaceAll("user".asVariableRegex, name)
+                    chatbotParams.ircListener ! IRCListener.SendMessage(
+                      finalGreet
+                    )
+                  case None =>
+                }
+              }
+
+            case None =>
+          }
+
+          Behaviors.same
+      }
     }
   }
 
   private def shouldGreet(
-                           userState: Chatbot.UserState,
-                           settings: KnownGreetsSettings,
-                           twitchRoomId: String,
-                           followers: Map[String, TwitchApi.UserFollowage]
+      userState: Chatbot.UserState,
+      settings: KnownGreetsSettings,
+      twitchRoomId: String,
+      followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = {
     val dontGreet = userState.flags.contains(Chatbot.UserFlag.DontGreet)
     settings.mode match {
@@ -3520,8 +3525,8 @@ class TwitchCommandsService(using
   }
 
   private def isBroadcaster(
-                             userState: Chatbot.UserState,
-                             twitchRoomId: String
+      userState: Chatbot.UserState,
+      twitchRoomId: String
   ): Boolean = userState.user.user_id == twitchRoomId
 
   private def isMod(
@@ -3541,15 +3546,15 @@ class TwitchCommandsService(using
   }
 
   private def isFollower(
-                          userState: Chatbot.UserState,
-                          followers: Map[String, TwitchApi.UserFollowage]
+      userState: Chatbot.UserState,
+      followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = {
     followers.keySet.contains(userState.user.user_id)
   }
 
   private def getGreetAndName(
-                               userState: Chatbot.UserState,
-                               settings: KnownGreetsSettings
+      userState: Chatbot.UserState,
+      settings: KnownGreetsSettings
   ): (String, String) = {
     val greet = (settings.specificGreets
       .getOrElse(

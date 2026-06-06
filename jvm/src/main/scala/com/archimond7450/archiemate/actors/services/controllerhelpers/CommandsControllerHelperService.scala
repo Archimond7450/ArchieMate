@@ -3,7 +3,6 @@ package com.archimond7450.archiemate.actors.services.controllerhelpers
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.repositories.settings.CommandsSettingsRepository
 import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.http.ChannelSettings.CommandsSettings
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
@@ -38,49 +37,51 @@ object CommandsControllerHelperService {
       Behaviors.setup { ctx =>
         given ActorContext[Command] = ctx
 
-        Behaviors.receiveAndLogMessage {
-          case GetCommandsForChannelName(replyTo, twitchChannelName) =>
-            ctx.ask[ArchieMateMediator.Command, Option[
-              TwitchApiResponse.GetTokenUser
-            ]](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendTwitchTokenUserCacheServiceCommand(
-                  TwitchTokenUserCacheService
-                    .GetTokenUserFromUserName(ref, twitchChannelName)
-                )
-            ) {
-              case Success(Some(tokenUser)) =>
-                GetCommandsForTwitchRoomId(replyTo, tokenUser.id)
+        Behaviors.logMessages {
+          Behaviors.receiveMessage {
+            case GetCommandsForChannelName(replyTo, twitchChannelName) =>
+              ctx.ask[ArchieMateMediator.Command, Option[
+                TwitchApiResponse.GetTokenUser
+              ]](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendTwitchTokenUserCacheServiceCommand(
+                    TwitchTokenUserCacheService
+                      .GetTokenUserFromUserName(ref, twitchChannelName)
+                  )
+              ) {
+                case Success(Some(tokenUser)) =>
+                  GetCommandsForTwitchRoomId(replyTo, tokenUser.id)
 
-              case Success(None) =>
-                Reply(replyTo, CommandsSettings())
+                case Success(None) =>
+                  Reply(replyTo, CommandsSettings())
 
-              case Failure(ex) =>
-                Reply(replyTo, CommandsSettings())
-            }
-            Behaviors.same
+                case Failure(ex) =>
+                  Reply(replyTo, CommandsSettings())
+              }
+              Behaviors.same
 
-          case GetCommandsForTwitchRoomId(replyTo, twitchRoomId) =>
-            ctx.ask[ArchieMateMediator.Command, CommandsSettings](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
-                  CommandsSettingsRepository
-                    .GetCommandsSettings(ref, twitchRoomId)
-                )
-            ) {
-              case Success(settings) =>
-                Reply(replyTo, settings)
+            case GetCommandsForTwitchRoomId(replyTo, twitchRoomId) =>
+              ctx.ask[ArchieMateMediator.Command, CommandsSettings](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
+                    CommandsSettingsRepository
+                      .GetCommandsSettings(ref, twitchRoomId)
+                  )
+              ) {
+                case Success(settings) =>
+                  Reply(replyTo, settings)
 
-              case Failure(ex) =>
-                Reply(replyTo, CommandsSettings())
-            }
-            Behaviors.same
+                case Failure(ex) =>
+                  Reply(replyTo, CommandsSettings())
+              }
+              Behaviors.same
 
-          case Reply(replyTo, reply) =>
-            replyTo ! reply
-            Behaviors.same
+            case Reply(replyTo, reply) =>
+              replyTo ! reply
+              Behaviors.same
+          }
         }
       }
     }

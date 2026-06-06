@@ -9,7 +9,6 @@ import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient.{
   WrappedSuccessfulResponse
 }
 import com.archimond7450.archiemate.actors.{ArchieMateMediator, HttpClient}
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.helpers.JsonHelper.{
   decodeOrThrow,
@@ -155,66 +154,68 @@ class KickApiClient(using
   val settings = Settings(ctx.system)
   given Timeout = settings.askTimeout
 
-  def operational(): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case cmd: Request =>
-      processRequest(cmd)
-      Behaviors.same
+  def operational(): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case cmd: Request =>
+        processRequest(cmd)
+        Behaviors.same
 
-    case cmd: WrappedSuccessfulResponse =>
-      processWrappedSuccessfulResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedSuccessfulResponse =>
+        processWrappedSuccessfulResponse(cmd)
+        Behaviors.same
 
-    case cmd: WrappedFailedResponse =>
-      processWrappedFailedResponse(cmd)
-      Behaviors.same
+      case cmd: WrappedFailedResponse =>
+        processWrappedFailedResponse(cmd)
+        Behaviors.same
 
-    case cmd: RefreshToken =>
-      processRefreshToken(cmd)
-      Behaviors.same
+      case cmd: RefreshToken =>
+        processRefreshToken(cmd)
+        Behaviors.same
 
-    case cmd: TokenRefreshed =>
-      processTokenRefreshed(cmd)
-      Behaviors.same
+      case cmd: TokenRefreshed =>
+        processTokenRefreshed(cmd)
+        Behaviors.same
 
-    case cmd: GetToken =>
-      processGetToken(cmd)
-      Behaviors.same
+      case cmd: GetToken =>
+        processGetToken(cmd)
+        Behaviors.same
 
-    case cmd: GetTokenUserFromTokenId =>
-      processGetTokenUserFromTokenId(cmd)
-      Behaviors.same
+      case cmd: GetTokenUserFromTokenId =>
+        processGetTokenUserFromTokenId(cmd)
+        Behaviors.same
 
-    case cmd: GetTokenUserFromAccessToken =>
-      processGetTokenUserFromAccessToken(cmd)
-      Behaviors.same
+      case cmd: GetTokenUserFromAccessToken =>
+        processGetTokenUserFromAccessToken(cmd)
+        Behaviors.same
 
-    case cmd: GetPublicKey =>
-      processGetPublicKey(cmd)
-      Behaviors.same
+      case cmd: GetPublicKey =>
+        processGetPublicKey(cmd)
+        Behaviors.same
 
-    case cmd: GetEventsSubscriptions =>
-      processGetEventsSubscriptions(cmd)
-      Behaviors.same
+      case cmd: GetEventsSubscriptions =>
+        processGetEventsSubscriptions(cmd)
+        Behaviors.same
 
-    case cmd: SubscribeToEvents =>
-      processSubscribeToEvents(cmd)
-      Behaviors.same
+      case cmd: SubscribeToEvents =>
+        processSubscribeToEvents(cmd)
+        Behaviors.same
 
-    case cmd: PostChatMessage =>
-      processPostChatMessage(cmd)
-      Behaviors.same
+      case cmd: PostChatMessage =>
+        processPostChatMessage(cmd)
+        Behaviors.same
 
-    case cmd: GetCategories =>
-      processGetCategories(cmd)
-      Behaviors.same
+      case cmd: GetCategories =>
+        processGetCategories(cmd)
+        Behaviors.same
 
-    case cmd: GetChannel =>
-      processGetChannel(cmd)
-      Behaviors.same
+      case cmd: GetChannel =>
+        processGetChannel(cmd)
+        Behaviors.same
 
-    case cmd: UpdateChannel =>
-      processUpdateChannel(cmd)
-      Behaviors.same
+      case cmd: UpdateChannel =>
+        processUpdateChannel(cmd)
+        Behaviors.same
+    }
   }
 
   private def processRequest(request: Request): Unit = {

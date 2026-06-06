@@ -1,6 +1,5 @@
 package com.archimond7450.archiemate.actors.services
 
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.providers.RandomProvider
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
@@ -65,45 +64,47 @@ object TwitchLoginValidatorService {
       scheduler: TimerScheduler[Command],
       settings: Settings,
       randomProvider: RandomProvider
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case NewRequest(replyTo, twitchUserIdOption) =>
-      val uuid = randomProvider.uuid()
-      val now = OffsetDateTime.now()
-      scheduler.startSingleTimer(
-        uuid,
-        RequestTimedOut(uuid),
-        settings.newLoginExpirationTime
-      )
-      ctx.log.debug(
-        "New login request with id '{}' to expire in {} seconds",
-        uuid,
-        settings.newLoginExpirationTime.toSeconds
-      )
-      replyTo ! NewRequestCreated(
-        uuid,
-        now.plusNanos(settings.newLoginExpirationTime.toNanos)
-      )
-      ready(requests + (uuid -> RequestData(now, twitchUserIdOption)))
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case NewRequest(replyTo, twitchUserIdOption) =>
+        val uuid = randomProvider.uuid()
+        val now = OffsetDateTime.now()
+        scheduler.startSingleTimer(
+          uuid,
+          RequestTimedOut(uuid),
+          settings.newLoginExpirationTime
+        )
+        ctx.log.debug(
+          "New login request with id '{}' to expire in {} seconds",
+          uuid,
+          settings.newLoginExpirationTime.toSeconds
+        )
+        replyTo ! NewRequestCreated(
+          uuid,
+          now.plusNanos(settings.newLoginExpirationTime.toNanos)
+        )
+        ready(requests + (uuid -> RequestData(now, twitchUserIdOption)))
 
-    case msg @ RequestSucceeded(replyTo, uuid) =>
-      requests.get(uuid) match {
-        case Some(requestData) =>
-          ctx.log.debug("Login request with id '{}' succeeded.", uuid)
-          scheduler.cancel(uuid)
-          replyTo ! Acknowledged(msg, requestData.twitchUserIdOption)
+      case msg @ RequestSucceeded(replyTo, uuid) =>
+        requests.get(uuid) match {
+          case Some(requestData) =>
+            ctx.log.debug("Login request with id '{}' succeeded.", uuid)
+            scheduler.cancel(uuid)
+            replyTo ! Acknowledged(msg, requestData.twitchUserIdOption)
 
-        case None =>
-          ctx.log.warn(
-            "Login request with id '{}' is no longer valid and therefore cannot succeed.",
-            uuid
-          )
-          replyTo ! InvalidRequest(uuid)
-      }
+          case None =>
+            ctx.log.warn(
+              "Login request with id '{}' is no longer valid and therefore cannot succeed.",
+              uuid
+            )
+            replyTo ! InvalidRequest(uuid)
+        }
 
-      ready(requests - uuid)
+        ready(requests - uuid)
 
-    case RequestTimedOut(uuid) =>
-      ctx.log.debug("Login request with id '{}' timed out.", uuid)
-      ready(requests - uuid)
+      case RequestTimedOut(uuid) =>
+        ctx.log.debug("Login request with id '{}' timed out.", uuid)
+        ready(requests - uuid)
+    }
   }
 }

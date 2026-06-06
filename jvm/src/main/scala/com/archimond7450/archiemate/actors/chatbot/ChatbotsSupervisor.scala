@@ -16,7 +16,6 @@ import com.archimond7450.archiemate.actors.repositories.settings.{
 }
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient.GetTokenUserFromTokenId
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.http.ChannelSettings
 import com.archimond7450.archiemate.http.ChannelSettings.{
@@ -121,98 +120,118 @@ class ChatbotsSupervisor(using
       chatbots: Map[String, ActorRef[Chatbot.Command]] = Map.empty,
       operationalChatbots: Map[String, ActorRef[Chatbot.Command]] = Map.empty
   ): Behavior[ChatbotsSupervisor.Command] =
-    Behaviors.receiveAndLogMessage {
-      case Join(twitchRoomId) =>
-        operational(
-          chatbots + (twitchRoomId -> spawnChatbotActor(twitchRoomId)),
-          operationalChatbots
-        )
+    Behaviors.logMessages {
+      Behaviors.receiveMessage {
+        case Join(twitchRoomId) =>
+          operational(
+            chatbots + (twitchRoomId -> spawnChatbotActor(twitchRoomId)),
+            operationalChatbots
+          )
 
-      case Leave(twitchRoomId) =>
-        chatbots(twitchRoomId) ! Chatbot.Leave
-        operational(chatbots - twitchRoomId, operationalChatbots - twitchRoomId)
+        case Leave(twitchRoomId) =>
+          chatbots(twitchRoomId) ! Chatbot.Leave
+          operational(
+            chatbots - twitchRoomId,
+            operationalChatbots - twitchRoomId
+          )
 
-      case AuthorizationNeeded(twitchRoomId) =>
-        operational(chatbots - twitchRoomId, operationalChatbots - twitchRoomId)
+        case AuthorizationNeeded(twitchRoomId) =>
+          operational(
+            chatbots - twitchRoomId,
+            operationalChatbots - twitchRoomId
+          )
 
-      case JoinOK(twitchRoomId) =>
-        val newOperationalChatbots =
-          operationalChatbots + (twitchRoomId -> chatbots(twitchRoomId))
-        operational(chatbots - twitchRoomId, newOperationalChatbots)
+        case JoinOK(twitchRoomId) =>
+          val newOperationalChatbots =
+            operationalChatbots + (twitchRoomId -> chatbots(twitchRoomId))
+          operational(chatbots - twitchRoomId, newOperationalChatbots)
 
-      case NewChannelSettingsEvent(twitchRoomId, event) =>
-        val chatbotOption = chatbots
-          .find(_._1 == twitchRoomId)
-          .orElse(operationalChatbots.find(_._1 == twitchRoomId))
+        case NewChannelSettingsEvent(twitchRoomId, event) =>
+          val chatbotOption = chatbots
+            .find(_._1 == twitchRoomId)
+            .orElse(operationalChatbots.find(_._1 == twitchRoomId))
 
-        chatbotOption match {
-          case Some((_, chatbot)) =>
-            event match {
-              case BasicChatbotSettingsChanged(settings) if settings.join =>
-                chatbot ! Chatbot.NewBasicChatbotSettings(settings)
-              case BasicChatbotSettingsChanged(settings) =>
-                ctx.self ! Leave(twitchRoomId)
-              case BuiltInCommandsSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewBuiltInCommandsSettings(settings)
-              case CommandsSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewCommandsSettings(settings)
-              case VariablesSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewVariablesSettings(settings)
-              case TimersSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewTimersSettings(settings)
-              case OverlaysSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewOverlaysSettings(settings)
-              case AutomaticMessagesSettingsChanged(settings) =>
-                chatbot ! Chatbot.NewAutomaticMessagesSettings(settings)
-              case PollsChanged(polls) =>
-                chatbot ! Chatbot.NewPolls(polls)
-              case PredictionsChanged(predictions) =>
-                chatbot ! Chatbot.NewPredictions(predictions)
-            }
+          chatbotOption match {
+            case Some((_, chatbot)) =>
+              event match {
+                case BasicChatbotSettingsChanged(settings) if settings.join =>
+                  chatbot ! Chatbot.NewBasicChatbotSettings(settings)
+                case BasicChatbotSettingsChanged(settings) =>
+                  ctx.self ! Leave(twitchRoomId)
+                case BuiltInCommandsSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewBuiltInCommandsSettings(settings)
+                case CommandsSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewCommandsSettings(settings)
+                case VariablesSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewVariablesSettings(settings)
+                case TimersSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewTimersSettings(settings)
+                case OverlaysSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewOverlaysSettings(settings)
+                case AutomaticMessagesSettingsChanged(settings) =>
+                  chatbot ! Chatbot.NewAutomaticMessagesSettings(settings)
+                case PollsChanged(polls) =>
+                  chatbot ! Chatbot.NewPolls(polls)
+                case PredictionsChanged(predictions) =>
+                  chatbot ! Chatbot.NewPredictions(predictions)
+              }
 
-          case None =>
-            event match {
-              case BasicChatbotSettingsChanged(settings) =>
-                if (settings.join) {
-                  ctx.self ! Join(twitchRoomId)
-                }
+            case None =>
+              event match {
+                case BasicChatbotSettingsChanged(settings) =>
+                  if (settings.join) {
+                    ctx.self ! Join(twitchRoomId)
+                  }
 
-              case _ =>
-            }
-        }
-        Behaviors.same
+                case _ =>
+              }
+          }
+          Behaviors.same
 
-      case KickWebhookReceived(kickBroadcasterId, webhook) =>
-        ctx.ask[
-          ArchieMateMediator.Command,
-          KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId
-        ](
-          mediator,
-          ref =>
-            ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
-              KickUserSessionsRepository
-                .GetTwitchUserIdForKickUserId(ref, kickBroadcasterId)
-            )
-        ) {
-          case Success(KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId(maybeTwitchUserId)) =>
-            KickWebhookWithTwitchUserId(maybeTwitchUserId, webhook)
-          case Failure(ex) =>
-            ctx.log.error(
-              "There was an exception while waiting for kick user sessions repository to return twitch user id for kick user id.",
-              ex
-            )
-            KickWebhookWithTwitchUserId(None, webhook)
-        }
-        Behaviors.same
+        case KickWebhookReceived(kickBroadcasterId, webhook) =>
+          ctx.ask[
+            ArchieMateMediator.Command,
+            KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId
+          ](
+            mediator,
+            ref =>
+              ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
+                KickUserSessionsRepository
+                  .GetTwitchUserIdForKickUserId(ref, kickBroadcasterId)
+              )
+          ) {
+            case Success(
+                  KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId(
+                    maybeTwitchUserId
+                  )
+                ) =>
+              KickWebhookWithTwitchUserId(maybeTwitchUserId, webhook)
+            case Failure(ex) =>
+              ctx.log.error(
+                "There was an exception while waiting for kick user sessions repository to return twitch user id for kick user id.",
+                ex
+              )
+              KickWebhookWithTwitchUserId(None, webhook)
+          }
+          Behaviors.same
 
-      case KickWebhookWithTwitchUserId(Some(twitchUserId), webhook) =>
-        chatbots.get(twitchUserId).orElse(operationalChatbots.get(twitchUserId)) match {
-          case Some(chatbot) =>
-            chatbot ! Chatbot.NewKickWebhook(webhook)
-          case None =>
-            ctx.log.warn("Received webhook {} for non joined channel.")
-        }
-        Behaviors.same
+        case KickWebhookWithTwitchUserId(Some(twitchUserId), webhook) =>
+          chatbots
+            .get(twitchUserId)
+            .orElse(operationalChatbots.get(twitchUserId)) match {
+            case Some(chatbot) =>
+              chatbot ! Chatbot.NewKickWebhook(webhook)
+            case None =>
+              ctx.log.warn("Received webhook {} for non joined channel.")
+          }
+          Behaviors.same
+
+        case KickWebhookWithTwitchUserId(None, webhook) =>
+          ctx.log.error(
+            "Received webhook for a channel that doesn't have Twitch channel connected."
+          )
+          Behaviors.same
+      }
     }
 
   private def spawnChatbotActor(

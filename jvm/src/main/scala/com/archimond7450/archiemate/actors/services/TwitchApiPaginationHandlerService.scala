@@ -2,7 +2,6 @@ package com.archimond7450.archiemate.actors.services
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
@@ -106,193 +105,197 @@ class TwitchApiPaginationHandlerService(using
       ctx: ActorContext[Command],
       timeout: Timeout,
       mediator: ActorRef[ArchieMateMediator.Command]
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case cmd @ GetChatters(clientCmd) =>
-      askForChatters(cmd)
-      active(state.copy(chatters = state.chatters + (cmd -> Nil)))
-    case cmd @ GetModerators(clientCmd) =>
-      askForModerators(cmd)
-      active(state.copy(moderators = state.moderators + (cmd -> Nil)))
-    case cmd @ GetVIPs(clientCmd) =>
-      askForVIPs(cmd)
-      active(state.copy(vips = state.vips + (cmd -> Nil)))
-    case cmd @ GetSubs(clientCmd) =>
-      askForSubs(cmd)
-      active(state.copy(subs = state.subs + (cmd -> Nil)))
-    case cmd @ GetChannelFollowers(clientCmd) =>
-      askForChannelFollowers(cmd)
-      active(state.copy(followers = state.followers + (cmd -> Nil)))
-    case cmd @ GetStream(clientCmd) =>
-      askForStream(cmd)
-      active(state.copy(stream = state.stream + (cmd -> Nil)))
-    case cmd @ GetPolls(clientCmd) =>
-      askForPolls(cmd)
-      active(state.copy(polls = state.polls + (cmd -> Nil)))
-    case cmd @ GetPredictions(clientCmd) =>
-      askForPredictions(cmd)
-      active(state.copy(predictions = state.predictions + (cmd -> Nil)))
-    case ChattersResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(chatters = state.chatters - cmd))
-    case ModeratorsResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(moderators = state.moderators - cmd))
-    case VIPsResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(vips = state.vips - cmd))
-    case SubsResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(subs = state.subs - cmd))
-    case ChannelFollowersResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(followers = state.followers - cmd))
-    case StreamResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(stream = state.stream - cmd))
-    case PollsResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(polls = state.polls - cmd))
-    case PredictionsResponse(cmd, Failure(ex)) =>
-      cmd.clientCmd.replyTo ! StatusReply.error(ex)
-      active(state.copy(predictions = state.predictions - cmd))
-    case ChattersResponse(cmd, Success(chatters)) =>
-      chatters.pagination.cursor match {
-        case Some(cursor) =>
-          askForChatters(cmd, cursor = Some(cursor))
-          active(
-            state.copy(chatters =
-              state.chatters + (cmd -> (state.chatters(cmd) :+ chatters))
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case cmd @ GetChatters(clientCmd) =>
+        askForChatters(cmd)
+        active(state.copy(chatters = state.chatters + (cmd -> Nil)))
+      case cmd @ GetModerators(clientCmd) =>
+        askForModerators(cmd)
+        active(state.copy(moderators = state.moderators + (cmd -> Nil)))
+      case cmd @ GetVIPs(clientCmd) =>
+        askForVIPs(cmd)
+        active(state.copy(vips = state.vips + (cmd -> Nil)))
+      case cmd @ GetSubs(clientCmd) =>
+        askForSubs(cmd)
+        active(state.copy(subs = state.subs + (cmd -> Nil)))
+      case cmd @ GetChannelFollowers(clientCmd) =>
+        askForChannelFollowers(cmd)
+        active(state.copy(followers = state.followers + (cmd -> Nil)))
+      case cmd @ GetStream(clientCmd) =>
+        askForStream(cmd)
+        active(state.copy(stream = state.stream + (cmd -> Nil)))
+      case cmd @ GetPolls(clientCmd) =>
+        askForPolls(cmd)
+        active(state.copy(polls = state.polls + (cmd -> Nil)))
+      case cmd @ GetPredictions(clientCmd) =>
+        askForPredictions(cmd)
+        active(state.copy(predictions = state.predictions + (cmd -> Nil)))
+      case ChattersResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(chatters = state.chatters - cmd))
+      case ModeratorsResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(moderators = state.moderators - cmd))
+      case VIPsResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(vips = state.vips - cmd))
+      case SubsResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(subs = state.subs - cmd))
+      case ChannelFollowersResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(followers = state.followers - cmd))
+      case StreamResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(stream = state.stream - cmd))
+      case PollsResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(polls = state.polls - cmd))
+      case PredictionsResponse(cmd, Failure(ex)) =>
+        cmd.clientCmd.replyTo ! StatusReply.error(ex)
+        active(state.copy(predictions = state.predictions - cmd))
+      case ChattersResponse(cmd, Success(chatters)) =>
+        chatters.pagination.cursor match {
+          case Some(cursor) =>
+            askForChatters(cmd, cursor = Some(cursor))
+            active(
+              state.copy(chatters =
+                state.chatters + (cmd -> (state.chatters(cmd) :+ chatters))
+              )
             )
-          )
-        case _ =>
-          val chattersData = state.chatters(cmd) :+ chatters
-          val finalData = chattersData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            chatters.copy(data = finalData.toList)
-          )
-          active(state.copy(chatters = state.chatters - cmd))
-      }
-    case ModeratorsResponse(cmd, Success(moderators)) =>
-      moderators.pagination.cursor match {
-        case Some(cursor) =>
-          askForModerators(cmd, cursor = Some(cursor))
-          active(
-            state.copy(moderators =
-              state.moderators + (cmd -> (state.moderators(cmd) :+ moderators))
+          case _ =>
+            val chattersData = state.chatters(cmd) :+ chatters
+            val finalData = chattersData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              chatters.copy(data = finalData.toList)
             )
-          )
-        case _ =>
-          val moderatorsData = state.moderators(cmd) :+ moderators
-          val finalData = moderatorsData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            moderators.copy(data = finalData.toList)
-          )
-          active(state.copy(moderators = state.moderators - cmd))
-      }
-    case VIPsResponse(cmd, Success(vips)) =>
-      vips.pagination.cursor match {
-        case Some(cursor) =>
-          askForVIPs(cmd, cursor = Some(cursor))
-          active(
-            state.copy(vips = state.vips + (cmd -> (state.vips(cmd) :+ vips)))
-          )
-        case _ =>
-          val vipsData = state.vips(cmd) :+ vips
-          val finalData = vipsData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            vips.copy(data = finalData.toList)
-          )
-          active(state.copy(vips = state.vips - cmd))
-      }
-    case SubsResponse(cmd, Success(subs)) =>
-      subs.pagination.cursor match {
-        case Some(cursor)
-            if subs.data.length + state
-              .subs(cmd)
-              .map(_.data.length)
-              .sum <= subs.total =>
-          askForSubs(cmd, cursor = Some(cursor))
-          active(
-            state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))
-          )
-        case _ =>
-          val subsData = state.subs(cmd) :+ subs
-          val finalData = subsData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            subs.copy(data = finalData.toList)
-          )
-          active(state.copy(subs = state.subs - cmd))
-      }
-    case ChannelFollowersResponse(cmd, Success(followers)) =>
-      followers.pagination.cursor match {
-        case Some(cursor) =>
-          askForChannelFollowers(cmd, cursor = Some(cursor))
-          active(
-            state.copy(followers =
-              state.followers + (cmd -> (state.followers(cmd) :+ followers))
+            active(state.copy(chatters = state.chatters - cmd))
+        }
+      case ModeratorsResponse(cmd, Success(moderators)) =>
+        moderators.pagination.cursor match {
+          case Some(cursor) =>
+            askForModerators(cmd, cursor = Some(cursor))
+            active(
+              state.copy(moderators =
+                state.moderators + (cmd -> (state.moderators(
+                  cmd
+                ) :+ moderators))
+              )
             )
-          )
-        case _ =>
-          val followersData = state.followers(cmd) :+ followers
-          val finalData = followersData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            followers.copy(data = finalData.toList)
-          )
-          active(state.copy(followers = state.followers - cmd))
-      }
-    case StreamResponse(cmd, Success(stream)) =>
-      stream.pagination.cursor match {
-        case Some(cursor) =>
-          askForStream(cmd, cursor = Some(cursor))
-          active(
-            state.copy(stream =
-              state.stream + (cmd -> (state.stream(cmd) :+ stream))
+          case _ =>
+            val moderatorsData = state.moderators(cmd) :+ moderators
+            val finalData = moderatorsData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              moderators.copy(data = finalData.toList)
             )
-          )
-        case _ =>
-          val streamData = state.stream(cmd) :+ stream
-          val finalData = streamData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            stream.copy(data = finalData.toList)
-          )
-          active(state.copy(stream = state.stream - cmd))
-      }
-    case PollsResponse(cmd, Success(polls)) =>
-      polls.pagination.cursor match {
-        case Some(cursor) =>
-          askForPolls(cmd, cursor = Some(cursor))
-          active(
-            state.copy(polls =
-              state.polls + (cmd -> (state.polls(cmd) :+ polls))
+            active(state.copy(moderators = state.moderators - cmd))
+        }
+      case VIPsResponse(cmd, Success(vips)) =>
+        vips.pagination.cursor match {
+          case Some(cursor) =>
+            askForVIPs(cmd, cursor = Some(cursor))
+            active(
+              state.copy(vips = state.vips + (cmd -> (state.vips(cmd) :+ vips)))
             )
-          )
-        case _ =>
-          val pollsData = state.polls(cmd) :+ polls
-          val finalData = pollsData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            polls.copy(data = finalData.toList)
-          )
-          active(state.copy(polls = state.polls - cmd))
-      }
-    case PredictionsResponse(cmd, Success(predictions)) =>
-      predictions.pagination.cursor match {
-        case Some(cursor) =>
-          askForPredictions(cmd, cursor = Some(cursor))
-          active(
-            state.copy(predictions =
-              state.predictions + (cmd -> (state.predictions(
-                cmd
-              ) :+ predictions))
+          case _ =>
+            val vipsData = state.vips(cmd) :+ vips
+            val finalData = vipsData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              vips.copy(data = finalData.toList)
             )
-          )
-        case _ =>
-          val predictionsData = state.predictions(cmd) :+ predictions
-          val finalData = predictionsData.flatMap(_.data).toSet
-          cmd.clientCmd.replyTo ! StatusReply.success(
-            predictions.copy(data = finalData.toList)
-          )
-          active(state.copy(predictions = state.predictions - cmd))
-      }
+            active(state.copy(vips = state.vips - cmd))
+        }
+      case SubsResponse(cmd, Success(subs)) =>
+        subs.pagination.cursor match {
+          case Some(cursor)
+              if subs.data.length + state
+                .subs(cmd)
+                .map(_.data.length)
+                .sum <= subs.total =>
+            askForSubs(cmd, cursor = Some(cursor))
+            active(
+              state.copy(subs = state.subs + (cmd -> (state.subs(cmd) :+ subs)))
+            )
+          case _ =>
+            val subsData = state.subs(cmd) :+ subs
+            val finalData = subsData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              subs.copy(data = finalData.toList)
+            )
+            active(state.copy(subs = state.subs - cmd))
+        }
+      case ChannelFollowersResponse(cmd, Success(followers)) =>
+        followers.pagination.cursor match {
+          case Some(cursor) =>
+            askForChannelFollowers(cmd, cursor = Some(cursor))
+            active(
+              state.copy(followers =
+                state.followers + (cmd -> (state.followers(cmd) :+ followers))
+              )
+            )
+          case _ =>
+            val followersData = state.followers(cmd) :+ followers
+            val finalData = followersData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              followers.copy(data = finalData.toList)
+            )
+            active(state.copy(followers = state.followers - cmd))
+        }
+      case StreamResponse(cmd, Success(stream)) =>
+        stream.pagination.cursor match {
+          case Some(cursor) =>
+            askForStream(cmd, cursor = Some(cursor))
+            active(
+              state.copy(stream =
+                state.stream + (cmd -> (state.stream(cmd) :+ stream))
+              )
+            )
+          case _ =>
+            val streamData = state.stream(cmd) :+ stream
+            val finalData = streamData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              stream.copy(data = finalData.toList)
+            )
+            active(state.copy(stream = state.stream - cmd))
+        }
+      case PollsResponse(cmd, Success(polls)) =>
+        polls.pagination.cursor match {
+          case Some(cursor) =>
+            askForPolls(cmd, cursor = Some(cursor))
+            active(
+              state.copy(polls =
+                state.polls + (cmd -> (state.polls(cmd) :+ polls))
+              )
+            )
+          case _ =>
+            val pollsData = state.polls(cmd) :+ polls
+            val finalData = pollsData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              polls.copy(data = finalData.toList)
+            )
+            active(state.copy(polls = state.polls - cmd))
+        }
+      case PredictionsResponse(cmd, Success(predictions)) =>
+        predictions.pagination.cursor match {
+          case Some(cursor) =>
+            askForPredictions(cmd, cursor = Some(cursor))
+            active(
+              state.copy(predictions =
+                state.predictions + (cmd -> (state.predictions(
+                  cmd
+                ) :+ predictions))
+              )
+            )
+          case _ =>
+            val predictionsData = state.predictions(cmd) :+ predictions
+            val finalData = predictionsData.flatMap(_.data).toSet
+            cmd.clientCmd.replyTo ! StatusReply.success(
+              predictions.copy(data = finalData.toList)
+            )
+            active(state.copy(predictions = state.predictions - cmd))
+        }
+    }
   }
 
   private def askForChatters(

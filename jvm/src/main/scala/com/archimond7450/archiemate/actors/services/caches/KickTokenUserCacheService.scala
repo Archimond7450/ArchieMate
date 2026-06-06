@@ -1,6 +1,5 @@
 package com.archimond7450.archiemate.actors.services.caches
 
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.kick.api.KickApiResponse
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
@@ -32,16 +31,18 @@ object KickTokenUserCacheService {
 
   private def ready(tokenUsers: Map[Int, KickApiResponse.User] = Map.empty)(
       using ActorContext[Command]
-  ): Behavior[Command] = Behaviors.receiveAndLogMessage {
-    case CacheTokenUser(tokenUser) =>
-      ready(tokenUsers + (tokenUser.userId -> tokenUser))
+  ): Behavior[Command] = Behaviors.logMessages {
+    Behaviors.receiveMessage {
+      case CacheTokenUser(tokenUser) =>
+        ready(tokenUsers + (tokenUser.userId -> tokenUser))
 
-    case GetTokenUserFromUserId(replyTo, userId) =>
-      replyTo ! tokenUsers.get(userId)
-      Behaviors.same
+      case GetTokenUserFromUserId(replyTo, userId) =>
+        replyTo ! tokenUsers.get(userId)
+        Behaviors.same
 
-    case GetTokenUserFromUserName(replyTo, userName) =>
-      replyTo ! tokenUsers.find(_._2.name == userName).map(_._2)
-      Behaviors.same
+      case GetTokenUserFromUserName(replyTo, userName) =>
+        replyTo ! tokenUsers.find(_._2.name == userName).map(_._2)
+        Behaviors.same
+    }
   }
 }

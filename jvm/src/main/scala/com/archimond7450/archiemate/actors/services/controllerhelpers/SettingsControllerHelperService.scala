@@ -9,7 +9,6 @@ import com.archimond7450.archiemate.actors.repositories.sessions.{
 import com.archimond7450.archiemate.actors.repositories.settings.*
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
-import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.http.ChannelSettings.*
 import com.archimond7450.archiemate.youtube.api.YouTubeApiResponse
@@ -178,525 +177,540 @@ object SettingsControllerHelperService {
       Behaviors.setup { ctx =>
         given ActorContext[Command] = ctx
 
-        Behaviors.receiveAndLogMessage {
-          case cmd: GetConnections =>
-            ctx.log.debug("GetConnections received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+        Behaviors.logMessages {
+          Behaviors.receiveMessage {
+            case cmd: GetConnections =>
+              ctx.log.debug("GetConnections received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: TwitchConnectionReceived =>
-            ctx.log.debug("TwitchConnectionReceived received: {}", cmd)
-            ctx.ask[
-              ArchieMateMediator.Command,
-              KickUserSessionsRepository.ReturnedTokenIdForUserId
-            ](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
-                  KickUserSessionsRepository
-                    .GetTokenIdForTwitchUserId(ref, cmd.twitchUserId)
-                )
-            ) {
-              case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
-                      maybeTokenId
-                    )
-                  ) =>
-                KickConnectionReceived(cmd, Success(maybeTokenId.nonEmpty))
-              case Failure(ex) => KickConnectionReceived(cmd, Failure(ex))
-            }
-            Behaviors.same
-
-          case cmd: KickConnectionReceived =>
-            ctx.log.debug("KickConnectionReceived received: {}", cmd)
-            ctx.ask[
-              ArchieMateMediator.Command,
-              YouTubeChannelSessionsRepository.ReturnedTokenIdsForUserId
-            ](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendYouTubeChannelSessionsRepositoryCommand(
-                  YouTubeChannelSessionsRepository
-                    .GetTokenIdsForUserId(
-                      ref,
-                      cmd.twitchConnection.twitchUserId
-                    )
-                )
-            ) {
-              case Success(
-                    YouTubeChannelSessionsRepository.ReturnedTokenIdsForUserId(
-                      userId,
-                      tokenIds
-                    )
-                  ) =>
-                GetYouTubeConnections(cmd, tokenIds)
-              case Failure(ex) =>
-                SendReply(
-                  cmd.twitchConnection.originalCommand.replyTo,
-                  GetConnectionsOKResponse(
-                    cmd.twitchConnection.tryTwitchConnected,
-                    cmd.tryKickConnected,
-                    Failure(ex)
+            case cmd: TwitchConnectionReceived =>
+              ctx.log.debug("TwitchConnectionReceived received: {}", cmd)
+              ctx.ask[
+                ArchieMateMediator.Command,
+                KickUserSessionsRepository.ReturnedTokenIdForUserId
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
+                    KickUserSessionsRepository
+                      .GetTokenIdForTwitchUserId(ref, cmd.twitchUserId)
                   )
-                )
-            }
-            Behaviors.same
-
-          case cmd @ GetYouTubeConnections(
-                kickConnectionReceived,
-                Nil,
-                receivedChannels
-              ) =>
-            ctx.log.debug("Last GetYouTubeConnections received: {}", cmd)
-            val twitchConnection = kickConnectionReceived.twitchConnection
-            val tryTwitchConnected = twitchConnection.tryTwitchConnected
-            val tryKickConnected = kickConnectionReceived.tryKickConnected
-            ctx.self ! SendReply(
-              twitchConnection.originalCommand.replyTo,
-              GetConnectionsOKResponse(
-                tryTwitchConnected,
-                tryKickConnected,
-                Try(
-                  receivedChannels.toList.map(channelMap =>
-                    channelMap._2.map(channel => {
-                      val channelItem = channel.items.last
-                      YouTubeConnection(
-                        channelItem.id,
-                        channelItem.snippet.title,
-                        channelItem.snippet.thumbnails("default").url
+              ) {
+                case Success(
+                      KickUserSessionsRepository.ReturnedTokenIdForUserId(
+                        maybeTokenId
                       )
-                    })
+                    ) =>
+                  KickConnectionReceived(cmd, Success(maybeTokenId.nonEmpty))
+                case Failure(ex) => KickConnectionReceived(cmd, Failure(ex))
+              }
+              Behaviors.same
+
+            case cmd: KickConnectionReceived =>
+              ctx.log.debug("KickConnectionReceived received: {}", cmd)
+              ctx.ask[
+                ArchieMateMediator.Command,
+                YouTubeChannelSessionsRepository.ReturnedTokenIdsForUserId
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator
+                    .SendYouTubeChannelSessionsRepositoryCommand(
+                      YouTubeChannelSessionsRepository
+                        .GetTokenIdsForUserId(
+                          ref,
+                          cmd.twitchConnection.twitchUserId
+                        )
+                    )
+              ) {
+                case Success(
+                      YouTubeChannelSessionsRepository
+                        .ReturnedTokenIdsForUserId(
+                          userId,
+                          tokenIds
+                        )
+                    ) =>
+                  GetYouTubeConnections(cmd, tokenIds)
+                case Failure(ex) =>
+                  SendReply(
+                    cmd.twitchConnection.originalCommand.replyTo,
+                    GetConnectionsOKResponse(
+                      cmd.twitchConnection.tryTwitchConnected,
+                      cmd.tryKickConnected,
+                      Failure(ex)
+                    )
+                  )
+              }
+              Behaviors.same
+
+            case cmd @ GetYouTubeConnections(
+                  kickConnectionReceived,
+                  Nil,
+                  receivedChannels
+                ) =>
+              ctx.log.debug("Last GetYouTubeConnections received: {}", cmd)
+              val twitchConnection = kickConnectionReceived.twitchConnection
+              val tryTwitchConnected = twitchConnection.tryTwitchConnected
+              val tryKickConnected = kickConnectionReceived.tryKickConnected
+              ctx.self ! SendReply(
+                twitchConnection.originalCommand.replyTo,
+                GetConnectionsOKResponse(
+                  tryTwitchConnected,
+                  tryKickConnected,
+                  Try(
+                    receivedChannels.toList.map(channelMap =>
+                      channelMap._2.map(channel => {
+                        val channelItem = channel.items.last
+                        YouTubeConnection(
+                          channelItem.id,
+                          channelItem.snippet.title,
+                          channelItem.snippet.thumbnails("default").url
+                        )
+                      })
+                    )
                   )
                 )
               )
-            )
-            Behaviors.same
+              Behaviors.same
 
-          case cmd @ GetYouTubeConnections(
-                twitchConnection,
-                tokenIds,
-                receivedChannels
-              ) =>
-            ctx.log.debug("GetYouTubeConnections received: {}", cmd)
-            ctx.askWithStatus[
-              ArchieMateMediator.Command,
-              YouTubeApiResponse.Response[YouTubeApiResponse.Channel]
-            ](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendYouTubeApiClientCommand(
-                  YouTubeApiClient.GetChannelFromTokenId(ref, tokenIds.last)
-                )
-            ) {
-              case Success(response) =>
-                cmd.copy(
-                  tokenIds = tokenIds.take(tokenIds.length - 1),
-                  receivedChannels =
-                    receivedChannels + (tokenIds.last -> Success(response))
-                )
-              case Failure(ex) =>
-                cmd.copy(
-                  tokenIds = tokenIds.take(tokenIds.length - 1),
-                  receivedChannels =
-                    receivedChannels + (tokenIds.last -> Failure(ex))
-                )
-            }
-            Behaviors.same
+            case cmd @ GetYouTubeConnections(
+                  twitchConnection,
+                  tokenIds,
+                  receivedChannels
+                ) =>
+              ctx.log.debug("GetYouTubeConnections received: {}", cmd)
+              ctx.askWithStatus[
+                ArchieMateMediator.Command,
+                YouTubeApiResponse.Response[YouTubeApiResponse.Channel]
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendYouTubeApiClientCommand(
+                    YouTubeApiClient.GetChannelFromTokenId(ref, tokenIds.last)
+                  )
+              ) {
+                case Success(response) =>
+                  cmd.copy(
+                    tokenIds = tokenIds.take(tokenIds.length - 1),
+                    receivedChannels =
+                      receivedChannels + (tokenIds.last -> Success(response))
+                  )
+                case Failure(ex) =>
+                  cmd.copy(
+                    tokenIds = tokenIds.take(tokenIds.length - 1),
+                    receivedChannels =
+                      receivedChannels + (tokenIds.last -> Failure(ex))
+                  )
+              }
+              Behaviors.same
 
-          case cmd: GetBasicChatbotSettings =>
-            ctx.log.debug("GetBasicChatbotSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetBasicChatbotSettings =>
+              ctx.log.debug("GetBasicChatbotSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetBuiltInCommandsSettings =>
-            ctx.log.debug("GetBuiltInCommandsSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetBuiltInCommandsSettings =>
+              ctx.log.debug("GetBuiltInCommandsSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetCommandsSettings =>
-            ctx.log.debug("GetCommandsSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetCommandsSettings =>
+              ctx.log.debug("GetCommandsSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetVariablesSettings =>
-            ctx.log.debug("GetVariablesSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetVariablesSettings =>
+              ctx.log.debug("GetVariablesSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetTimersSettings =>
-            ctx.log.debug("GetTimersSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetTimersSettings =>
+              ctx.log.debug("GetTimersSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetOverlaysSettings =>
-            ctx.log.debug("GetOverlaysSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetOverlaysSettings =>
+              ctx.log.debug("GetOverlaysSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd: GetAutomaticMessagesSettings =>
-            ctx.log.debug("GetAutomaticMessagesSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: GetAutomaticMessagesSettings =>
+              ctx.log.debug("GetAutomaticMessagesSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-          case cmd @ DecodeJWT(originalCommand) =>
-            ctx.log.debug("DecodeJWT received: {}", cmd)
-            val (replyTo, jwt) = originalCommand match {
-              case GetConnections(replyTo, jwt)                => (replyTo, jwt)
-              case GetBasicChatbotSettings(replyTo, jwt)       => (replyTo, jwt)
-              case GetBuiltInCommandsSettings(replyTo, jwt)    => (replyTo, jwt)
-              case GetCommandsSettings(replyTo, jwt)           => (replyTo, jwt)
-              case GetVariablesSettings(replyTo, jwt)          => (replyTo, jwt)
-              case GetTimersSettings(replyTo, jwt)             => (replyTo, jwt)
-              case GetOverlaysSettings(replyTo, jwt)           => (replyTo, jwt)
-              case GetAutomaticMessagesSettings(replyTo, jwt)  => (replyTo, jwt)
-              case ChangeBasicChatbotSettings(replyTo, jwt, _) => (replyTo, jwt)
-              case ChangeBuiltInChatbotSettings(replyTo, jwt, _) =>
-                (replyTo, jwt)
-              case ChangeCommandsSettings(replyTo, jwt, _)  => (replyTo, jwt)
-              case ChangeVariablesSettings(replyTo, jwt, _) => (replyTo, jwt)
-              case ChangeTimersSettings(replyTo, jwt, _)    => (replyTo, jwt)
-              case ChangeOverlaysSettings(replyTo, jwt, _)  => (replyTo, jwt)
-              case ChangeAutomaticMessagesSettings(replyTo, jwt, _) =>
-                (replyTo, jwt)
-            }
-            ctx.ask[ArchieMateMediator.Command, JWTService.DecodeJWTResponse](
-              mediator,
-              ref =>
-                ArchieMateMediator.SendJWTServiceCommand(
-                  JWTService.DecodeJWT(ref, jwt)
-                )
-            ) {
-              case Success(JWTService.DecodedJWT(userId, _)) =>
-                PublicCommandWithUserId(originalCommand, userId)
+            case cmd @ DecodeJWT(originalCommand) =>
+              ctx.log.debug("DecodeJWT received: {}", cmd)
+              val (replyTo, jwt) = originalCommand match {
+                case GetConnections(replyTo, jwt)             => (replyTo, jwt)
+                case GetBasicChatbotSettings(replyTo, jwt)    => (replyTo, jwt)
+                case GetBuiltInCommandsSettings(replyTo, jwt) => (replyTo, jwt)
+                case GetCommandsSettings(replyTo, jwt)        => (replyTo, jwt)
+                case GetVariablesSettings(replyTo, jwt)       => (replyTo, jwt)
+                case GetTimersSettings(replyTo, jwt)          => (replyTo, jwt)
+                case GetOverlaysSettings(replyTo, jwt)        => (replyTo, jwt)
+                case GetAutomaticMessagesSettings(replyTo, jwt) =>
+                  (replyTo, jwt)
+                case ChangeBasicChatbotSettings(replyTo, jwt, _) =>
+                  (replyTo, jwt)
+                case ChangeBuiltInChatbotSettings(replyTo, jwt, _) =>
+                  (replyTo, jwt)
+                case ChangeCommandsSettings(replyTo, jwt, _)  => (replyTo, jwt)
+                case ChangeVariablesSettings(replyTo, jwt, _) => (replyTo, jwt)
+                case ChangeTimersSettings(replyTo, jwt, _)    => (replyTo, jwt)
+                case ChangeOverlaysSettings(replyTo, jwt, _)  => (replyTo, jwt)
+                case ChangeAutomaticMessagesSettings(replyTo, jwt, _) =>
+                  (replyTo, jwt)
+              }
+              ctx.ask[ArchieMateMediator.Command, JWTService.DecodeJWTResponse](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendJWTServiceCommand(
+                    JWTService.DecodeJWT(ref, jwt)
+                  )
+              ) {
+                case Success(JWTService.DecodedJWT(userId, _)) =>
+                  PublicCommandWithUserId(originalCommand, userId)
 
-              case Success(JWTService.InvalidJWT) =>
-                SendReply(replyTo, InvalidJWT)
+                case Success(JWTService.InvalidJWT) =>
+                  SendReply(replyTo, InvalidJWT)
 
-              case Failure(ex) =>
-                sendErrorResponse(ctx, originalCommand, ex)
-            }
-            Behaviors.same
+                case Failure(ex) =>
+                  sendErrorResponse(ctx, originalCommand, ex)
+              }
+              Behaviors.same
 
-          case publicCmd @ PublicCommandWithUserId(originalCommand, userId) =>
-            ctx.log.debug("PublicCommandWithUserId received: {}", publicCmd)
-            originalCommand match {
-              case cmd @ GetConnections(replyTo, _) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  TwitchUserSessionsRepository.ReturnedTokenIdForUserId
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(
-                      TwitchUserSessionsRepository
-                        .GetTokenIdForUserId(ref, userId)
-                    )
-                ) {
-                  case Success(
-                        TwitchUserSessionsRepository.ReturnedTokenIdForUserId(
-                          maybeTokenId
+            case publicCmd @ PublicCommandWithUserId(originalCommand, userId) =>
+              ctx.log.debug("PublicCommandWithUserId received: {}", publicCmd)
+              originalCommand match {
+                case cmd @ GetConnections(replyTo, _) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    TwitchUserSessionsRepository.ReturnedTokenIdForUserId
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendTwitchUserSessionsRepositoryCommand(
+                          TwitchUserSessionsRepository
+                            .GetTokenIdForUserId(ref, userId)
                         )
-                      ) =>
-                    TwitchConnectionReceived(
-                      cmd,
-                      userId,
-                      Success(maybeTokenId.nonEmpty)
-                    )
-                  case Failure(ex) =>
-                    TwitchConnectionReceived(cmd, userId, Failure(ex))
-                }
-                Behaviors.same
-
-              case GetBasicChatbotSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, BasicChatbotSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendBasicChatbotSettingsRepositoryCommand(
-                        BasicChatbotSettingsRepository.GetSettings(ref, userId)
+                  ) {
+                    case Success(
+                          TwitchUserSessionsRepository.ReturnedTokenIdForUserId(
+                            maybeTokenId
+                          )
+                        ) =>
+                      TwitchConnectionReceived(
+                        cmd,
+                        userId,
+                        Success(maybeTokenId.nonEmpty)
                       )
-                ) { trySettings =>
-                  SendReply(
-                    replyTo,
-                    GetBasicChatbotSettingsOKResponse(trySettings)
-                  )
-                }
-                Behaviors.same
+                    case Failure(ex) =>
+                      TwitchConnectionReceived(cmd, userId, Failure(ex))
+                  }
+                  Behaviors.same
 
-              case GetBuiltInCommandsSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, BuiltInCommandsSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendBuiltInCommandsSettingsRepositoryCommand(
-                        BuiltInCommandsSettingsRepository
-                          .GetSettings(ref, userId)
+                case GetBasicChatbotSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, BasicChatbotSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendBasicChatbotSettingsRepositoryCommand(
+                          BasicChatbotSettingsRepository
+                            .GetSettings(ref, userId)
+                        )
+                  ) { trySettings =>
+                    SendReply(
+                      replyTo,
+                      GetBasicChatbotSettingsOKResponse(trySettings)
+                    )
+                  }
+                  Behaviors.same
+
+                case GetBuiltInCommandsSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, BuiltInCommandsSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendBuiltInCommandsSettingsRepositoryCommand(
+                          BuiltInCommandsSettingsRepository
+                            .GetSettings(ref, userId)
+                        )
+                  ) { trySettings =>
+                    SendReply(
+                      replyTo,
+                      GetBuiltInCommandsSettingsOKResponse(trySettings)
+                    )
+                  }
+                  Behaviors.same
+
+                case GetCommandsSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, CommandsSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
+                        CommandsSettingsRepository
+                          .GetCommandsSettings(ref, userId)
                       )
-                ) { trySettings =>
-                  SendReply(
-                    replyTo,
-                    GetBuiltInCommandsSettingsOKResponse(trySettings)
-                  )
-                }
-                Behaviors.same
-
-              case GetCommandsSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, CommandsSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
-                      CommandsSettingsRepository
-                        .GetCommandsSettings(ref, userId)
+                  ) { trySettings =>
+                    SendReply(
+                      replyTo,
+                      GetCommandsSettingsOKResponse(trySettings)
                     )
-                ) { trySettings =>
-                  SendReply(replyTo, GetCommandsSettingsOKResponse(trySettings))
-                }
-                Behaviors.same
+                  }
+                  Behaviors.same
 
-              case GetVariablesSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, VariablesSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendVariablesSettingsRepositoryCommand(
-                      VariablesSettingsRepository
-                        .GetVariablesSettings(ref, userId)
-                    )
-                ) { trySettings =>
-                  SendReply(
-                    replyTo,
-                    GetVariablesSettingsOKResponse(trySettings)
-                  )
-                }
-                Behaviors.same
-
-              case GetTimersSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, TimersSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendTimersSettingsRepositoryCommand(
-                      TimersSettingsRepository.GetSettings(ref, userId)
-                    )
-                ) { trySettings =>
-                  SendReply(replyTo, GetTimersSettingsOKResponse(trySettings))
-                }
-                Behaviors.same
-
-              case GetOverlaysSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, OverlaysSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(
-                      OverlaysSettingsRepository.GetSettings(ref, userId)
-                    )
-                ) { trySettings =>
-                  SendReply(replyTo, GetOverlaysSettingsOKResponse(trySettings))
-                }
-                Behaviors.same
-
-              case GetAutomaticMessagesSettings(replyTo, _) =>
-                ctx.ask[ArchieMateMediator.Command, AutomaticMessagesSettings](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendAutomaticMessagesSettingsRepositoryCommand(
-                        AutomaticMessagesSettingsRepository
-                          .GetSettings(ref, userId)
+                case GetVariablesSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, VariablesSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendVariablesSettingsRepositoryCommand(
+                        VariablesSettingsRepository
+                          .GetVariablesSettings(ref, userId)
                       )
-                ) { trySettings =>
-                  SendReply(
-                    replyTo,
-                    GetAutomaticMessagesSettingsOKResponse(trySettings)
-                  )
-                }
-                Behaviors.same
+                  ) { trySettings =>
+                    SendReply(
+                      replyTo,
+                      GetVariablesSettingsOKResponse(trySettings)
+                    )
+                  }
+                  Behaviors.same
 
-              case ChangeBasicChatbotSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  BasicChatbotSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendBasicChatbotSettingsRepositoryCommand(
-                        BasicChatbotSettingsRepository
+                case GetTimersSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, TimersSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendTimersSettingsRepositoryCommand(
+                        TimersSettingsRepository.GetSettings(ref, userId)
+                      )
+                  ) { trySettings =>
+                    SendReply(replyTo, GetTimersSettingsOKResponse(trySettings))
+                  }
+                  Behaviors.same
+
+                case GetOverlaysSettings(replyTo, _) =>
+                  ctx.ask[ArchieMateMediator.Command, OverlaysSettings](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(
+                        OverlaysSettingsRepository.GetSettings(ref, userId)
+                      )
+                  ) { trySettings =>
+                    SendReply(
+                      replyTo,
+                      GetOverlaysSettingsOKResponse(trySettings)
+                    )
+                  }
+                  Behaviors.same
+
+                case GetAutomaticMessagesSettings(replyTo, _) =>
+                  ctx
+                    .ask[ArchieMateMediator.Command, AutomaticMessagesSettings](
+                      mediator,
+                      ref =>
+                        ArchieMateMediator
+                          .SendAutomaticMessagesSettingsRepositoryCommand(
+                            AutomaticMessagesSettingsRepository
+                              .GetSettings(ref, userId)
+                          )
+                    ) { trySettings =>
+                      SendReply(
+                        replyTo,
+                        GetAutomaticMessagesSettingsOKResponse(trySettings)
+                      )
+                    }
+                  Behaviors.same
+
+                case ChangeBasicChatbotSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    BasicChatbotSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendBasicChatbotSettingsRepositoryCommand(
+                          BasicChatbotSettingsRepository
+                            .ChangeSettings(ref, userId, settings)
+                        )
+                  ) {
+                    case Success(BasicChatbotSettingsRepository.Acknowledged) =>
+                      SendReply(replyTo, SettingsChanged)
+
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
+
+                case ChangeBuiltInChatbotSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    BuiltInCommandsSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendBuiltInCommandsSettingsRepositoryCommand(
+                          BuiltInCommandsSettingsRepository
+                            .ChangeSettings(ref, userId, settings)
+                        )
+                  ) {
+                    case Success(
+                          BuiltInCommandsSettingsRepository.Acknowledged
+                        ) =>
+                      SendReply(replyTo, SettingsChanged)
+
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
+
+                case ChangeCommandsSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    CommandsSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
+                        CommandsSettingsRepository
+                          .SetCommandsSettings(ref, userId, settings)
+                      )
+                  ) {
+                    case Success(CommandsSettingsRepository.Acknowledged) =>
+                      SendReply(replyTo, SettingsChanged)
+
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
+
+                case ChangeVariablesSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    VariablesSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendVariablesSettingsRepositoryCommand(
+                        VariablesSettingsRepository
+                          .SetVariablesSettings(ref, userId, settings)
+                      )
+                  ) {
+                    case Success(VariablesSettingsRepository.Acknowledged) =>
+                      SendReply(replyTo, SettingsChanged)
+
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
+
+                case ChangeTimersSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    TimersSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendTimersSettingsRepositoryCommand(
+                        TimersSettingsRepository
                           .ChangeSettings(ref, userId, settings)
                       )
-                ) {
-                  case Success(BasicChatbotSettingsRepository.Acknowledged) =>
-                    SendReply(replyTo, SettingsChanged)
+                  ) {
+                    case Success(TimersSettingsRepository.Acknowledged) =>
+                      SendReply(replyTo, SettingsChanged)
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
 
-              case ChangeBuiltInChatbotSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  BuiltInCommandsSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendBuiltInCommandsSettingsRepositoryCommand(
-                        BuiltInCommandsSettingsRepository
+                case ChangeOverlaysSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    OverlaysSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(
+                        OverlaysSettingsRepository
                           .ChangeSettings(ref, userId, settings)
                       )
-                ) {
-                  case Success(
-                        BuiltInCommandsSettingsRepository.Acknowledged
-                      ) =>
-                    SendReply(replyTo, SettingsChanged)
+                  ) {
+                    case Success(OverlaysSettingsRepository.Acknowledged) =>
+                      SendReply(replyTo, SettingsChanged)
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
 
-              case ChangeCommandsSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  CommandsSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendCommandsSettingsRepositoryCommand(
-                      CommandsSettingsRepository
-                        .SetCommandsSettings(ref, userId, settings)
-                    )
-                ) {
-                  case Success(CommandsSettingsRepository.Acknowledged) =>
-                    SendReply(replyTo, SettingsChanged)
+                case ChangeAutomaticMessagesSettings(replyTo, _, settings) =>
+                  ctx.ask[
+                    ArchieMateMediator.Command,
+                    AutomaticMessagesSettingsRepository.Acknowledged.type
+                  ](
+                    mediator,
+                    ref =>
+                      ArchieMateMediator
+                        .SendAutomaticMessagesSettingsRepositoryCommand(
+                          AutomaticMessagesSettingsRepository
+                            .ChangeSettings(ref, userId, settings)
+                        )
+                  ) {
+                    case Success(
+                          AutomaticMessagesSettingsRepository.Acknowledged
+                        ) =>
+                      SendReply(replyTo, SettingsChanged)
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+                    case Failure(ex) =>
+                      SendReply(replyTo, SettingsFailedToChange(ex))
+                  }
+                  Behaviors.same
+              }
 
-              case ChangeVariablesSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  VariablesSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendVariablesSettingsRepositoryCommand(
-                      VariablesSettingsRepository
-                        .SetVariablesSettings(ref, userId, settings)
-                    )
-                ) {
-                  case Success(VariablesSettingsRepository.Acknowledged) =>
-                    SendReply(replyTo, SettingsChanged)
+            case cmd @ SendReply(replyTo, response) =>
+              ctx.log.debug("SendReply received: {}", cmd)
+              replyTo ! response
+              Behaviors.same
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+            case cmd: ChangeBasicChatbotSettings =>
+              ctx.log.debug("ChangeChatbotSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-              case ChangeTimersSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  TimersSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendTimersSettingsRepositoryCommand(
-                      TimersSettingsRepository
-                        .ChangeSettings(ref, userId, settings)
-                    )
-                ) {
-                  case Success(TimersSettingsRepository.Acknowledged) =>
-                    SendReply(replyTo, SettingsChanged)
+            case cmd: ChangeBuiltInChatbotSettings =>
+              ctx.log.debug("ChangeBuiltInChatbotSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+            case cmd: ChangeCommandsSettings =>
+              ctx.log.debug("ChangeCommandsSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-              case ChangeOverlaysSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  OverlaysSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator.SendOverlaysSettingsRepositoryCommand(
-                      OverlaysSettingsRepository
-                        .ChangeSettings(ref, userId, settings)
-                    )
-                ) {
-                  case Success(OverlaysSettingsRepository.Acknowledged) =>
-                    SendReply(replyTo, SettingsChanged)
+            case cmd: ChangeVariablesSettings =>
+              ctx.log.debug("ChangeVariablesSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
+            case cmd: ChangeTimersSettings =>
+              ctx.log.debug("ChangeTimersSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-              case ChangeAutomaticMessagesSettings(replyTo, _, settings) =>
-                ctx.ask[
-                  ArchieMateMediator.Command,
-                  AutomaticMessagesSettingsRepository.Acknowledged.type
-                ](
-                  mediator,
-                  ref =>
-                    ArchieMateMediator
-                      .SendAutomaticMessagesSettingsRepositoryCommand(
-                        AutomaticMessagesSettingsRepository
-                          .ChangeSettings(ref, userId, settings)
-                      )
-                ) {
-                  case Success(
-                        AutomaticMessagesSettingsRepository.Acknowledged
-                      ) =>
-                    SendReply(replyTo, SettingsChanged)
+            case cmd: ChangeOverlaysSettings =>
+              ctx.log.debug("ChangeOverlaysSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
 
-                  case Failure(ex) =>
-                    SendReply(replyTo, SettingsFailedToChange(ex))
-                }
-                Behaviors.same
-            }
-
-          case cmd @ SendReply(replyTo, response) =>
-            ctx.log.debug("SendReply received: {}", cmd)
-            replyTo ! response
-            Behaviors.same
-
-          case cmd: ChangeBasicChatbotSettings =>
-            ctx.log.debug("ChangeChatbotSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeBuiltInChatbotSettings =>
-            ctx.log.debug("ChangeBuiltInChatbotSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeCommandsSettings =>
-            ctx.log.debug("ChangeCommandsSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeVariablesSettings =>
-            ctx.log.debug("ChangeVariablesSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeTimersSettings =>
-            ctx.log.debug("ChangeTimersSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeOverlaysSettings =>
-            ctx.log.debug("ChangeOverlaysSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
-
-          case cmd: ChangeAutomaticMessagesSettings =>
-            ctx.log.debug("ChangeAutomaticMessagesSettings received: {}", cmd)
-            ctx.self ! DecodeJWT(cmd)
-            Behaviors.same
+            case cmd: ChangeAutomaticMessagesSettings =>
+              ctx.log.debug("ChangeAutomaticMessagesSettings received: {}", cmd)
+              ctx.self ! DecodeJWT(cmd)
+              Behaviors.same
+          }
         }
       }
     }
