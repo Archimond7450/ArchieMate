@@ -83,7 +83,7 @@ object KickApiResponse {
   }
 
   final case class GetEventsSubscriptions(
-      data: GetEventsSubscriptionsData,
+      data: List[GetEventsSubscriptionsData],
       message: String
   ) extends KickApiResponse
   object GetEventsSubscriptions {

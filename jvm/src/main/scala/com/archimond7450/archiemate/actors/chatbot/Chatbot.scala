@@ -49,6 +49,7 @@ import com.archimond7450.archiemate.http.ChannelSettings.{
 }
 import com.archimond7450.archiemate.http.Polls.ChannelPolls
 import com.archimond7450.archiemate.http.Predictions.ChannelPredictions
+import com.archimond7450.archiemate.kick.api.{KickApiRequest, KickApiResponse}
 import com.archimond7450.archiemate.kick.webhooks.KickWebhooks
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.{TwitchApi, TwitchApiResponse}
@@ -78,7 +79,7 @@ import org.apache.pekko.util.Timeout
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 object Chatbot {
   sealed trait Command
@@ -125,6 +126,10 @@ object Chatbot {
   final case class Afk(chatterUserId: String) extends Command
   private case object ChattersTimer extends Command
   private case object MessageTimer extends Command
+  private case object AskForKickWebhooks extends Command
+  private final case class KickWebhooksSubscriptions(
+      trySubscriptions: Try[List[KickApiResponse.GetEventsSubscriptionsData]]
+  ) extends Command
 
   sealed trait UserFlag
   object UserFlag {
@@ -528,7 +533,7 @@ class Chatbot(twitchRoomId: String)(using
   }
 
   def withSettings(
-      tokenId: String,
+      twitchTokenId: String,
       kickTokenIdOption: Option[String],
       channelSettings: ChannelSettings,
       polls: ChannelPolls,
@@ -537,7 +542,7 @@ class Chatbot(twitchRoomId: String)(using
   ): Behavior[Chatbot.Command] = {
     val eventSubListener = ctx.spawn(
       EventSubListener(
-        tokenId,
+        twitchTokenId,
         broadcaster
       ),
       EventSubListener.actorName
@@ -548,18 +553,23 @@ class Chatbot(twitchRoomId: String)(using
       IRCListener.actorName
     )
 
-    askForMods(tokenId, broadcaster)
-    askForVIPs(tokenId, broadcaster)
-    askForSubs(tokenId, broadcaster)
-    askForFollowers(tokenId, broadcaster)
-    askForChatters(tokenId, broadcaster)
-    askForStream(tokenId, broadcaster)
-    askForPollsHistory(tokenId, broadcaster)
-    askForPredictionsHistory(tokenId, broadcaster)
+    askForMods(twitchTokenId, broadcaster)
+    askForVIPs(twitchTokenId, broadcaster)
+    askForSubs(twitchTokenId, broadcaster)
+    askForFollowers(twitchTokenId, broadcaster)
+    askForChatters(twitchTokenId, broadcaster)
+    askForStream(twitchTokenId, broadcaster)
+    askForPollsHistory(twitchTokenId, broadcaster)
+    askForPredictionsHistory(twitchTokenId, broadcaster)
+    timers.startTimerAtFixedRate(
+      Chatbot.AskForKickWebhooks,
+      0.seconds,
+      10.minutes
+    )
 
     initializing(
       InitializingParameters(
-        tokenId,
+        twitchTokenId,
         kickTokenIdOption,
         channelSettings,
         polls,
@@ -1731,14 +1741,63 @@ class Chatbot(twitchRoomId: String)(using
         )
       )
 
+    case Chatbot.AskForKickWebhooks =>
+      params.kickTokenIdOption match {
+        case Some(kickTokenId) =>
+          ctx.askWithStatus[
+            ArchieMateMediator.Command,
+            KickApiResponse.GetEventsSubscriptions
+          ](
+            mediator,
+            ref =>
+              ArchieMateMediator.SendKickApiClientCommand(
+                KickApiClient.GetEventsSubscriptions(ref, kickTokenId)
+              )
+          ) { resp: Try[KickApiResponse.GetEventsSubscriptions] =>
+            Chatbot.KickWebhooksSubscriptions(resp.map(_.data))
+          }
+        case None =>
+          Chatbot.KickWebhooksSubscriptions(Success(Nil))
+      }
+      Behaviors.same
+
+    case Chatbot.KickWebhooksSubscriptions(
+          Success(
+            subscriptions: List[KickApiResponse.GetEventsSubscriptionsData]
+          )
+        ) if params.kickTokenIdOption.nonEmpty =>
+      val expectedSubscriptions: Set[(String, Int)] =
+        Set("chat.message.sent" -> 1, "channel.followed" -> 1)
+      val actualSubscriptions: Set[(String, Int)] =
+        subscriptions.map(sub => (sub.event, sub.version)).toSet
+      expectedSubscriptions.diff(actualSubscriptions) match {
+        case Set.empty =>
+        case subsToAsk =>
+          val subs: List[KickApiRequest.KickEvent] =
+            subsToAsk.map(KickApiRequest.KickEvent.apply).toList
+          mediator ! ArchieMateMediator.SendKickApiClientCommand(
+            KickApiClient.SubscribeToEvents(
+              ctx.system.ignoreRef,
+              params.kickTokenIdOption.get,
+              subs
+            )
+          )
+      }
+      Behaviors.same
+
+    case _: Chatbot.KickWebhooksSubscriptions =>
+      Behaviors.same
+
     case Chatbot.NewKickWebhook(e: KickWebhooks.ChatMessageSentV1) =>
-      e.content.toLowerCase().match { case "!commands" =>
-        KickApiClient.PostChatMessage(
-          ctx.system.ignoreRef,
-          params.kickTokenIdOption.get,
-          s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}",
-          None
-        )
+      e.content.toLowerCase().match {
+        case "!commands" =>
+          KickApiClient.PostChatMessage(
+            ctx.system.ignoreRef,
+            params.kickTokenIdOption.get,
+            s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}",
+            None
+          )
+        case _ =>
       }
       Behaviors.same
 
