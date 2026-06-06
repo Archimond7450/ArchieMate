@@ -1,7 +1,9 @@
 package com.archimond7450.archiemate.actors
 
 import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.kick.api.KickApiClient
 import com.archimond7450.archiemate.actors.repositories.sessions.{
+  KickUserSessionsRepository,
   TwitchUserSessionsRepository,
   YouTubeChannelSessionsRepository
 }
@@ -21,7 +23,10 @@ import com.archimond7450.archiemate.actors.services.{
   TwitchApiPaginationHandlerService,
   TwitchLoginValidatorService
 }
-import com.archimond7450.archiemate.actors.services.caches.TwitchTokenUserCacheService
+import com.archimond7450.archiemate.actors.services.caches.{
+  KickTokenUserCacheService,
+  TwitchTokenUserCacheService
+}
 import com.archimond7450.archiemate.actors.services.controllerhelpers.{
   CommandsControllerHelperService,
   OAuthControllerHelperService,
@@ -56,6 +61,9 @@ object ArchieMateMediator {
   final case class SendTwitchUserSessionsRepositoryCommand(
       cmd: TwitchUserSessionsRepository.Command
   ) extends Command
+  final case class SendKickUserSessionsRepositoryCommand(
+      cmd: KickUserSessionsRepository.Command
+  ) extends Command
   final case class SendYouTubeChannelSessionsRepositoryCommand(
       cmd: YouTubeChannelSessionsRepository.Command
   ) extends Command
@@ -89,6 +97,9 @@ object ArchieMateMediator {
   final case class SendTwitchTokenUserCacheServiceCommand(
       cmd: TwitchTokenUserCacheService.Command
   ) extends Command
+  final case class SendKickTokenUserCacheServiceCommand(
+      cmd: KickTokenUserCacheService.Command
+  ) extends Command
   final case class SendCommandsControllerHelperServiceCommand(
       Cmd: CommandsControllerHelperService.Command
   ) extends Command
@@ -110,6 +121,8 @@ object ArchieMateMediator {
       cmd: TwitchLoginValidatorService.Command
   ) extends Command
   final case class SendTwitchApiClientCommand(cmd: TwitchApiClient.Command)
+      extends Command
+  final case class SendKickApiClientCommand(cmd: KickApiClient.Command)
       extends Command
   final case class SendYouTubeApiClientCommand(cmd: YouTubeApiClient.Command)
       extends Command
@@ -146,6 +159,7 @@ final class ArchieMateMediator(using
       twitchUserSessionsRepository: ActorRef[
         TwitchUserSessionsRepository.Command
       ],
+      kickUserSessionsRepository: ActorRef[KickUserSessionsRepository.Command],
       youTubeChannelSessionsRepository: ActorRef[
         YouTubeChannelSessionsRepository.Command
       ],
@@ -169,6 +183,7 @@ final class ArchieMateMediator(using
       twitchTokenUserCacheService: ActorRef[
         TwitchTokenUserCacheService.Command
       ],
+      kickTokenUserCacheService: ActorRef[KickTokenUserCacheService.Command],
       commandsControllerHelperService: ActorRef[
         CommandsControllerHelperService.Command
       ],
@@ -189,6 +204,7 @@ final class ArchieMateMediator(using
         TwitchLoginValidatorService.Command
       ],
       twitchApiClient: ActorRef[TwitchApiClient.Command],
+      kickApiClient: ActorRef[KickApiClient.Command],
       youTubeApiClient: ActorRef[YouTubeApiClient.Command]
   )
 
@@ -203,6 +219,10 @@ final class ArchieMateMediator(using
       twitchUserSessionsRepository = ctx.spawn(
         TwitchUserSessionsRepository(),
         TwitchUserSessionsRepository.actorName
+      ),
+      kickUserSessionsRepository = ctx.spawn(
+        KickUserSessionsRepository(),
+        KickUserSessionsRepository.actorName
       ),
       youTubeChannelSessionsRepository = ctx.spawn(
         YouTubeChannelSessionsRepository(),
@@ -241,6 +261,10 @@ final class ArchieMateMediator(using
         TwitchTokenUserCacheService(),
         TwitchTokenUserCacheService.actorName
       ),
+      kickTokenUserCacheService = ctx.spawn(
+        KickTokenUserCacheService(),
+        KickTokenUserCacheService.actorName
+      ),
       commandsControllerHelperService = ctx.spawn(
         CommandsControllerHelperService(),
         CommandsControllerHelperService.actorName
@@ -267,6 +291,7 @@ final class ArchieMateMediator(using
         TwitchLoginValidatorService.actorName
       ),
       twitchApiClient = ctx.spawn(TwitchApiClient(), TwitchApiClient.actorName),
+      kickApiClient = ctx.spawn(KickApiClient(), KickApiClient.actorName),
       youTubeApiClient =
         ctx.spawn(YouTubeApiClient(), YouTubeApiClient.actorName)
     )
@@ -285,6 +310,10 @@ final class ArchieMateMediator(using
 
     case SendTwitchUserSessionsRepositoryCommand(cmd) =>
       state.twitchUserSessionsRepository ! cmd
+      Behaviors.same
+
+    case SendKickUserSessionsRepositoryCommand(cmd) =>
+      state.kickUserSessionsRepository ! cmd
       Behaviors.same
 
     case SendYouTubeChannelSessionsRepositoryCommand(cmd) =>
@@ -331,6 +360,10 @@ final class ArchieMateMediator(using
       state.twitchTokenUserCacheService ! cmd
       Behaviors.same
 
+    case SendKickTokenUserCacheServiceCommand(cmd) =>
+      state.kickTokenUserCacheService ! cmd
+      Behaviors.same
+
     case SendCommandsControllerHelperServiceCommand(cmd) =>
       state.commandsControllerHelperService ! cmd
       Behaviors.same
@@ -361,6 +394,10 @@ final class ArchieMateMediator(using
 
     case SendTwitchApiClientCommand(cmd) =>
       state.twitchApiClient ! cmd
+      Behaviors.same
+
+    case SendKickApiClientCommand(cmd) =>
+      state.kickApiClient ! cmd
       Behaviors.same
 
     case SendYouTubeApiClientCommand(cmd) =>
