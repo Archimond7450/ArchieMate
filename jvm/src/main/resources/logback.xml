@@ -24,17 +24,17 @@
         <encoder>
             <pattern>[%date{ISO8601}] [%-5level] [%logger] [%marker] [%thread] - %msg | MDC: {%mdc}%n</pattern>
         </encoder>
-    </appender-->
+    </appender>
 
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
         <queueSize>8192</queueSize>
         <neverBlock>true</neverBlock>
         <appender-ref ref="FILE" />
-    </appender>
+    </appender-->
 
     <!-- Root logger configuration -->
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
-        <appender-ref ref="ASYNC"/>
+        <!--appender-ref ref="ASYNC"/-->
     </root>
 </configuration>
