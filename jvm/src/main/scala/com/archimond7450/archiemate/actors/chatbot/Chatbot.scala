@@ -1810,17 +1810,12 @@ class Chatbot(twitchRoomId: String)(using
         Behaviors.same
 
       case Chatbot.NewKickWebhook(e: KickWebhooks.ChatMessageSentV1) =>
-        ctx.log.debug(
-          s"NewKickWebhook ChatMessageSentV1 - content: ${e.content}"
-        )
-        e.content.toLowerCase() match {
-          case "!commands" =>
-            KickApiClient.PostChatMessage(
-              ctx.system.ignoreRef,
-              params.kickTokenIdOption.get,
-              s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
-            )
-          case _ =>
+        if (e.content.trim().toLowerCase() == "!commands") {
+          KickApiClient.PostChatMessage(
+            ctx.system.ignoreRef,
+            params.kickTokenIdOption.get,
+            s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
+          )
         }
         Behaviors.same
 
