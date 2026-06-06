@@ -69,6 +69,63 @@ object KickApiResponse {
     given Encoder[User] = ConfiguredEncoder.derived
   }
 
+  final case class GetPublicKey(data: GetPublicKeyData, message: String)
+      extends KickApiResponse
+  object GetPublicKey {
+    given Decoder[GetPublicKey] = ConfiguredDecoder.derived
+    given Encoder[GetPublicKey] = ConfiguredEncoder.derived
+  }
+
+  final case class GetPublicKeyData(publicKey: String)
+  object GetPublicKeyData {
+    given Decoder[GetPublicKeyData] = ConfiguredDecoder.derived
+    given Encoder[GetPublicKeyData] = ConfiguredEncoder.derived
+  }
+
+  final case class GetEventsSubscriptions(
+      data: GetEventsSubscriptionsData,
+      message: String
+  ) extends KickApiResponse
+  object GetEventsSubscriptions {
+    given Decoder[GetEventsSubscriptions] = ConfiguredDecoder.derived
+    given Encoder[GetEventsSubscriptions] = ConfiguredEncoder.derived
+  }
+
+  final case class GetEventsSubscriptionsData(
+      appId: String,
+      broadcasterUserId: Int,
+      createdAt: OffsetDateTime,
+      event: String,
+      id: String,
+      method: String,
+      updatedAt: OffsetDateTime,
+      version: Int
+  )
+  object GetEventsSubscriptionsData {
+    given Decoder[GetEventsSubscriptionsData] = ConfiguredDecoder.derived
+    given Encoder[GetEventsSubscriptionsData] = ConfiguredEncoder.derived
+  }
+
+  final case class SubscribeToEvents(
+      data: SubscribeToEventsData,
+      message: String
+  ) extends KickApiResponse
+  object SubscribeToEvents {
+    given Decoder[SubscribeToEvents] = ConfiguredDecoder.derived
+    given Encoder[SubscribeToEvents] = ConfiguredEncoder.derived
+  }
+
+  final case class SubscribeToEventsData(
+      error: Option[String],
+      name: String,
+      subscriptionId: String,
+      version: Int
+  )
+  object SubscribeToEventsData {
+    given Decoder[SubscribeToEventsData] = ConfiguredDecoder.derived
+    given Encoder[SubscribeToEventsData] = ConfiguredEncoder.derived
+  }
+
   final case class PostChatMessage(
       data: List[PostChatMessageData],
       message: Option[String]

@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors.services
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.{IRCListener, TwitchChatbot}
+import com.archimond7450.archiemate.actors.chatbot.{IRCListener, Chatbot}
 import com.archimond7450.archiemate.actors.repositories.settings.{
   AutomaticMessagesSettingsRepository,
   CommandsSettingsRepository,
@@ -51,8 +51,8 @@ object TwitchCommandsService {
 
   sealed trait Command
   final case class RespondToCommand(
-      chatbotParams: TwitchChatbot.OperationalParameters,
-      e: eventsub.ChannelChatMessageEvent
+                                     chatbotParams: Chatbot.OperationalParameters,
+                                     e: eventsub.ChannelChatMessageEvent
   ) extends Command
   private final case class ReturnCommandResponse(
       cmd: RespondToCommand,
@@ -60,18 +60,18 @@ object TwitchCommandsService {
       responseOption: Option[String]
   ) extends Command
   final case class RespondForTimer(
-      chatbotParams: TwitchChatbot.OperationalParameters
+      chatbotParams: Chatbot.OperationalParameters
   ) extends Command
   final case class GreetUsers(
-      chatbotParams: TwitchChatbot.OperationalParameters,
-      userStateMap: Map[String, TwitchChatbot.UserState]
+                               chatbotParams: Chatbot.OperationalParameters,
+                               userStateMap: Map[String, Chatbot.UserState]
   ) extends Command
 
   def apply()(using
-      mediator: ActorRef[ArchieMateMediator.Command],
-      chatbot: ActorRef[TwitchChatbot.Command],
-      randomProvider: RandomProvider,
-      timeProvider: TimeProvider
+              mediator: ActorRef[ArchieMateMediator.Command],
+              chatbot: ActorRef[Chatbot.Command],
+              randomProvider: RandomProvider,
+              timeProvider: TimeProvider
   ): Behavior[Command] = Behaviors
     .supervise[Command] {
       Behaviors.setup { ctx =>
@@ -83,11 +83,11 @@ object TwitchCommandsService {
 }
 
 class TwitchCommandsService(using
-    private val ctx: ActorContext[TwitchCommandsService.Command],
-    private val mediator: ActorRef[ArchieMateMediator.Command],
-    private val chatbot: ActorRef[TwitchChatbot.Command],
-    private val randomProvider: RandomProvider,
-    private val timeProvider: TimeProvider
+                            private val ctx: ActorContext[TwitchCommandsService.Command],
+                            private val mediator: ActorRef[ArchieMateMediator.Command],
+                            private val chatbot: ActorRef[Chatbot.Command],
+                            private val randomProvider: RandomProvider,
+                            private val timeProvider: TimeProvider
 ) {
   private val settings = Settings(ctx.system)
   given Timeout = settings.askTimeout
@@ -305,7 +305,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit
     }
 
@@ -346,14 +346,14 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val channelName = cmd.chatbotParams.broadcaster.login
         val isBroadcaster = broadcasterId == cmd.e.chatterUserId
         val isModerator = cmd.chatbotParams.users.exists((userId, userState) =>
           userId == cmd.e.chatterUserId && userState.flags.contains(
-            TwitchChatbot.UserFlag.Mod
+            Chatbot.UserFlag.Mod
           )
         )
         if (isBroadcaster || isModerator) {
@@ -636,7 +636,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, _, _) => {
         ctx.self ! TwitchCommandsService.ReturnCommandResponse(
           cmd,
@@ -658,7 +658,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val channelName = cmd.chatbotParams.broadcaster.login
@@ -721,7 +721,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         if (strParameters.trim.isEmpty) {
           ctx.self ! TwitchCommandsService.ReturnCommandResponse(
@@ -779,11 +779,11 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val chatterUserId = cmd.e.chatterUserId
         val broadcasterId = cmd.chatbotParams.broadcaster.id
-        val tokenId = cmd.chatbotParams.tokenId
+        val tokenId = cmd.chatbotParams.twitchTokenId
 
         if (strParameters.isEmpty) {
           ctx.askWithStatus[
@@ -821,7 +821,7 @@ class TwitchCommandsService(using
           chatterUserId == broadcasterId || cmd.chatbotParams.users.exists(
             (userId, userState) =>
               userId == chatterUserId && userState.flags
-                .contains(TwitchChatbot.UserFlag.Mod)
+                .contains(Chatbot.UserFlag.Mod)
           )
         ) {
           val newTitle = strParameters
@@ -866,11 +866,11 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val chatterUserId = cmd.e.chatterUserId
         val broadcasterId = cmd.chatbotParams.broadcaster.id
-        val tokenId = cmd.chatbotParams.tokenId
+        val tokenId = cmd.chatbotParams.twitchTokenId
 
         if (strParameters.isEmpty) {
           ctx.askWithStatus[
@@ -908,7 +908,7 @@ class TwitchCommandsService(using
           chatterUserId == broadcasterId || cmd.chatbotParams.users.exists(
             (userId, userState) =>
               userId == chatterUserId && userState.flags
-                .contains(TwitchChatbot.UserFlag.Mod)
+                .contains(Chatbot.UserFlag.Mod)
           )
         ) {
           val gameName = strParameters
@@ -968,10 +968,10 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val subCount = cmd.chatbotParams.users.count(
-          _._2.flags.contains(TwitchChatbot.UserFlag.Sub)
+          _._2.flags.contains(Chatbot.UserFlag.Sub)
         )
         val (isOrAre, subCountNum, subOrSubs) =
           if (subCount == 1) ("is", "one", "sub")
@@ -991,7 +991,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val response = cmd.chatbotParams.stream match {
           case Some(stream) =>
@@ -1035,7 +1035,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val chatterName = strParameters.split("\\s+").head.stripPrefix("@")
         val chatterUserIdOption = {
@@ -1061,7 +1061,7 @@ class TwitchCommandsService(using
                 ArchieMateMediator.SendTwitchApiClientCommand(
                   TwitchApiClient.CheckUserFollowage(
                     ref,
-                    cmd.chatbotParams.tokenId,
+                    cmd.chatbotParams.twitchTokenId,
                     cmd.e.broadcasterUserId,
                     chatterUserId
                   )
@@ -1126,7 +1126,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, chatbot) => {
         ctx.self ! TwitchCommandsService.ReturnCommandResponse(
           cmd,
@@ -1139,13 +1139,13 @@ class TwitchCommandsService(using
         if (
           cmd.chatbotParams.users.exists((userId, userState) =>
             userId == userId && (userState.flags
-              .contains(TwitchChatbot.UserFlag.Streamer) || userState.flags
-              .contains(TwitchChatbot.UserFlag.Mod) || userState.flags.contains(
-              TwitchChatbot.UserFlag.Vip
-            ) || userState.flags.contains(TwitchChatbot.UserFlag.Sub))
+              .contains(Chatbot.UserFlag.Streamer) || userState.flags
+              .contains(Chatbot.UserFlag.Mod) || userState.flags.contains(
+              Chatbot.UserFlag.Vip
+            ) || userState.flags.contains(Chatbot.UserFlag.Sub))
           )
         ) {
-          chatbot ! TwitchChatbot.Afk(userId)
+          chatbot ! Chatbot.Afk(userId)
         }
       }
     }
@@ -1200,7 +1200,7 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val isBroadcaster = broadcasterId == cmd.e.chatterUserId
@@ -1223,15 +1223,15 @@ class TwitchCommandsService(using
           cmd.chatbotParams.channelSettings.automaticMessagesSettings
         val greetsSettings = automaticMessagesSettings.knownGreets
         val isMod = cmd.chatbotParams.users
-          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Mod))
+          .filter(_._2.flags.contains(Chatbot.UserFlag.Mod))
           .keySet
           .contains(cmd.e.chatterUserId)
         val isVip = cmd.chatbotParams.users
-          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Vip))
+          .filter(_._2.flags.contains(Chatbot.UserFlag.Vip))
           .keySet
           .contains(cmd.e.chatterUserId)
         val isSub = cmd.chatbotParams.users
-          .filter(_._2.flags.contains(TwitchChatbot.UserFlag.Sub))
+          .filter(_._2.flags.contains(Chatbot.UserFlag.Sub))
           .keySet
           .contains(cmd.e.chatterUserId)
         val isFollower =
@@ -1990,7 +1990,7 @@ class TwitchCommandsService(using
             case (Actions.TEST, false, Some(knownGreetsSettings)) =>
               val userState = cmd.chatbotParams.users.getOrElse(
                 cmd.e.chatterUserId,
-                TwitchChatbot.UserState(user =
+                Chatbot.UserState(user =
                   TwitchApi.User(
                     cmd.e.chatterUserId,
                     cmd.e.chatterUserLogin,
@@ -1999,7 +1999,7 @@ class TwitchCommandsService(using
                 )
               )
               val userStateWithoutOnline = userState.copy(flags =
-                userState.flags - TwitchChatbot.UserFlag.Online
+                userState.flags - Chatbot.UserFlag.Online
               )
               val tempChatbotParams = cmd.chatbotParams.copy(users =
                 cmd.chatbotParams.users + (cmd.e.chatterUserId -> userStateWithoutOnline)
@@ -2084,14 +2084,14 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val isModerator = cmd.chatbotParams.users.keySet
           .contains(cmd.e.chatterUserId) && cmd.chatbotParams
           .users(cmd.e.chatterUserId)
           .flags
-          .contains(TwitchChatbot.UserFlag.Mod)
+          .contains(Chatbot.UserFlag.Mod)
 
         if (cmd.e.chatterUserId != broadcasterId && !isModerator) {
           ctx.self ! TwitchCommandsService.ReturnCommandResponse(
@@ -2412,7 +2412,7 @@ class TwitchCommandsService(using
                       ArchieMateMediator.SendTwitchApiClientCommand(
                         TwitchApiClient.CreatePoll(
                           ref,
-                          cmd.chatbotParams.tokenId,
+                          cmd.chatbotParams.twitchTokenId,
                           broadcasterId,
                           question,
                           answers.toSet,
@@ -2486,7 +2486,7 @@ class TwitchCommandsService(using
                           ArchieMateMediator.SendTwitchApiClientCommand(
                             TwitchApiClient.CreatePoll(
                               ref,
-                              cmd.chatbotParams.tokenId,
+                              cmd.chatbotParams.twitchTokenId,
                               broadcasterId,
                               poll.question,
                               poll.choices,
@@ -2540,7 +2540,7 @@ class TwitchCommandsService(using
                       ArchieMateMediator.SendTwitchApiClientCommand(
                         TwitchApiClient.EndPoll(
                           ref,
-                          cmd.chatbotParams.tokenId,
+                          cmd.chatbotParams.twitchTokenId,
                           broadcasterId,
                           poll.id,
                           withoutTrace
@@ -2635,14 +2635,14 @@ class TwitchCommandsService(using
           TwitchCommandsService.RespondToCommand,
           List[String],
           String,
-          ActorRef[TwitchChatbot.Command]
+          ActorRef[Chatbot.Command]
       ) => Unit = (cmd, chatters, strParameters, _) => {
         val broadcasterId = cmd.chatbotParams.broadcaster.id
         val isModerator = cmd.chatbotParams.users.keySet
           .contains(cmd.e.chatterUserId) && cmd.chatbotParams
           .users(cmd.e.chatterUserId)
           .flags
-          .contains(TwitchChatbot.UserFlag.Mod)
+          .contains(Chatbot.UserFlag.Mod)
 
         if (cmd.e.chatterUserId != broadcasterId && !isModerator) {
           ctx.self ! TwitchCommandsService.ReturnCommandResponse(
@@ -2954,7 +2954,7 @@ class TwitchCommandsService(using
                       ArchieMateMediator.SendTwitchApiClientCommand(
                         TwitchApiClient.CreatePrediction(
                           ref,
-                          cmd.chatbotParams.tokenId,
+                          cmd.chatbotParams.twitchTokenId,
                           broadcasterId,
                           title,
                           outcomes.toSet,
@@ -3024,7 +3024,7 @@ class TwitchCommandsService(using
                           ArchieMateMediator.SendTwitchApiClientCommand(
                             TwitchApiClient.CreatePrediction(
                               ref,
-                              cmd.chatbotParams.tokenId,
+                              cmd.chatbotParams.twitchTokenId,
                               broadcasterId,
                               prediction.title,
                               prediction.outcomes,
@@ -3077,7 +3077,7 @@ class TwitchCommandsService(using
                   ArchieMateMediator.SendTwitchApiClientCommand(
                     TwitchApiClient.CancelPrediction(
                       ref,
-                      cmd.chatbotParams.tokenId,
+                      cmd.chatbotParams.twitchTokenId,
                       broadcasterId,
                       cmd.chatbotParams.currentPrediction.get.id
                     )
@@ -3134,7 +3134,7 @@ class TwitchCommandsService(using
                   ArchieMateMediator.SendTwitchApiClientCommand(
                     TwitchApiClient.LockPrediction(
                       ref,
-                      cmd.chatbotParams.tokenId,
+                      cmd.chatbotParams.twitchTokenId,
                       broadcasterId,
                       cmd.chatbotParams.currentPrediction.get.id
                     )
@@ -3204,7 +3204,7 @@ class TwitchCommandsService(using
                         ArchieMateMediator.SendTwitchApiClientCommand(
                           TwitchApiClient.ResolvePrediction(
                             ref,
-                            cmd.chatbotParams.tokenId,
+                            cmd.chatbotParams.twitchTokenId,
                             broadcasterId,
                             prediction.id,
                             prediction.outcomes(indexStr.toInt).id
@@ -3255,7 +3255,7 @@ class TwitchCommandsService(using
                           ArchieMateMediator.SendTwitchApiClientCommand(
                             TwitchApiClient.ResolvePrediction(
                               ref,
-                              cmd.chatbotParams.tokenId,
+                              cmd.chatbotParams.twitchTokenId,
                               broadcasterId,
                               cmd.chatbotParams.currentPrediction.get.id,
                               outcome.id
@@ -3452,8 +3452,8 @@ class TwitchCommandsService(using
               shouldGreetUsersId.filter(greetUserId =>
                 chatbotParams.users.exists((userId, user) =>
                   greetUserId == userId && !user.flags.contains(
-                    TwitchChatbot.UserFlag.Online
-                  ) && !user.flags.contains(TwitchChatbot.UserFlag.Ignore)
+                    Chatbot.UserFlag.Online
+                  ) && !user.flags.contains(Chatbot.UserFlag.Ignore)
                 )
               )
 
@@ -3470,7 +3470,7 @@ class TwitchCommandsService(using
                 )
               )
               val optionFollowerUserState =
-                optionFollowerUser.map(TwitchChatbot.UserState(_))
+                optionFollowerUser.map(Chatbot.UserState(_))
               val optionUserState =
                 chatbotParams.users.get(userId).orElse(optionFollowerUserState)
               optionUserState match {
@@ -3496,12 +3496,12 @@ class TwitchCommandsService(using
   }
 
   private def shouldGreet(
-      userState: TwitchChatbot.UserState,
-      settings: KnownGreetsSettings,
-      twitchRoomId: String,
-      followers: Map[String, TwitchApi.UserFollowage]
+                           userState: Chatbot.UserState,
+                           settings: KnownGreetsSettings,
+                           twitchRoomId: String,
+                           followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = {
-    val dontGreet = userState.flags.contains(TwitchChatbot.UserFlag.DontGreet)
+    val dontGreet = userState.flags.contains(Chatbot.UserFlag.DontGreet)
     settings.mode match {
       case KnownGreetsMode.All =>
         !isBroadcaster(userState, twitchRoomId) && !dontGreet
@@ -3520,36 +3520,36 @@ class TwitchCommandsService(using
   }
 
   private def isBroadcaster(
-      userState: TwitchChatbot.UserState,
-      twitchRoomId: String
+                             userState: Chatbot.UserState,
+                             twitchRoomId: String
   ): Boolean = userState.user.user_id == twitchRoomId
 
   private def isMod(
-      userState: TwitchChatbot.UserState
+      userState: Chatbot.UserState
   ): Boolean =
-    userState.flags.contains(TwitchChatbot.UserFlag.Mod)
+    userState.flags.contains(Chatbot.UserFlag.Mod)
 
   private def isVip(
-      userState: TwitchChatbot.UserState
+      userState: Chatbot.UserState
   ): Boolean =
-    userState.flags.contains(TwitchChatbot.UserFlag.Vip)
+    userState.flags.contains(Chatbot.UserFlag.Vip)
 
   private def isSub(
-      userState: TwitchChatbot.UserState
+      userState: Chatbot.UserState
   ): Boolean = {
-    userState.flags.contains(TwitchChatbot.UserFlag.Sub)
+    userState.flags.contains(Chatbot.UserFlag.Sub)
   }
 
   private def isFollower(
-      userState: TwitchChatbot.UserState,
-      followers: Map[String, TwitchApi.UserFollowage]
+                          userState: Chatbot.UserState,
+                          followers: Map[String, TwitchApi.UserFollowage]
   ): Boolean = {
     followers.keySet.contains(userState.user.user_id)
   }
 
   private def getGreetAndName(
-      userState: TwitchChatbot.UserState,
-      settings: KnownGreetsSettings
+                               userState: Chatbot.UserState,
+                               settings: KnownGreetsSettings
   ): (String, String) = {
     val greet = (settings.specificGreets
       .getOrElse(

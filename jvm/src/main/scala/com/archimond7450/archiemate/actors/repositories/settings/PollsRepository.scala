@@ -3,7 +3,7 @@ package com.archimond7450.archiemate.actors.repositories.settings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
 import com.archimond7450.archiemate.SerializerIDs
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.http.Polls.{ChannelPolls, Poll}
 import com.archimond7450.archiemate.providers.RandomProvider
@@ -119,11 +119,11 @@ object PollsRepository {
       mediator: ActorRef[ArchieMateMediator.Command]
   ): String => State => Unit = twitchRoomId =>
     state => {
-      val event = TwitchChatbotsSupervisor.PollsChanged(
+      val event = ChatbotsSupervisor.PollsChanged(
         state.twitchRoomIdToPolls(twitchRoomId)
       )
-      mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
-        TwitchChatbotsSupervisor.NewChannelSettingsEvent(twitchRoomId, event)
+      mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
+        ChatbotsSupervisor.NewChannelSettingsEvent(twitchRoomId, event)
       )
     }
 

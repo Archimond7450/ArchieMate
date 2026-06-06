@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.http.ChannelSettings.BasicChatbotSettings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
@@ -98,8 +98,8 @@ object BasicChatbotSettingsRepository {
             .filter((_, settings) => settings.join)
             .keys
             .foreach { twitchRoomId =>
-              mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
-                TwitchChatbotsSupervisor.Join(twitchRoomId)
+              mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
+                ChatbotsSupervisor.Join(twitchRoomId)
               )
             }
         }
@@ -111,11 +111,11 @@ object BasicChatbotSettingsRepository {
   ): (String, BasicChatbotSettings) => State => Unit =
     (twitchRoomId, newSettings) =>
       state => {
-        val event = TwitchChatbotsSupervisor
+        val event = ChatbotsSupervisor
           .BasicChatbotSettingsChanged(newSettings)
         mediator ! ArchieMateMediator
-          .SendTwitchChatbotsSupervisorCommand(
-            TwitchChatbotsSupervisor
+          .SendChatbotsSupervisorCommand(
+            ChatbotsSupervisor
               .NewChannelSettingsEvent(twitchRoomId, event)
           )
       }

@@ -6,6 +6,18 @@ import io.circe.{Decoder, Encoder}
 import io.circe.derivation.{ConfiguredDecoder, ConfiguredEncoder}
 
 object KickApiRequest {
+  final case class KickEvent(name: String, version: Int)
+  object KickEvent {
+    given Decoder[KickEvent] = ConfiguredDecoder.derived
+    given Encoder[KickEvent] = ConfiguredEncoder.derived
+  }
+
+  final case class SubscribeToEvents(events: List[KickEvent], method: String = "webhook")
+  object SubscribeToEvents {
+    given Decoder[SubscribeToEvents] = ConfiguredDecoder.derived
+    given Encoder[SubscribeToEvents] = ConfiguredEncoder.derived
+  }
+
   final case class PostChatMessage(
       content: String,
       `type`: String,

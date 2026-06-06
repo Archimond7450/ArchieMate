@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.http.ChannelSettings.AutomaticMessagesSettings
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
@@ -13,12 +13,12 @@ class AutomaticMessagesSettingsRepositorySpec
   import AutomaticMessagesSettingsRepositorySpec.*
 
   "An Automatic Messages Settings Repository" should {
-    val twitchChatbotsSupervisorProbe =
-      testKit.createTestProbe[TwitchChatbotsSupervisor.Command](
-        TwitchChatbotsSupervisor.actorName
+    val chatbotsSupervisorProbe =
+      testKit.createTestProbe[ChatbotsSupervisor.Command](
+        ChatbotsSupervisor.actorName
       )
-    given twitchChatbotsSupervisor: ActorRef[TwitchChatbotsSupervisor.Command] =
-      twitchChatbotsSupervisorProbe.ref
+    given chatbotsSupervisor: ActorRef[ChatbotsSupervisor.Command] =
+      chatbotsSupervisorProbe.ref
     val mediatorProbe = testKit.createTestProbe[ArchieMateMediator.Command](
       ArchieMateMediator.actorName
     )
@@ -38,7 +38,7 @@ class AutomaticMessagesSettingsRepositorySpec
       }
 
       mediatorProbe.expectNoMessage()
-      twitchChatbotsSupervisorProbe.expectNoMessage()
+      chatbotsSupervisorProbe.expectNoMessage()
     }
 
     "return acknowledge message when settings change and notify twitch chatbots supervisor of the change" in {
@@ -57,20 +57,20 @@ class AutomaticMessagesSettingsRepositorySpec
       probe.expectMessage(AutomaticMessagesSettingsRepository.Acknowledged)
 
       val mediatorCmd = mediatorProbe.expectMessageType[
-        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+        ArchieMateMediator.SendChatbotsSupervisorCommand
       ]
-      twitchChatbotsSupervisor.ref ! mediatorCmd.cmd
-      twitchChatbotsSupervisorProbe.expectMessage(
-        TwitchChatbotsSupervisor.NewChannelSettingsEvent(
+      chatbotsSupervisor.ref ! mediatorCmd.cmd
+      chatbotsSupervisorProbe.expectMessage(
+        ChatbotsSupervisor.NewChannelSettingsEvent(
           roomId,
-          TwitchChatbotsSupervisor.AutomaticMessagesSettingsChanged(
+          ChatbotsSupervisor.AutomaticMessagesSettingsChanged(
             onlyStreamSettings
           )
         )
       )
 
       mediatorProbe.expectNoMessage()
-      twitchChatbotsSupervisorProbe.expectNoMessage()
+      chatbotsSupervisorProbe.expectNoMessage()
     }
 
     "return default settings when settings are not present for twitchRoomId, otherwise return the stored settings when GetSettings message is received" in {
@@ -93,7 +93,7 @@ class AutomaticMessagesSettingsRepositorySpec
       }
 
       mediatorProbe.expectNoMessage()
-      twitchChatbotsSupervisorProbe.expectNoMessage()
+      chatbotsSupervisorProbe.expectNoMessage()
     }
 
     "return acknowledge message when settings reset and notify twitch chatbots supervisor of the change" in {
@@ -112,20 +112,20 @@ class AutomaticMessagesSettingsRepositorySpec
       probe.expectMessage(AutomaticMessagesSettingsRepository.Acknowledged)
 
       val mediatorCmd = mediatorProbe.expectMessageType[
-        ArchieMateMediator.SendTwitchChatbotsSupervisorCommand
+        ArchieMateMediator.SendChatbotsSupervisorCommand
       ]
-      twitchChatbotsSupervisor.ref ! mediatorCmd.cmd
-      twitchChatbotsSupervisorProbe.expectMessage(
-        TwitchChatbotsSupervisor.NewChannelSettingsEvent(
+      chatbotsSupervisor.ref ! mediatorCmd.cmd
+      chatbotsSupervisorProbe.expectMessage(
+        ChatbotsSupervisor.NewChannelSettingsEvent(
           roomId,
-          TwitchChatbotsSupervisor.AutomaticMessagesSettingsChanged(
+          ChatbotsSupervisor.AutomaticMessagesSettingsChanged(
             defaultSettings
           )
         )
       )
 
       mediatorProbe.expectNoMessage()
-      twitchChatbotsSupervisorProbe.expectNoMessage()
+      chatbotsSupervisorProbe.expectNoMessage()
     }
 
     "return default settings when settings are not present for twitchRoomId, otherwise return the stored settings when GetSettings message is received #2" in {
@@ -142,7 +142,7 @@ class AutomaticMessagesSettingsRepositorySpec
       }
 
       mediatorProbe.expectNoMessage()
-      twitchChatbotsSupervisorProbe.expectNoMessage()
+      chatbotsSupervisorProbe.expectNoMessage()
     }
   }
 }

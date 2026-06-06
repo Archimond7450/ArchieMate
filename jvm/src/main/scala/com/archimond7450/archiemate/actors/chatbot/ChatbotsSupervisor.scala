@@ -1,7 +1,10 @@
 package com.archimond7450.archiemate.actors.chatbot
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.repositories.sessions.TwitchUserSessionsRepository
+import com.archimond7450.archiemate.actors.repositories.sessions.{
+  KickUserSessionsRepository,
+  TwitchUserSessionsRepository
+}
 import com.archimond7450.archiemate.actors.repositories.settings.{
   AutomaticMessagesSettingsRepository,
   BasicChatbotSettingsRepository,
@@ -27,6 +30,7 @@ import com.archimond7450.archiemate.http.ChannelSettings.{
 }
 import com.archimond7450.archiemate.http.Polls.ChannelPolls
 import com.archimond7450.archiemate.http.Predictions.ChannelPredictions
+import com.archimond7450.archiemate.kick.webhooks.KickWebhooks
 import com.archimond7450.archiemate.providers.{RandomProvider, TimeProvider}
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse.GetTokenUser
@@ -40,8 +44,8 @@ import org.apache.pekko.util.Timeout
 
 import scala.util.{Failure, Success}
 
-object TwitchChatbotsSupervisor {
-  val actorName = "TwitchChatbotsSupervisor"
+object ChatbotsSupervisor {
+  val actorName = "ChatbotsSupervisor"
 
   sealed trait Command
   final case class Join(twitchRoomId: String) extends Command
@@ -74,6 +78,15 @@ object TwitchChatbotsSupervisor {
   final case class PredictionsChanged(predictions: ChannelPredictions)
       extends SettingsEvent
 
+  final case class KickWebhookReceived(
+      kickBroadcasterId: Int,
+      webhook: KickWebhooks.KickWebhook
+  ) extends Command
+  private final case class KickWebhookWithTwitchUserId(
+      twitchRoomIdOption: Option[String],
+      webhook: KickWebhooks.KickWebhook
+  ) extends Command
+
   def apply()(using
       mediator: ActorRef[ArchieMateMediator.Command],
       randomProvider: RandomProvider,
@@ -84,14 +97,14 @@ object TwitchChatbotsSupervisor {
       Behaviors.setup { ctx =>
         given ActorContext[Command] = ctx
 
-        (new TwitchChatbotsSupervisor).operational()
+        (new ChatbotsSupervisor).operational()
       }
     }
     .onFailure[Throwable](SupervisorStrategy.resume)
 }
 
-class TwitchChatbotsSupervisor(using
-    private val ctx: ActorContext[TwitchChatbotsSupervisor.Command],
+class ChatbotsSupervisor(using
+    private val ctx: ActorContext[ChatbotsSupervisor.Command],
     private val mediator: ActorRef[ArchieMateMediator.Command],
     private val randomProvider: RandomProvider,
     private val timeProvider: TimeProvider,
@@ -102,13 +115,12 @@ class TwitchChatbotsSupervisor(using
   given IncomingMessageDecoder = new IncomingMessageDecoder
   given OutgoingMessageEncoder = new OutgoingMessageEncoder
 
-  import TwitchChatbotsSupervisor.*
+  import ChatbotsSupervisor.*
 
   def operational(
-      chatbots: Map[String, ActorRef[TwitchChatbot.Command]] = Map.empty,
-      operationalChatbots: Map[String, ActorRef[TwitchChatbot.Command]] =
-        Map.empty
-  ): Behavior[TwitchChatbotsSupervisor.Command] =
+      chatbots: Map[String, ActorRef[Chatbot.Command]] = Map.empty,
+      operationalChatbots: Map[String, ActorRef[Chatbot.Command]] = Map.empty
+  ): Behavior[ChatbotsSupervisor.Command] =
     Behaviors.receiveAndLogMessage {
       case Join(twitchRoomId) =>
         operational(
@@ -117,7 +129,7 @@ class TwitchChatbotsSupervisor(using
         )
 
       case Leave(twitchRoomId) =>
-        chatbots(twitchRoomId) ! TwitchChatbot.Leave
+        chatbots(twitchRoomId) ! Chatbot.Leave
         operational(chatbots - twitchRoomId, operationalChatbots - twitchRoomId)
 
       case AuthorizationNeeded(twitchRoomId) =>
@@ -137,25 +149,25 @@ class TwitchChatbotsSupervisor(using
           case Some((_, chatbot)) =>
             event match {
               case BasicChatbotSettingsChanged(settings) if settings.join =>
-                chatbot ! TwitchChatbot.NewBasicChatbotSettings(settings)
+                chatbot ! Chatbot.NewBasicChatbotSettings(settings)
               case BasicChatbotSettingsChanged(settings) =>
                 ctx.self ! Leave(twitchRoomId)
               case BuiltInCommandsSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewBuiltInCommandsSettings(settings)
+                chatbot ! Chatbot.NewBuiltInCommandsSettings(settings)
               case CommandsSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewCommandsSettings(settings)
+                chatbot ! Chatbot.NewCommandsSettings(settings)
               case VariablesSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewVariablesSettings(settings)
+                chatbot ! Chatbot.NewVariablesSettings(settings)
               case TimersSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewTimersSettings(settings)
+                chatbot ! Chatbot.NewTimersSettings(settings)
               case OverlaysSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewOverlaysSettings(settings)
+                chatbot ! Chatbot.NewOverlaysSettings(settings)
               case AutomaticMessagesSettingsChanged(settings) =>
-                chatbot ! TwitchChatbot.NewAutomaticMessagesSettings(settings)
+                chatbot ! Chatbot.NewAutomaticMessagesSettings(settings)
               case PollsChanged(polls) =>
-                chatbot ! TwitchChatbot.NewPolls(polls)
+                chatbot ! Chatbot.NewPolls(polls)
               case PredictionsChanged(predictions) =>
-                chatbot ! TwitchChatbot.NewPredictions(predictions)
+                chatbot ! Chatbot.NewPredictions(predictions)
             }
 
           case None =>
@@ -169,14 +181,46 @@ class TwitchChatbotsSupervisor(using
             }
         }
         Behaviors.same
+
+      case KickWebhookReceived(kickBroadcasterId, webhook) =>
+        ctx.ask[
+          ArchieMateMediator.Command,
+          KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId
+        ](
+          mediator,
+          ref =>
+            ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
+              KickUserSessionsRepository
+                .GetTwitchUserIdForKickUserId(ref, kickBroadcasterId)
+            )
+        ) {
+          case Success(KickUserSessionsRepository.ReturnedTwitchUserIdForKickUserId(maybeTwitchUserId)) =>
+            KickWebhookWithTwitchUserId(maybeTwitchUserId, webhook)
+          case Failure(ex) =>
+            ctx.log.error(
+              "There was an exception while waiting for kick user sessions repository to return twitch user id for kick user id.",
+              ex
+            )
+            KickWebhookWithTwitchUserId(None, webhook)
+        }
+        Behaviors.same
+
+      case KickWebhookWithTwitchUserId(Some(twitchUserId), webhook) =>
+        chatbots.get(twitchUserId).orElse(operationalChatbots.get(twitchUserId)) match {
+          case Some(chatbot) =>
+            chatbot ! Chatbot.NewKickWebhook(webhook)
+          case None =>
+            ctx.log.warn("Received webhook {} for non joined channel.")
+        }
+        Behaviors.same
     }
 
   private def spawnChatbotActor(
       twitchRoomId: String
-  ): ActorRef[TwitchChatbot.Command] = {
+  ): ActorRef[Chatbot.Command] = {
     given ActorRef[Command] = ctx.self
     ctx.spawn(
-      TwitchChatbot(twitchRoomId),
+      Chatbot(twitchRoomId),
       twitchRoomId
     )
   }
