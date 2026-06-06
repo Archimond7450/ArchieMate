@@ -57,14 +57,26 @@ class WebhooksController(using mediator: ActorRef[ArchieMateMediator.Command])(
                 val kickBroadcasterId = webhook match {
                   case KickWebhooks.ChannelFollowedV1(broadcaster, follower) =>
                     broadcaster.userId
-                  case KickWebhooks.ChatMessageSentV1(messageId, repliesTo, broadcaster, sender, content, emotes, createdAt) =>
+                  case KickWebhooks.ChatMessageSentV1(
+                        messageId,
+                        repliesTo,
+                        broadcaster,
+                        sender,
+                        content,
+                        emotes,
+                        createdAt
+                      ) =>
                     broadcaster.userId
                 }
                 mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
-                  ChatbotsSupervisor.KickWebhookReceived(kickBroadcasterId, webhook)
+                  ChatbotsSupervisor.KickWebhookReceived(
+                    kickBroadcasterId,
+                    webhook
+                  )
                 )
                 complete(StatusCodes.NoContent)
               case Failure(ex) =>
+                log.error(ex, "Couldn't decode webhook body")
                 complete(StatusCodes.InternalServerError)
             }
           case Success(false) =>
