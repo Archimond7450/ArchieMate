@@ -188,7 +188,7 @@ object SettingsControllerHelperService {
             ctx.log.debug("TwitchConnectionReceived received: {}", cmd)
             ctx.ask[
               ArchieMateMediator.Command,
-              KickUserSessionsRepository.ReturnedTokenIdForTwitchUserId
+              KickUserSessionsRepository.ReturnedTokenIdForUserId
             ](
               mediator,
               ref =>
@@ -198,7 +198,7 @@ object SettingsControllerHelperService {
                 )
             ) {
               case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForTwitchUserId(
+                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
                       maybeTokenId
                     )
                   ) =>

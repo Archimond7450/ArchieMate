@@ -106,7 +106,7 @@ object UserControllerHelperService {
           case GetUserKickTokenId(originalCommand, twitchUserId, twitchUser) =>
             ctx.ask[
               ArchieMateMediator.Command,
-              KickUserSessionsRepository.ReturnedTokenIdForTwitchUserId
+              KickUserSessionsRepository.ReturnedTokenIdForUserId
             ](
               mediator,
               ref =>
@@ -116,14 +116,14 @@ object UserControllerHelperService {
                 )
             ) {
               case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForTwitchUserId(
+                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
                       Some(tokenId)
                     )
                   ) =>
                 GetUserWithKickIds(originalCommand, twitchUser, tokenId)
 
               case Success(
-                    KickUserSessionsRepository.ReturnedTokenIdForTwitchUserId(
+                    KickUserSessionsRepository.ReturnedTokenIdForUserId(
                       None
                     )
                   ) =>

@@ -1,6 +1,6 @@
 package com.archimond7450.archiemate.actors
 
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.repositories.sessions.{
   TwitchUserSessionsRepository,
   YouTubeChannelSessionsRepository
@@ -38,7 +38,7 @@ import com.archimond7450.archiemate.extensions.*
 import com.archimond7450.archiemate.extensions.BehaviorsExtensions.receiveAndLogMessage
 import com.archimond7450.archiemate.helpers.HttpControllerHelpers.logoutSessionCookie
 import com.archimond7450.archiemate.helpers.PkceHelpers
-import com.archimond7450.archiemate.http.OAuthController
+import com.archimond7450.archiemate.http.{OAuthController, WebhooksController}
 import com.archimond7450.archiemate.http.api.v1.{
   SettingsController,
   V1BaseController
@@ -111,6 +111,7 @@ object UserGuardian {
 
       val v1BaseController = new V1BaseController
       val OAuthController = new OAuthController
+      val webhooksController = new WebhooksController
 
       def logout: Route = (get & path("logout" / "confirm")) {
         logoutSessionCookie {
@@ -119,7 +120,7 @@ object UserGuardian {
       }
 
       val routes =
-        logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ getFromResourceDirectory(
+        logout ~ v1BaseController.getAllRoutes ~ OAuthController.getAllRoutes ~ webhooksController.getAllRoutes ~ getFromResourceDirectory(
           "public"
         ) ~ getFromResource("public/index.html")
 

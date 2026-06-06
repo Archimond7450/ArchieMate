@@ -92,6 +92,21 @@ object KickApiClient {
       accessToken: String
   ) extends PublicCommand
 
+  final case class GetPublicKey(
+      replyTo: ActorRef[StatusReply[KickApiResponse.GetPublicKey]]
+  ) extends PublicCommand
+
+  final case class GetEventsSubscriptions(
+      replyTo: ActorRef[StatusReply[KickApiResponse.GetEventsSubscriptions]],
+      tokenId: String
+  ) extends PublicCommand
+
+  final case class SubscribeToEvents(
+      replyTo: ActorRef[StatusReply[KickApiResponse.SubscribeToEvents]],
+      tokenId: String,
+      events: List[KickApiRequest.KickEvent]
+  ) extends PublicCommand
+
   final case class PostChatMessage(
       replyTo: ActorRef[StatusReply[KickApiResponse.PostChatMessage]],
       tokenId: String,
@@ -171,6 +186,18 @@ class KickApiClient(using
 
     case cmd: GetTokenUserFromAccessToken =>
       processGetTokenUserFromAccessToken(cmd)
+      Behaviors.same
+
+    case cmd: GetPublicKey =>
+      processGetPublicKey(cmd)
+      Behaviors.same
+
+    case cmd: GetEventsSubscriptions =>
+      processGetEventsSubscriptions(cmd)
+      Behaviors.same
+
+    case cmd: SubscribeToEvents =>
+      processSubscribeToEvents(cmd)
       Behaviors.same
 
     case cmd: PostChatMessage =>
@@ -303,6 +330,21 @@ class KickApiClient(using
         val tryResponse = tryUsers.map(_.data.last)
         cmd.replyTo ! tryResponseToStatusReply(tryResponse)
 
+      case cmd: GetPublicKey =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[KickApiResponse.GetPublicKey](json)
+        )
+
+      case cmd: GetEventsSubscriptions =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[KickApiResponse.GetEventsSubscriptions](json)
+        )
+
+      case cmd: SubscribeToEvents =>
+        cmd.replyTo ! tryResponseToStatusReply(
+          decodeResponse[KickApiResponse.SubscribeToEvents](json)
+        )
+
       case cmd: PostChatMessage =>
         cmd.replyTo ! tryResponseToStatusReply(
           decodeResponse[KickApiResponse.PostChatMessage](json)
@@ -335,6 +377,15 @@ class KickApiClient(using
         cmd.replyTo ! StatusReply.error(resp.cause)
 
       case cmd: GetTokenUserFromAccessToken =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetPublicKey =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: GetEventsSubscriptions =>
+        cmd.replyTo ! StatusReply.error(resp.cause)
+
+      case cmd: SubscribeToEvents =>
         cmd.replyTo ! StatusReply.error(resp.cause)
 
       case cmd: PostChatMessage =>
@@ -451,6 +502,41 @@ class KickApiClient(using
       uri = Uri("https://api.kick.com/public/v1/users"),
       token = Some(KickApiResponse.GetToken(cmd.accessToken, "", "", 0, "")),
       shouldRefresh = false
+    )
+  }
+
+  private def processGetPublicKey(cmd: GetPublicKey): Unit = {
+    ctx.log.debug("processGetPublicKey(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = Uri("https://api.kick.com/public/v1/public-key")
+    )
+  }
+
+  private def processGetEventsSubscriptions(
+      cmd: GetEventsSubscriptions
+  ): Unit = {
+    ctx.log.debug("processGetEventsSubscriptions(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.GET,
+      uri = Uri("https://api.kick.com/public/v1/events/subscriptions"),
+      tokenId = Some(cmd.tokenId)
+    )
+  }
+
+  private def processSubscribeToEvents(cmd: SubscribeToEvents): Unit = {
+    ctx.log.debug("processSubscribeToEvents(cmd: {})", cmd)
+    ctx.self ! Request(
+      originalCommand = cmd,
+      method = HttpMethods.POST,
+      uri = Uri("https://api.kick.com/public/v1/events/subscriptions"),
+      entity = HttpEntity(
+        ContentTypes.`application/json`,
+        KickApiRequest.SubscribeToEvents(cmd.events).asJson.noSpaces
+      ),
+      tokenId = Some(cmd.tokenId)
     )
   }
 

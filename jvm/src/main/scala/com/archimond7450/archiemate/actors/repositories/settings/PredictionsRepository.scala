@@ -3,7 +3,7 @@ package com.archimond7450.archiemate.actors.repositories.settings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
 import com.archimond7450.archiemate.SerializerIDs
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.http.Predictions.{
   ChannelPredictions,
@@ -122,11 +122,11 @@ object PredictionsRepository {
       mediator: ActorRef[ArchieMateMediator.Command]
   ): String => State => Unit = twitchRoomId =>
     state => {
-      val event = TwitchChatbotsSupervisor.PredictionsChanged(
+      val event = ChatbotsSupervisor.PredictionsChanged(
         state.twitchRoomIdToPredictions(twitchRoomId)
       )
-      mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
-        TwitchChatbotsSupervisor.NewChannelSettingsEvent(twitchRoomId, event)
+      mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
+        ChatbotsSupervisor.NewChannelSettingsEvent(twitchRoomId, event)
       )
     }
 

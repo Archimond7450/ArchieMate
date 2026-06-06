@@ -1,6 +1,6 @@
 package com.archimond7450.archiemate.actors
 
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.kick.api.KickApiClient
 import com.archimond7450.archiemate.actors.repositories.sessions.{
   KickUserSessionsRepository,
@@ -32,7 +32,8 @@ import com.archimond7450.archiemate.actors.services.controllerhelpers.{
   CommandsControllerHelperService,
   OAuthControllerHelperService,
   SettingsControllerHelperService,
-  UserControllerHelperService
+  UserControllerHelperService,
+  WebhooksControllerKickHelperService
 }
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.actors.youtube.api.YouTubeApiClient
@@ -57,8 +58,8 @@ object ArchieMateMediator {
 
   final case class SendHttpClientRequest(cmd: HttpClient.Request)
       extends Command
-  final case class SendTwitchChatbotsSupervisorCommand(
-      cmd: TwitchChatbotsSupervisor.Command
+  final case class SendChatbotsSupervisorCommand(
+      cmd: ChatbotsSupervisor.Command
   ) extends Command
   final case class SendTwitchUserSessionsRepositoryCommand(
       cmd: TwitchUserSessionsRepository.Command
@@ -114,6 +115,9 @@ object ArchieMateMediator {
   final case class SendUserControllerHelperServiceCommand(
       cmd: UserControllerHelperService.Command
   ) extends Command
+  final case class SendWebhooksControllerKickHelperServiceCommand(
+      cmd: WebhooksControllerKickHelperService.Command
+  ) extends Command
   final case class SendJWTServiceCommand(cmd: JWTService.Command)
       extends Command
   final case class SendTwitchApiPaginationHandlerServiceCommand(
@@ -162,7 +166,7 @@ final class ArchieMateMediator(using
 
   case class State(
       httpClient: ActorRef[HttpClient.Request],
-      twitchChatbotsSupervisor: ActorRef[TwitchChatbotsSupervisor.Command],
+      chatbotsSupervisor: ActorRef[ChatbotsSupervisor.Command],
       twitchUserSessionsRepository: ActorRef[
         TwitchUserSessionsRepository.Command
       ],
@@ -203,6 +207,9 @@ final class ArchieMateMediator(using
       userControllerHelperService: ActorRef[
         UserControllerHelperService.Command
       ],
+      webhooksControllerKickHelperService: ActorRef[
+        WebhooksControllerKickHelperService.Command
+      ],
       jwtService: ActorRef[JWTService.Command],
       twitchApiPaginationHandlerService: ActorRef[
         TwitchApiPaginationHandlerService.Command
@@ -222,8 +229,8 @@ final class ArchieMateMediator(using
         HttpClient(HttpClient.PekkoHttpClientAdapter(Http())),
         HttpClient.actorName
       ),
-      twitchChatbotsSupervisor = ctx
-        .spawn(TwitchChatbotsSupervisor(), TwitchChatbotsSupervisor.actorName),
+      chatbotsSupervisor = ctx
+        .spawn(ChatbotsSupervisor(), ChatbotsSupervisor.actorName),
       twitchUserSessionsRepository = ctx.spawn(
         TwitchUserSessionsRepository(),
         TwitchUserSessionsRepository.actorName
@@ -289,6 +296,10 @@ final class ArchieMateMediator(using
         UserControllerHelperService(),
         UserControllerHelperService.actorName
       ),
+      webhooksControllerKickHelperService = ctx.spawn(
+        WebhooksControllerKickHelperService(),
+        WebhooksControllerKickHelperService.actorName
+      ),
       jwtService = ctx.spawn(JWTService(), JWTService.actorName),
       twitchApiPaginationHandlerService = ctx.spawn(
         TwitchApiPaginationHandlerService(),
@@ -316,8 +327,8 @@ final class ArchieMateMediator(using
       state.httpClient ! cmd
       Behaviors.same
 
-    case SendTwitchChatbotsSupervisorCommand(cmd) =>
-      state.twitchChatbotsSupervisor ! cmd
+    case SendChatbotsSupervisorCommand(cmd) =>
+      state.chatbotsSupervisor ! cmd
       Behaviors.same
 
     case SendTwitchUserSessionsRepositoryCommand(cmd) =>
@@ -390,6 +401,10 @@ final class ArchieMateMediator(using
 
     case SendUserControllerHelperServiceCommand(cmd) =>
       state.userControllerHelperService ! cmd
+      Behaviors.same
+
+    case SendWebhooksControllerKickHelperServiceCommand(cmd) =>
+      state.webhooksControllerKickHelperService ! cmd
       Behaviors.same
 
     case SendJWTServiceCommand(cmd) =>

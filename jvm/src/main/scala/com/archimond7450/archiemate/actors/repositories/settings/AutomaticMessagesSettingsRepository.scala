@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.http.ChannelSettings.AutomaticMessagesSettings
 import com.archimond7450.archiemate.CirceConfiguration.frontendConfiguration
 import com.archimond7450.archiemate.SerializerIDs
@@ -91,11 +91,11 @@ object AutomaticMessagesSettingsRepository {
   ): (String, AutomaticMessagesSettings) => State => Unit =
     (twitchRoomId, newSettings) =>
       state => {
-        val event = TwitchChatbotsSupervisor
+        val event = ChatbotsSupervisor
           .AutomaticMessagesSettingsChanged(newSettings)
         mediator ! ArchieMateMediator
-          .SendTwitchChatbotsSupervisorCommand(
-            TwitchChatbotsSupervisor
+          .SendChatbotsSupervisorCommand(
+            ChatbotsSupervisor
               .NewChannelSettingsEvent(twitchRoomId, event)
           )
       }

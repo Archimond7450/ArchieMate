@@ -644,7 +644,12 @@ object OAuthControllerHelperService {
               ) =>
             mediator ! ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
               KickUserSessionsRepository
-                .SetToken(originalRequest.state, twitchUserId, token)
+                .SetToken(
+                  originalRequest.state,
+                  twitchUserId,
+                  tokenUser.userId,
+                  token
+                )
             )
             originalRequest.replyTo ! KickAuthorized(token, tokenUser)
             Behaviors.same

@@ -35,9 +35,9 @@ object EventSubListener {
   private final case class StreamFailure(ex: Throwable) extends Command
 
   def apply(tokenId: String, broadcaster: TwitchApiResponse.GetTokenUser)(using
-      twitchChatbot: ActorRef[TwitchChatbot.Command],
-      mediator: ActorRef[ArchieMateMediator.Command],
-      settings: Settings
+                                                                          chatbot: ActorRef[Chatbot.Command],
+                                                                          mediator: ActorRef[ArchieMateMediator.Command],
+                                                                          settings: Settings
   ): Behavior[Command] = Behaviors
     .supervise[Command] {
       Behaviors.setup { ctx =>
@@ -61,12 +61,12 @@ private class EventSubListener(
     private val tokenId: String,
     private val broadcaster: TwitchApiResponse.GetTokenUser
 )(using
-    private val ctx: ActorContext[EventSubListener.Command],
-    private val scheduler: TimerScheduler[EventSubListener.Command],
-    private val buffer: StashBuffer[EventSubListener.Command],
-    private val twitchChatbot: ActorRef[TwitchChatbot.Command],
-    private val mediator: ActorRef[ArchieMateMediator.Command],
-    private val settings: Settings
+  private val ctx: ActorContext[EventSubListener.Command],
+  private val scheduler: TimerScheduler[EventSubListener.Command],
+  private val buffer: StashBuffer[EventSubListener.Command],
+  private val chatbot: ActorRef[Chatbot.Command],
+  private val mediator: ActorRef[ArchieMateMediator.Command],
+  private val settings: Settings
 ) {
   import EventSubListener.*
 
@@ -431,7 +431,7 @@ private class EventSubListener(
     case StreamDecodedMessage(
           IncomingMessage(metadata, Payload(_, _, Some(event)))
         ) if metadata.messageType == "notification" =>
-      twitchChatbot ! TwitchChatbot.EventSubEvent(event)
+      chatbot ! Chatbot.EventSubEvent(event)
       Behaviors.same
 
     case StreamDecodedMessage(

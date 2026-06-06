@@ -1,7 +1,7 @@
 package com.archimond7450.archiemate.actors.repositories.settings
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.TwitchChatbotsSupervisor
+import com.archimond7450.archiemate.actors.chatbot.ChatbotsSupervisor
 import com.archimond7450.archiemate.actors.repositories.GenericSerializer
 import com.archimond7450.archiemate.http.ChannelSettings.{
   ChannelVariable,
@@ -209,10 +209,10 @@ object VariablesSettingsRepository {
   ): String => State => Unit =
     twitchRoomId =>
       state =>
-        mediator ! ArchieMateMediator.SendTwitchChatbotsSupervisorCommand(
-          TwitchChatbotsSupervisor.NewChannelSettingsEvent(
+        mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
+          ChatbotsSupervisor.NewChannelSettingsEvent(
             twitchRoomId,
-            TwitchChatbotsSupervisor.VariablesSettingsChanged(
+            ChatbotsSupervisor.VariablesSettingsChanged(
               state.getVariablesSettings(twitchRoomId)
             )
           )
