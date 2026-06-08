@@ -1810,30 +1810,35 @@ class Chatbot(twitchRoomId: String)(using
         Behaviors.same
 
       case Chatbot.NewKickWebhook(e: KickWebhooks.ChatMessageSentV1) =>
-        e.content.toLowerCase() match {
-          case "!commands" =>
-            mediator ! ArchieMateMediator.SendKickApiClientCommand(
-              KickApiClient.PostChatMessage(
-                ctx.system.ignoreRef,
-                params.kickTokenIdOption.get,
-                s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
+        params.kickTokenIdOption.foreach { kickTokenId =>
+          e.content.toLowerCase() match {
+            case "!commands" =>
+              mediator ! ArchieMateMediator.SendKickApiClientCommand(
+                KickApiClient.PostChatMessage(
+                  ctx.system.ignoreRef,
+                  kickTokenId,
+                  s"${settings.archiemateRedirectUriPrefix}/t/commands/${params.broadcaster.login}"
+                )
               )
-            )
-          case _ =>
+            case _ =>
+          }
         }
         Behaviors.same
 
       case Chatbot.NewKickWebhook(e: KickWebhooks.ChannelFollowedV1) =>
-        params.channelSettings.automaticMessagesSettings.follow.foreach { msg =>
-          val msgWithUser =
-            msg.replaceAll("user".asVariableRegex, e.follower.username)
-          mediator ! ArchieMateMediator.SendKickApiClientCommand(
-            KickApiClient.PostChatMessage(
-              ctx.system.ignoreRef,
-              params.kickTokenIdOption.get,
-              msgWithUser
-            )
-          )
+        params.kickTokenIdOption.foreach { kickTokenId =>
+          params.channelSettings.automaticMessagesSettings.follow.foreach {
+            msg =>
+              val msgWithUser =
+                msg.replaceAll("user".asVariableRegex, e.follower.username)
+              mediator ! ArchieMateMediator.SendKickApiClientCommand(
+                KickApiClient.PostChatMessage(
+                  ctx.system.ignoreRef,
+                  kickTokenId,
+                  msgWithUser
+                )
+              )
+          }
         }
         Behaviors.same
 

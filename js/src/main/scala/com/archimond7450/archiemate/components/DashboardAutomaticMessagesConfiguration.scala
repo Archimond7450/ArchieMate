@@ -138,6 +138,54 @@ object DashboardAutomaticMessagesConfiguration {
                   "Message sent when the hype train starts",
                   hypeTrainBegin
                 ),
+                // TODO threshold optional inputs
+                /*OptionalInput.render(
+                  "Hype Train Level Up",
+                  "Message sent when the hype train levels up",
+                  hypeTrainLevelUp
+                ),*/
+                OptionalInput.render(
+                  "End of Hype Train",
+                  "Message sent when the hype train ends",
+                  hypeTrainEnd
+                ),
+                OptionalInput.render(
+                  "Follow",
+                  s"Message sent when someone follows your channnel | The variable $${user} can be used",
+                  follow
+                ),
+                // TODO threshold optional inputs
+                /*OptionalInput.render(
+                  "Subscription",
+                  s"Message sent when someone subscribes to your channel.",
+                  subscription
+                ),*/
+                /*OptionalInput.render(
+                  "Anonymous Subscription Gift",
+                  s"Message sent when someone anonymously gifts a subscription in your channel.",
+                  anonymousSubscriptionGift
+                ),*/
+                /*OptionalInput.render(
+                  "Subscription Gift",
+                  s"Message sent when someone gifts a subscription in your channel.",
+                  subscriptionGift
+                ),*/
+                /*OptionalInput.render(
+                  "Cheer",
+                  s"Message sent when someone cheers in your Twitch channel.",
+                  cheer
+                ),*/
+                /*OptionalInput.render(
+                  "Anonymous Cheer",
+                  s"Message sent when someone cheers anonymously in your Twitch channel.",
+                  anonymousCheer
+                ),*/
+                /*OptionalInput.render(
+                  "Hype Chat",
+                  s"Message sent when someone sends a Hype Chat in your Twitch channel.",
+                  hypeChat
+                ),*/
+                // TODO knownGreets
                 SaveButton.render[AutomaticMessagesSettings](
                   state,
                   currentSettings =>
