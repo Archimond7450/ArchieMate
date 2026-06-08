@@ -1192,7 +1192,7 @@ class TwitchCommandsService(using
       }
 
       private val usage =
-        s"$${sender} Usage: !greets (${Actions.ALL_GREETS_ACTIONS.mkString("|")}) (name|index|position|) (greet|)"
+        s"$${sender} ${settings.archiemateRedirectUriPrefix}/docs#builtin-commands-greets"
 
       override val getCommandResponse: (
           TwitchCommandsService.RespondToCommand,
@@ -2069,7 +2069,7 @@ class TwitchCommandsService(using
       }
 
       private val usage =
-        s"$${sender} Usage: !poll (${Actions.ALL_POLL_ACTIONS.mkString("|")}) (alias) (timeInSeconds|nextAlias|\"Question\") (\"Answer 1\")..."
+        s"$${sender} ${settings.archiemateRedirectUriPrefix}/docs#builtin-commands-poll"
       private val syntax =
         s"$${sender}, invalid syntax. Use the \" character to surround the question and the answers."
 
@@ -2620,7 +2620,7 @@ class TwitchCommandsService(using
       }
 
       private val usage =
-        s"$${sender}, Usage: !prediction (${Actions.ALL_PREDICTION_ACTIONS.mkString("|")} (alias) (timeInSeconds|nextAlias|\"Prediction title\") (\"Outcome 1\")..."
+        s"$${sender} ${settings.archiemateRedirectUriPrefix}/docs#builtin-commands-prediction"
       private val syntax =
         s"$${sender}, invalid syntax. Use the \" character to surround the prediction title and the outcomes."
 
