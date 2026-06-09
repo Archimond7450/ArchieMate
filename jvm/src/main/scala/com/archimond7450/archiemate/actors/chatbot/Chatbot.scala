@@ -1788,7 +1788,11 @@ class Chatbot(twitchRoomId: String)(using
             )
           ) if params.kickTokenIdOption.nonEmpty =>
         val expectedSubscriptions: Set[(String, Int)] =
-          Set("chat.message.sent" -> 1, "channel.followed" -> 1)
+          Set(
+            "chat.message.sent" -> 1,
+            "channel.followed" -> 1,
+            "livestream.status.updated" -> 1
+          )
         val actualSubscriptions: Set[(String, Int)] =
           subscriptions.map(sub => (sub.event, sub.version)).toSet
         expectedSubscriptions.diff(actualSubscriptions) match {
@@ -1839,6 +1843,49 @@ class Chatbot(twitchRoomId: String)(using
                 )
               )
           }
+        }
+        Behaviors.same
+
+      case cmd @ Chatbot.NewKickWebhook(
+            e: KickWebhooks.LivestreamStatusUpdatedV1
+          ) if e.isLive =>
+        params.stream match {
+          case None =>
+            ctx.scheduleOnce(
+              1.second,
+              ctx.self,
+              cmd
+            ) // If there is no Twitch stream data, wait for it
+          case Some(stream) =>
+            params.channelSettings.automaticMessagesSettings.streamStart
+              .foreach { msg =>
+                val message = msg
+                  .replaceAll(
+                    "game".asVariableRegex,
+                    stream.gameName
+                  ) // TODO: Use actual Kick game
+                  .replaceAll("title".asVariableRegex, e.title)
+                mediator ! ArchieMateMediator.SendKickApiClientCommand(
+                  KickApiClient.PostChatMessage(
+                    ctx.system.ignoreRef,
+                    params.kickTokenIdOption.get,
+                    msg
+                  )
+                )
+              }
+        }
+        Behaviors.same
+
+      case Chatbot.NewKickWebhook(_: KickWebhooks.LivestreamStatusUpdatedV1) =>
+        params.channelSettings.automaticMessagesSettings.streamEnd.foreach {
+          msg =>
+            mediator ! ArchieMateMediator.SendKickApiClientCommand(
+              KickApiClient.PostChatMessage(
+                ctx.system.ignoreRef,
+                params.kickTokenIdOption.get,
+                msg
+              )
+            )
         }
         Behaviors.same
 
