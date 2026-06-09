@@ -71,6 +71,14 @@ class WebhooksController(using mediator: ActorRef[ArchieMateMediator.Command])(
                         createdAt
                       ) =>
                     broadcaster.userId
+                  case KickWebhooks.LivestreamStatusUpdatedV1(
+                        broadcaster,
+                        isLive,
+                        title,
+                        startedAt,
+                        endedAt
+                      ) =>
+                    broadcaster.userId
                 }
                 mediator ! ArchieMateMediator.SendChatbotsSupervisorCommand(
                   ChatbotsSupervisor.KickWebhookReceived(
