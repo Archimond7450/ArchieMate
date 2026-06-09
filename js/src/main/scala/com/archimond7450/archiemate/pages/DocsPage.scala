@@ -237,7 +237,7 @@ object DocsPage {
       codeElement("!set foo bar"),
       a(nameAttr("builtin-commands-unset")),
       h3Element("!unset"),
-      pElement("This command can be used to unset one or morw variables."),
+      pElement("This command can be used to unset one or more variables."),
       codeElement("!unset [variable1] [variable2] ..."),
       pElement("For example to unset variable foo, use the following:"),
       codeElement("!unset foo"),
@@ -389,7 +389,7 @@ object DocsPage {
       codeElement("!greets name Archie"),
       h4Element("Creating new greets"),
       pElement(
-        s"Broadcaster may create any number of generic greets. The same applies to specific greets. For example if the broadcaster wanted to add the generic greet \"Hi, there $${user}\" or anyone else wanted to add the same specific greet for themselves, they would use any of the following:"
+        s"Broadcaster may create any number of generic greets. The same applies to other users and their specific greets. For example if the broadcaster wanted to add the generic greet \"Hi, there $${user}\" or anyone else wanted to add the same specific greet for themselves, they would use any of the following:"
       ),
       codeElement(s"!greets add Hi, there $${user}"),
       codeElement(s"!greets create Hi, there $${user}"),
@@ -484,7 +484,7 @@ object DocsPage {
         "To quickly start a poll that ends in 60 seconds you could use the following:"
       ),
       codeElement(
-        "!poll quick \\\"Do you like the stream?\\\" \\\"Yes, very much!\\\" \\\"It's pretty good!\\\" \\\"It's OK.\\\" \\\"It could be better\\\" \\\"No\\\" 60"
+        "!poll quick \"Do you like the stream?\" \"Yes, very much!\" \"It's pretty good!\" \"It's OK.\" \"It could be better\" \"No\" 60"
       ),
       h4Element("Starting a poll saved in the poll system memory"),
       pElement(
