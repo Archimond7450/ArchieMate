@@ -19,6 +19,8 @@ object KickWebhooks {
         decode[KickWebhooks.ChatMessageSentV1](json)
       case ("channel.followed", "1") =>
         decode[KickWebhooks.ChannelFollowedV1](json)
+      case ("livestream.status.updated", "1") =>
+        decode[KickWebhooks.LivestreamStatusUpdatedV1](json)
       case _ =>
         Left(RuntimeException("Unsupported event/version combination"))
     }
@@ -103,5 +105,17 @@ object KickWebhooks {
   object ChannelFollowedV1 {
     given Decoder[ChannelFollowedV1] = ConfiguredDecoder.derived
     given Encoder[ChannelFollowedV1] = ConfiguredEncoder.derived
+  }
+
+  final case class LivestreamStatusUpdatedV1(
+      broadcaster: User,
+      isLive: Boolean,
+      title: String,
+      startedAt: OffsetDateTime,
+      endedAt: Option[OffsetDateTime]
+  ) extends KickWebhook
+  object LivestreamStatusUpdatedV1 {
+    given Decoder[LivestreamStatusUpdatedV1] = ConfiguredDecoder.derived
+    given Encoder[LivestreamStatusUpdatedV1] = ConfiguredEncoder.derived
   }
 }

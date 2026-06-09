@@ -137,5 +137,70 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
         ) shouldEqual Right(expected)
       }
     }
+
+    "LivestreamStatusUpdatedV1 is received" should {
+      "correctly decode stream started" in {
+        val json = readFile(
+          s"$TEST_JSON_DIRECTORY/livestream.status.updated.v1.stream.started.json"
+        )
+        val expected = KickWebhooks.LivestreamStatusUpdatedV1(
+          broadcaster = KickWebhooks.User(
+            isAnonymous = false,
+            userId = 123456789,
+            username = "broadcaster_name",
+            isVerified = true,
+            profilePicture = "https://example.com/broadcaster_avatar.jpg",
+            channelSlug = "broadcaster_channel",
+            identity = None
+          ),
+          isLive = true,
+          title = "Stream Title",
+          startedAt = OffsetDateTime.of(
+            LocalDateTime.of(2025, 1, 1, 11, 0, 0, 0),
+            ZoneOffset.ofHours(11)
+          ),
+          endedAt = None
+        )
+        KickWebhooks.KickWebhook.decodeJson(
+          "livestream.status.updated",
+          "1",
+          json
+        ) shouldEqual Right(expected)
+      }
+
+      "correctly decode stream ended" in {
+        val json = readFile(
+          s"$TEST_JSON_DIRECTORY/livestream.status.updated.v1.stream.ended.json"
+        )
+        val expected = KickWebhooks.LivestreamStatusUpdatedV1(
+          broadcaster = KickWebhooks.User(
+            isAnonymous = false,
+            userId = 123456789,
+            username = "broadcaster_name",
+            isVerified = true,
+            profilePicture = "https://example.com/broadcaster_avatar.jpg",
+            channelSlug = "broadcaster_channel",
+            identity = None
+          ),
+          isLive = false,
+          title = "Stream Title",
+          startedAt = OffsetDateTime.of(
+            LocalDateTime.of(2025, 1, 1, 11, 0, 0, 0),
+            ZoneOffset.ofHours(11)
+          ),
+          endedAt = Some(
+            OffsetDateTime.of(
+              LocalDateTime.of(2025, 1, 1, 15, 0, 0, 0),
+              ZoneOffset.ofHours(11)
+            )
+          )
+        )
+        KickWebhooks.KickWebhook.decodeJson(
+          "livestream.status.updated",
+          "1",
+          json
+        ) shouldEqual Right(expected)
+      }
+    }
   }
 }
