@@ -54,7 +54,7 @@ object KickWebhooks {
       isAnonymous: Boolean,
       userId: Int,
       username: String,
-      isVerified: Boolean,
+      isVerified: Option[Boolean],
       profilePicture: String,
       channelSlug: String,
       identity: Option[ChatMessageIdentity]
