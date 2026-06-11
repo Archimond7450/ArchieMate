@@ -1869,7 +1869,7 @@ class Chatbot(twitchRoomId: String)(using
                   KickApiClient.PostChatMessage(
                     ctx.system.ignoreRef,
                     params.kickTokenIdOption.get,
-                    msg
+                    message
                   )
                 )
               }
