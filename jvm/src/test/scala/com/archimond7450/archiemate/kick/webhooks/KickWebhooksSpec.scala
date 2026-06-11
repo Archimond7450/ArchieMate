@@ -32,7 +32,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
                 isAnonymous = false,
                 userId = 12345,
                 username = "parent_sender_name",
-                isVerified = false,
+                isVerified = Some(false),
                 profilePicture = "https://example.com/parent_sender_avatar.jpg",
                 channelSlug = "parent_sender_channel",
                 identity = None
@@ -43,7 +43,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
             isAnonymous = false,
             userId = 123456789,
             username = "broadcaster_name",
-            isVerified = true,
+            isVerified = Some(true),
             profilePicture = "https://example.com/broadcaster_avatar.jpg",
             channelSlug = "broadcaster_channel",
             identity = None
@@ -52,7 +52,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
             isAnonymous = false,
             userId = 987654321,
             username = "sender_name",
-            isVerified = false,
+            isVerified = Some(false),
             profilePicture = "https://example.com/sender_avatar.jpg",
             channelSlug = "sender_channel",
             identity = Some(
@@ -115,7 +115,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
               isAnonymous = false,
               userId = 123456789,
               username = "broadcaster_name",
-              isVerified = true,
+              isVerified = Some(true),
               profilePicture = "https://example.com/broadcaster_avatar.jpg",
               channelSlug = "broadcaster_channel",
               identity = None
@@ -124,7 +124,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
               isAnonymous = false,
               userId = 987654321,
               username = "follower_name",
-              isVerified = false,
+              isVerified = Some(false),
               profilePicture = "https://example.com/sender_avatar.jpg",
               channelSlug = "follower_channel",
               identity = None
@@ -148,7 +148,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
             isAnonymous = false,
             userId = 123456789,
             username = "broadcaster_name",
-            isVerified = true,
+            isVerified = Some(true),
             profilePicture = "https://example.com/broadcaster_avatar.jpg",
             channelSlug = "broadcaster_channel",
             identity = None
@@ -177,7 +177,7 @@ class KickWebhooksSpec extends AnyWordSpecLike with Matchers {
             isAnonymous = false,
             userId = 123456789,
             username = "broadcaster_name",
-            isVerified = true,
+            isVerified = Some(true),
             profilePicture = "https://example.com/broadcaster_avatar.jpg",
             channelSlug = "broadcaster_channel",
             identity = None
