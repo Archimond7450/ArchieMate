@@ -24,6 +24,18 @@ object DashboardConnections {
             div(
               div(
                 cls("flex items-start flex-col md:flex-row"),
+                a(
+                  href("/reset-connections"),
+                  button(
+                    cls(
+                      "bg-red-700 text-white font-bold rounded-md px-4 py-2 md:mx-2 hover:bg-red-800 transition"
+                    ),
+                    "Reset Connections"
+                  )
+                )
+              ),
+              div(
+                cls("flex items-start flex-col md:flex-row"),
                 div(
                   cls("md:mr-2 md:my-2"),
                   pElement("Twitch:")
