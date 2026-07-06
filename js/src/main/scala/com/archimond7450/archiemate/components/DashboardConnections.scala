@@ -26,7 +26,7 @@ object DashboardConnections {
               div(
                 cls("flex items-start flex-col md:flex-row"),
                 ResetConnectionsButton.render(() =>
-                  fetchPutStream("/user/connections")
+                  fetchPutStream("/api/v1/user/connections")
                 )
               ),
               div(

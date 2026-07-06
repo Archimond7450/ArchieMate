@@ -27,7 +27,7 @@ final class UserController(using
     with FailFastCirceSupport {
   override def routes: Route = extractLog { log =>
     given LoggingAdapter = log
-    deleteConnections ~ info
+    info ~ deleteConnections
   }
 
   private def info(using log: LoggingAdapter): Route = {
