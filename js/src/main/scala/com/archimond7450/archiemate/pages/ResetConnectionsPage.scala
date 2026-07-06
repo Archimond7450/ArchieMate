@@ -39,7 +39,7 @@ object ResetConnectionsPage {
         cls("flex flex-col items-center"),
         form(
           action("/user/connections"),
-          method("delete"),
+          method("post"),
           button(
             `type`("submit"),
             cls(
