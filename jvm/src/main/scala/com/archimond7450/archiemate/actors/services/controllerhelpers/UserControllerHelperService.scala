@@ -47,7 +47,7 @@ object UserControllerHelperService {
       kickUserOption: Try[Option[KickApiResponse.User]]
   ) extends Command
 
-  private final case class ResetConnections(
+  final case class ResetConnections(
       replyTo: ActorRef[Done],
       jwt: String
   ) extends Command
