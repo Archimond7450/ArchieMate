@@ -1,7 +1,6 @@
 package com.archimond7450.archiemate.http.api.v1
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
-import com.archimond7450.archiemate.actors.chatbot.ChannelsSupervisor
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.services.controllerhelpers.UserControllerHelperService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
