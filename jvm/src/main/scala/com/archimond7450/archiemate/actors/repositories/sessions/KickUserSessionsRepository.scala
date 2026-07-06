@@ -20,41 +20,48 @@ import org.apache.pekko.persistence.typed.{PersistenceId, RecoveryCompleted}
 object KickUserSessionsRepository {
   val actorName = "KickUserSessionsRepository"
 
-  private case class State(
+  private final case class State(
       users: Map[String, UserState] = Map.empty
   )
-  private case class UserState(
+  private final case class UserState(
       tokens: Map[String, GetToken] = Map.empty,
       twitchUserId: String,
       kickUserId: Int
   )
 
   sealed trait Command
-  case class SetToken(
+  final case class SetToken(
       tokenId: String,
       twitchUserId: String,
       kickUserId: Int,
       token: GetToken
   ) extends Command
-  case class RefreshToken(tokenId: String, token: GetToken) extends Command
-  case class GetTokenFromId(
+  final case class RefreshToken(tokenId: String, token: GetToken)
+      extends Command
+  final case class GetTokenFromId(
       replyTo: ActorRef[ReturnedTokenFromId],
       tokenId: String
   ) extends Command
-  case class GetTokenIdForTwitchUserId(
+  final case class GetTokenIdForTwitchUserId(
       replyTo: ActorRef[ReturnedTokenIdForUserId],
       twitchUserId: String
   ) extends Command
-  case class GetTwitchUserIdForKickUserId(
+  final case class GetTwitchUserIdForKickUserId(
       replyTo: ActorRef[ReturnedTwitchUserIdForKickUserId],
       kickUserId: Int
   ) extends Command
+  final case class ResetTokensForTwitchUserId(
+      replyTo: ActorRef[Acknowledged.type],
+      twitchUserId: String
+  ) extends Command
 
-  case class ReturnedTokenFromId(token: Option[GetToken])
-  case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
-  case class ReturnedTwitchUserIdForKickUserId(
+  final case class ReturnedTokenFromId(token: Option[GetToken])
+  final case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
+  final case class ReturnedTwitchUserIdForKickUserId(
       maybeTwitchUserId: Option[String]
   )
+
+  case object Acknowledged
 
   private sealed trait Event
   private object Event {
@@ -80,6 +87,13 @@ object KickUserSessionsRepository {
   private object TokenRefreshed {
     given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
     given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
+  }
+
+  private final case class TokensResetForTwitchUserId(twitchUserId: String)
+      extends Event
+  private object TokensResetForTwitchUserId {
+    given Decoder[TokensResetForTwitchUserId] = ConfiguredDecoder.derived
+    given Encoder[TokensResetForTwitchUserId] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
@@ -169,6 +183,11 @@ object KickUserSessionsRepository {
               userStateOption.map(_._2.twitchUserId)
             )
           }
+
+        case ResetTokensForTwitchUserId(replyTo, twitchUserId) =>
+          Effect
+            .persist(TokensResetForTwitchUserId(twitchUserId))
+            .thenReply(replyTo)(_ => Acknowledged)
       }
   }
 
@@ -192,6 +211,8 @@ object KickUserSessionsRepository {
           token,
           userState
         )
+      case TokensResetForTwitchUserId(twitchUserId) =>
+        state.copy(users = state.users - twitchUserId)
     }
   }
 
