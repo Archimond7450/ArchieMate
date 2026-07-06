@@ -9,7 +9,6 @@ import com.archimond7450.archiemate.helpers.HttpControllerHelpers.failWithoutSes
 import com.archimond7450.archiemate.http.IController
 import com.archimond7450.archiemate.http.User.{UserInfo, UserResponse}
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
-import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
 import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
 import org.apache.pekko.event.LoggingAdapter
@@ -27,10 +26,10 @@ final class UserController(using
     with FailFastCirceSupport {
   override def routes: Route = extractLog { log =>
     given LoggingAdapter = log
-    info ~ deleteConnections
+    info
   }
 
-  private def info(using log: LoggingAdapter): Route = {
+  private def info(using log: LoggingAdapter): Route =
     (get & pathEndOrSingleSlash) {
       failWithoutSessionCookie { jwt =>
         onComplete(
@@ -42,19 +41,21 @@ final class UserController(using
         ) {
           case Success(
                 UserControllerHelperService.GetUserOKResponse(
-                  Success(twitchUser),
-                  Success(kickUser)
+                  tryTwitchUser,
+                  tryKickUser
                 )
               ) =>
             complete(
               UserResponse(
                 UserInfo(
-                  userId = twitchUser.id,
-                  userName = twitchUser.login,
-                  userDisplayName = twitchUser.displayName,
-                  profilePictureUrl = twitchUser.profileImageUrl
+                  userId = tryTwitchUser.map(_.id).getOrElse(""),
+                  userName = tryTwitchUser.map(_.login).getOrElse(""),
+                  userDisplayName =
+                    tryTwitchUser.map(_.displayName).getOrElse(""),
+                  profilePictureUrl =
+                    tryTwitchUser.map(_.profileImageUrl).getOrElse("")
                 ),
-                kickUser.map(user =>
+                tryKickUser.toOption.flatten.map(user =>
                   UserInfo(
                     userId = user.userId.toString,
                     userName = user.name.toLowerCase(),
@@ -68,29 +69,9 @@ final class UserController(using
           case Success(UserControllerHelperService.InvalidJWT) =>
             complete(StatusCodes.Unauthorized)
 
-          case Success(
-                UserControllerHelperService.GetUserOKResponse(_, _)
-              ) =>
-            complete(StatusCodes.InternalServerError)
-
           case Failure(ex) =>
             complete(StatusCodes.InternalServerError)
         }
       }
     }
-  }
-
-  private def deleteConnections(using log: LoggingAdapter): Route = {
-    (delete & path("connections")) {
-      failWithoutSessionCookie { jwt =>
-        onComplete(
-          mediator.ask[Done](ref =>
-            ArchieMateMediator.SendUserControllerHelperServiceCommand(
-              UserControllerHelperService.ResetConnections(ref, jwt.value)
-            )
-          )
-        )(_ => redirect("/dashboard", StatusCodes.TemporaryRedirect))
-      }
-    }
-  }
 }
