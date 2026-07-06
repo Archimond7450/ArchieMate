@@ -34,20 +34,27 @@ object TwitchUserSessionsRepository {
   )
 
   sealed trait Command
-  case class SetToken(tokenId: String, userId: String, token: GetToken)
+  final case class SetToken(tokenId: String, userId: String, token: GetToken)
       extends Command
-  case class RefreshToken(tokenId: String, token: GetToken) extends Command
-  case class GetTokenFromId(
+  final case class RefreshToken(tokenId: String, token: GetToken)
+      extends Command
+  final case class GetTokenFromId(
       replyTo: ActorRef[ReturnedTokenFromId],
       tokenId: String
   ) extends Command
-  case class GetTokenIdForUserId(
+  final case class GetTokenIdForUserId(
       replyTo: ActorRef[ReturnedTokenIdForUserId],
       userId: String
   ) extends Command
+  final case class ResetTokensForUserId(
+      replyTo: ActorRef[Acknowledged.type],
+      userId: String
+  ) extends Command
 
-  case class ReturnedTokenFromId(token: Option[GetToken])
-  case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
+  final case class ReturnedTokenFromId(token: Option[GetToken])
+  final case class ReturnedTokenIdForUserId(maybeTokenId: Option[String])
+
+  case object Acknowledged
 
   private sealed trait Event
   private object Event {
@@ -72,6 +79,12 @@ object TwitchUserSessionsRepository {
   private object TokenRefreshed {
     given Decoder[TokenRefreshed] = ConfiguredDecoder.derived
     given Encoder[TokenRefreshed] = ConfiguredEncoder.derived
+  }
+
+  private final case class TokensResetForUserId(userId: String) extends Event
+  private object TokensResetForUserId {
+    given Decoder[TokensResetForUserId] = ConfiguredDecoder.derived
+    given Encoder[TokensResetForUserId] = ConfiguredEncoder.derived
   }
 
   private class EventSerializer
@@ -150,6 +163,11 @@ object TwitchUserSessionsRepository {
               userStateOption.flatMap(_.tokens.find(_._2.scope.nonEmpty))
             ReturnedTokenIdForUserId(tokenOption.map(_._1))
           }
+
+        case ResetTokensForUserId(replyTo, userId) =>
+          Effect
+            .persist(TokensResetForUserId(userId))
+            .thenReply(replyTo)(_ => Acknowledged)
       }
   }
 
@@ -163,6 +181,9 @@ object TwitchUserSessionsRepository {
         val (userId, userState) =
           state.users.find(_._2.tokens.contains(tokenId)).get
         updatedState(state, tokenId, userId, token, userState)
+
+      case TokensResetForUserId(userId) =>
+        state.copy(users = state.users - userId)
     }
   }
 
