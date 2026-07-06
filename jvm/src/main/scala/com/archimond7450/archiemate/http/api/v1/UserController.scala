@@ -42,19 +42,19 @@ final class UserController(using
         ) {
           case Success(
                 UserControllerHelperService.GetUserOKResponse(
-                  Success(twitchUser),
-                  Success(kickUser)
+                  tryTwitchUser,
+                  tryKickUser
                 )
               ) =>
             complete(
               UserResponse(
                 UserInfo(
-                  userId = twitchUser.id,
-                  userName = twitchUser.login,
-                  userDisplayName = twitchUser.displayName,
-                  profilePictureUrl = twitchUser.profileImageUrl
+                  userId = tryTwitchUser.map(_.id).getOrElse(""),
+                  userName = tryTwitchUser.map(_.login).getOrElse(""),
+                  userDisplayName = tryTwitchUser.map(_.displayName).getOrElse(""),
+                  profilePictureUrl = tryTwitchUser.map(_.profileImageUrl).getOrElse("")
                 ),
-                kickUser.map(user =>
+                tryKickUser.toOption.flatten.map(user =>
                   UserInfo(
                     userId = user.userId.toString,
                     userName = user.name.toLowerCase(),
@@ -67,11 +67,6 @@ final class UserController(using
 
           case Success(UserControllerHelperService.InvalidJWT) =>
             complete(StatusCodes.Unauthorized)
-
-          case Success(
-                UserControllerHelperService.GetUserOKResponse(_, _)
-              ) =>
-            complete(StatusCodes.InternalServerError)
 
           case Failure(ex) =>
             complete(StatusCodes.InternalServerError)
