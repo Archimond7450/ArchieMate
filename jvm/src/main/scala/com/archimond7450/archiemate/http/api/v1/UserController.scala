@@ -51,8 +51,10 @@ final class UserController(using
                 UserInfo(
                   userId = tryTwitchUser.map(_.id).getOrElse(""),
                   userName = tryTwitchUser.map(_.login).getOrElse(""),
-                  userDisplayName = tryTwitchUser.map(_.displayName).getOrElse(""),
-                  profilePictureUrl = tryTwitchUser.map(_.profileImageUrl).getOrElse("")
+                  userDisplayName =
+                    tryTwitchUser.map(_.displayName).getOrElse(""),
+                  profilePictureUrl =
+                    tryTwitchUser.map(_.profileImageUrl).getOrElse("")
                 ),
                 tryKickUser.toOption.flatten.map(user =>
                   UserInfo(
@@ -76,7 +78,7 @@ final class UserController(using
   }
 
   private def deleteConnections(using log: LoggingAdapter): Route = {
-    (post & path("connections")) {
+    (put & path("connections")) {
       failWithoutSessionCookie { jwt =>
         onComplete(
           mediator.ask[Done](ref =>
@@ -84,7 +86,7 @@ final class UserController(using
               UserControllerHelperService.ResetConnections(ref, jwt.value)
             )
           )
-        )(_ => redirect("/dashboard", StatusCodes.TemporaryRedirect))
+        )(_ => complete(StatusCodes.NoContent))
       }
     }
   }

@@ -7,7 +7,16 @@ import com.archimond7450.archiemate.elements.SVGs.menuSvg
 import com.archimond7450.archiemate.helpers.FetchHelpers.checkLoginStatus
 import com.archimond7450.archiemate.http.User.{UserInfo, UserResponse}
 import com.archimond7450.archiemate.models.{AuthModel, MobileMenuModel}
-import com.archimond7450.archiemate.pages.{BroadcasterCommandsPage, DashboardPage, DocsPage, HomePage, LoginPage, LogoutPage, NotFoundPage, OverlayPage, ResetConnectionsPage}
+import com.archimond7450.archiemate.pages.{
+  BroadcasterCommandsPage,
+  DashboardPage,
+  DocsPage,
+  HomePage,
+  LoginPage,
+  LogoutPage,
+  NotFoundPage,
+  OverlayPage
+}
 import com.raquo.laminar.api.L.{*, given}
 import com.raquo.waypoint.*
 import org.scalajs.dom
@@ -23,7 +32,6 @@ object App {
   case object Docs extends PageWithHeaderAndFooter("Docs")
   case object Login extends PageWithHeaderAndFooter("Login")
   case object Logout extends PageWithHeaderAndFooter("Logout")
-  case object ResetConnections extends PageWithHeaderAndFooter("Reset Connections")
   case object Dashboard extends PageWithHeaderAndFooter("Dashboard")
   case class BroadcasterCommands(userName: String)
       extends PageWithHeaderAndFooter(s"Commands in the $userName channel")
@@ -36,7 +44,6 @@ object App {
       Route.static(Docs, root / "docs" / endOfSegments),
       Route.static(Login, root / "login" / endOfSegments),
       Route.static(Logout, root / "logout" / endOfSegments),
-      Route.static(ResetConnections, root / "reset-connections" / endOfSegments),
       Route.static(Dashboard, root / "dashboard" / endOfSegments),
       Route[BroadcasterCommands, String](
         encode = _.userName,
@@ -50,7 +57,6 @@ object App {
       case Docs                          => "Docs"
       case Login                         => "Login"
       case Logout                        => "Logout"
-      case ResetConnections              => "ResetConnections"
       case Dashboard                     => "Dashboard"
       case BroadcasterCommands(userName) => s"BroadcasterCommands|$userName"
       case Overlay(overlayId)            => s"Overlay|$overlayId"
@@ -61,7 +67,6 @@ object App {
       case "Docs"                           => Docs
       case "Login"                          => Login
       case "Logout"                         => Logout
-      case "ResetConnections"               => ResetConnections
       case "Dashboard"                      => Dashboard
       case s"BroadcasterCommands|$userName" => BroadcasterCommands(userName)
       case s"Overlay|$overlayId"            => Overlay(overlayId)
@@ -95,7 +100,6 @@ object App {
       .collectStatic(Login) { LoginPage.render() }
       .collectStatic(Logout) { LogoutPage.render() }
       .collectStatic(Dashboard) { DashboardPage.render() }
-      .collectStatic(ResetConnections) { ResetConnectionsPage.render() }
       .collectSignal[BroadcasterCommands] { broadcasterCommandsPageSignal =>
         BroadcasterCommandsPage.render(broadcasterCommandsPageSignal)
       }

@@ -4,9 +4,22 @@ import com.archimond7450.archiemate.{Loaded, LoadingState}
 import com.archimond7450.archiemate.extensions.EitherExtensions.whenLeft
 import com.archimond7450.archiemate.extensions.FutureExtensions.onError
 import com.archimond7450.archiemate.http.Connections.Connections
-import com.archimond7450.archiemate.http.ChannelSettings.{AutomaticMessagesSettings, BasicChatbotSettings, BuiltInCommandsSettings, CommandsSettings, OverlaysSettings, Settings, TimersSettings, VariablesSettings}
+import com.archimond7450.archiemate.http.ChannelSettings.{
+  AutomaticMessagesSettings,
+  BasicChatbotSettings,
+  BuiltInCommandsSettings,
+  CommandsSettings,
+  OverlaysSettings,
+  Settings,
+  TimersSettings,
+  VariablesSettings
+}
 import com.archimond7450.archiemate.http.User.UserResponse
-import com.archimond7450.archiemate.models.{AuthModel, BroadcasterCommandsModel, DashboardModel}
+import com.archimond7450.archiemate.models.{
+  AuthModel,
+  BroadcasterCommandsModel,
+  DashboardModel
+}
 import com.raquo.laminar.api.L.{*, given}
 import io.circe.{Decoder, Encoder}
 import io.circe.jawn.decode
@@ -25,7 +38,13 @@ object FetchHelpers {
     method = dom.HttpMethod.GET
   }
 
-  def fetchWithCookies(url: String, init: dom.RequestInit = defaultInit, method: dom.HttpMethod = dom.HttpMethod.GET, headers: js.Dictionary[String] = js.Dictionary(), body: String = ""): Future[dom.Response] = {
+  def fetchWithCookies(
+      url: String,
+      init: dom.RequestInit = defaultInit,
+      method: dom.HttpMethod = dom.HttpMethod.GET,
+      headers: js.Dictionary[String] = js.Dictionary(),
+      body: String = ""
+  ): Future[dom.Response] = {
     init.credentials = dom.RequestCredentials.include
     if (method != dom.HttpMethod.GET) {
       init.method = method
@@ -39,19 +58,24 @@ object FetchHelpers {
     dom.fetch(url, init).toFuture
   }
 
-  def fetchGetStream[Data](url: String)(using Decoder[Data]): EventStream[Status[String, Either[Throwable, Data]]] = {
+  def fetchGetStream[Data](url: String)(using
+      Decoder[Data]
+  ): EventStream[Status[String, Either[Throwable, Data]]] = {
     EventStream.fromValue(url, emitOnce = true).flatMapWithStatus { url =>
       FetchStream
         .get(url, _.credentials(_ => dom.RequestCredentials.include))
         .map(decode[Data])
-        .recover {
-          case ex => Some(Left(ex))
+        .recover { case ex =>
+          Some(Left(ex))
         }
     }
   }
 
-  def fetchPostStream[Payload](url: String, payload: Payload)(using Encoder[Payload]): EventStream[Status[(String, Payload), Int]] = {
-    EventStream.fromValue((url, payload), emitOnce = true)
+  def fetchPostStream[Payload](url: String, payload: Payload)(using
+      Encoder[Payload]
+  ): EventStream[Status[(String, Payload), Int]] = {
+    EventStream
+      .fromValue((url, payload), emitOnce = true)
       .flatMapWithStatus { params =>
         FetchStream
           .withDecoder { response =>
@@ -63,8 +87,26 @@ object FetchHelpers {
             _.headers("Content-Type" -> "application/json"),
             _.body(params._2.asJson.noSpaces)
           )
-          .recover {
-            case _ => Some(500)
+          .recover { case _ =>
+            Some(500)
+          }
+      }
+  }
+
+  def fetchPutStream(url: String): EventStream[Status[String, Int]] = {
+    EventStream
+      .fromValue(url, emitOnce = true)
+      .flatMapWithStatus { urlParam =>
+        FetchStream
+          .withDecoder { response =>
+            EventStream.fromValue(response.status, emitOnce = true)
+          }
+          .put(
+            urlParam,
+            _.credentials(_ => dom.RequestCredentials.include)
+          )
+          .recover { case _ =>
+            Some(500)
           }
       }
   }
@@ -81,9 +123,15 @@ object FetchHelpers {
     }
   }
 
-  private def fetchAndDecode[JsonCaseClass](urlSuffix: String, onOk: JsonCaseClass => Unit, onError: Throwable => Unit)(using Decoder[JsonCaseClass]): Unit = {
+  private def fetchAndDecode[JsonCaseClass](
+      urlSuffix: String,
+      onOk: JsonCaseClass => Unit,
+      onError: Throwable => Unit
+  )(using Decoder[JsonCaseClass]): Unit = {
     for {
-      settingsResponse <- fetchWithCookies(s"/api/v1/$urlSuffix").onError(onError)
+      settingsResponse <- fetchWithCookies(s"/api/v1/$urlSuffix").onError(
+        onError
+      )
       json <- settingsResponse.text().toFuture.onError(onError)
       settings <- decode[JsonCaseClass](json).whenLeft(onError)
     } onOk(settings)
@@ -147,13 +195,19 @@ object FetchHelpers {
 
   def fetchConnections(model: DashboardModel): Unit = {
     for {
-      connectionsResponse <- fetchWithCookies("/api/v1/settings/connections").onError(model.failConnections)
+      connectionsResponse <- fetchWithCookies("/api/v1/settings/connections")
+        .onError(model.failConnections)
       json <- connectionsResponse.text().toFuture.onError(model.failConnections)
       connections <- decode[Connections](json).whenLeft(model.failConnections)
     } model.setConnections(connections)
   }
 
-  def fetchUpdate[Payload](urlSuffix: String, settings: Payload, onOk: () => Unit, onError: Throwable => Unit)(using Encoder[Payload]): Unit = {
+  def fetchUpdate[Payload](
+      urlSuffix: String,
+      settings: Payload,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  )(using Encoder[Payload]): Unit = {
     for {
       response <- fetchWithCookies(
         s"/api/v1/$urlSuffix",
@@ -168,35 +222,66 @@ object FetchHelpers {
     }
   }
 
-  def fetchUpdateBasicChatbotSettings(settings: BasicChatbotSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateBasicChatbotSettings(
+      settings: BasicChatbotSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/basic", settings, onOk, onError)
   }
 
-  def fetchUpdateBuiltInCommandsSettings(settings: BuiltInCommandsSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateBuiltInCommandsSettings(
+      settings: BuiltInCommandsSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("commands/builtin", settings, onOk, onError)
   }
 
-  def fetchUpdateCommandsSettings(settings: CommandsSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateCommandsSettings(
+      settings: CommandsSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/commands", settings, onOk, onError)
   }
 
-  def fetchUpdateVariablesSettings(settings: VariablesSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateVariablesSettings(
+      settings: VariablesSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/variables", settings, onOk, onError)
   }
 
-  def fetchUpdateTimersSettings(settings: TimersSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateTimersSettings(
+      settings: TimersSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/timers", settings, onOk, onError)
   }
 
-  def fetchUpdateOverlaysSettings(settings: OverlaysSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateOverlaysSettings(
+      settings: OverlaysSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/overlays", settings, onOk, onError)
   }
 
-  def fetchUpdateAutomaticMessagesSettings(settings: AutomaticMessagesSettings, onOk: () => Unit, onError: Throwable => Unit): Unit = {
+  def fetchUpdateAutomaticMessagesSettings(
+      settings: AutomaticMessagesSettings,
+      onOk: () => Unit,
+      onError: Throwable => Unit
+  ): Unit = {
     fetchUpdate("settings/automatic_messages", settings, onOk, onError)
   }
 
-  def fetchBroadcasterCommands(model: BroadcasterCommandsModel, channelName: String): Unit = {
+  def fetchBroadcasterCommands(
+      model: BroadcasterCommandsModel,
+      channelName: String
+  ): Unit = {
     fetchAndDecode(
       s"commands/$channelName",
       onOk = model.setCommandsSettings,
