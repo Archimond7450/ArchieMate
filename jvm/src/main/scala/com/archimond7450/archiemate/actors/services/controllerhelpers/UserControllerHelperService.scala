@@ -2,14 +2,19 @@ package com.archimond7450.archiemate.actors.services.controllerhelpers
 
 import com.archimond7450.archiemate.actors.ArchieMateMediator
 import com.archimond7450.archiemate.actors.kick.api.KickApiClient
-import com.archimond7450.archiemate.actors.repositories.sessions.KickUserSessionsRepository
+import com.archimond7450.archiemate.actors.repositories.sessions.{
+  KickUserSessionsRepository,
+  TwitchUserSessionsRepository
+}
 import com.archimond7450.archiemate.actors.services.JWTService
 import com.archimond7450.archiemate.actors.twitch.api.TwitchApiClient
 import com.archimond7450.archiemate.extensions.Settings
 import com.archimond7450.archiemate.kick.api.KickApiResponse
 import com.archimond7450.archiemate.twitch.api.TwitchApiResponse
+import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
+import org.apache.pekko.pattern.Backoff
 import org.apache.pekko.util.Timeout
 
 import scala.util.{Failure, Success, Try}
@@ -40,6 +45,24 @@ object UserControllerHelperService {
       originalCommand: GetUser,
       twitchUser: Try[TwitchApiResponse.GetTokenUser],
       kickUserOption: Try[Option[KickApiResponse.User]]
+  ) extends Command
+
+  private final case class ResetConnections(
+      replyTo: ActorRef[Done],
+      jwt: String
+  ) extends Command
+  private final case class ResetConnectionsWithTwitchId(
+      originalCommand: ResetConnections,
+      tryTwitchUserId: Try[String]
+  ) extends Command
+  private final case class ResetConnectionsWithTwitchResponse(
+      twitchUserIdCommand: ResetConnectionsWithTwitchId,
+      tryTwitchResponse: Try[TwitchUserSessionsRepository.Acknowledged.type]
+  ) extends Command
+  private final case class ResetConnectionsWithKickResponse(
+      twitchUserIdCommand: ResetConnectionsWithTwitchId,
+      tryTwitchRespnose: Try[TwitchUserSessionsRepository.Acknowledged.type],
+      tryKickResponse: Try[KickUserSessionsRepository.Acknowledged.type]
   ) extends Command
 
   sealed trait GetUserResponse
@@ -172,6 +195,97 @@ object UserControllerHelperService {
 
             case GetUserWithResponse(originalCommand, twitchUser, kickUser) =>
               originalCommand.replyTo ! GetUserOKResponse(twitchUser, kickUser)
+              Behaviors.same
+
+            case cmd @ ResetConnections(replyTo, jwt) =>
+              ctx.ask[ArchieMateMediator.Command, JWTService.DecodeJWTResponse](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendJWTServiceCommand(
+                    JWTService.DecodeJWT(ref, jwt)
+                  )
+              ) {
+                case Success(JWTService.DecodedJWT(userId, sessionId)) =>
+                  ResetConnectionsWithTwitchId(cmd, Success(userId))
+
+                case Success(JWTService.InvalidJWT) =>
+                  val cause = Failure(RuntimeException(invalidJWTMessage))
+                  val commandWithUserId =
+                    ResetConnectionsWithTwitchId(cmd, cause)
+                  ResetConnectionsWithKickResponse(
+                    commandWithUserId,
+                    cause,
+                    cause
+                  )
+
+                case Failure(ex) =>
+                  val cause = Failure(ex)
+                  val commandWithUserId =
+                    ResetConnectionsWithTwitchId(cmd, cause)
+                  ResetConnectionsWithKickResponse(
+                    commandWithUserId,
+                    cause,
+                    cause
+                  )
+              }
+              Behaviors.same
+
+            case cmd @ ResetConnectionsWithTwitchId(
+                  originalCommand,
+                  Failure(ex)
+                ) =>
+              val cause = Failure(ex)
+              ctx.self ! ResetConnectionsWithKickResponse(cmd, cause, cause)
+              Behaviors.same
+
+            case cmd @ ResetConnectionsWithTwitchId(
+                  originalCommand,
+                  Success(twitchUserId)
+                ) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                TwitchUserSessionsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendTwitchUserSessionsRepositoryCommand(
+                    TwitchUserSessionsRepository
+                      .ResetTokensForUserId(ref, twitchUserId)
+                  )
+              )(ResetConnectionsWithTwitchResponse(cmd, _))
+              Behaviors.same
+
+            case cmd @ ResetConnectionsWithTwitchResponse(
+                  twitchUserIdCommand,
+                  tryTwitchResponse
+                ) =>
+              ctx.ask[
+                ArchieMateMediator.Command,
+                KickUserSessionsRepository.Acknowledged.type
+              ](
+                mediator,
+                ref =>
+                  ArchieMateMediator.SendKickUserSessionsRepositoryCommand(
+                    KickUserSessionsRepository.ResetTokensForTwitchUserId(
+                      ref,
+                      twitchUserIdCommand.tryTwitchUserId.get
+                    )
+                  )
+              )(
+                ResetConnectionsWithKickResponse(
+                  cmd.twitchUserIdCommand,
+                  tryTwitchResponse,
+                  _
+                )
+              )
+              Behaviors.same
+
+            case cmd @ ResetConnectionsWithKickResponse(
+                  twitchUserIdCommand,
+                  tryTwitchRespnose,
+                  tryKickResponse
+                ) =>
+              twitchUserIdCommand.originalCommand.replyTo ! Done
               Behaviors.same
           }
         }
