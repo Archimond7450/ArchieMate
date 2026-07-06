@@ -18,7 +18,7 @@ import org.scalajs.dom.HTMLDivElement
 import scala.util.{Failure, Success}
 
 object DashboardBasicChatbotConfiguration {
-  final val pathbasicChatbotSettingsEndpoint = "/api/v1/settings/basic"
+  final val basicChatbotSettingsEndpoint = "/api/v1/settings/basic"
 
   def render(): ReactiveHtmlElement[HTMLDivElement] = {
     val basicChatbotSettingsStream =
