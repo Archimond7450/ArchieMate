@@ -26,10 +26,10 @@ import java.io.NotSerializableException
 object TwitchUserSessionsRepository {
   val actorName = "TwitchUserSessionsRepository"
 
-  private case class State(
+  private final case class State(
       users: Map[String, UserState] = Map.empty
   )
-  private case class UserState(
+  private final case class UserState(
       tokens: Map[String, GetToken] = Map.empty
   )
 
@@ -183,7 +183,16 @@ object TwitchUserSessionsRepository {
         updatedState(state, tokenId, userId, token, userState)
 
       case TokensResetForUserId(userId) =>
-        state.copy(users = state.users - userId)
+        state.users
+          .getOrElse(userId, UserState())
+          .tokens
+          .find(_._2.scope.getOrElse(Nil).isEmpty) match {
+          case Some((tokenId, token)) =>
+            state.copy(users =
+              state.users + (userId -> UserState(Map(tokenId -> token)))
+            )
+          case None => state.copy(users = state.users - userId)
+        }
     }
   }
 
